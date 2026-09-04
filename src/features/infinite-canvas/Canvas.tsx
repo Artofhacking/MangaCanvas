@@ -37,6 +37,8 @@ import { useCanvasDocumentsStore } from './stores/projectsStore';
 import { useThemeStore } from './stores/themeStore';
 import { getAllProjects } from './utils/indexedDB';
 import { workflowsApi } from '@/features/project/api/workflows';
+import { projectApi } from '@/api/projectApi';
+import type { Episode } from '@/types';
 
 import TextNode from './components/nodes/TextNode';
 import ImageNode from './components/nodes/ImageNode';
@@ -95,11 +97,13 @@ const CanvasInner: React.FC = () => {
   } = useCanvasStore();
 
   const {
+    projects,
     getProjectById,
     getProjectCanvas,
     updateProjectCanvas,
     initProjects,
     createWorkflowDocument,
+    syncProjectWorkflows,
   } = useCanvasDocumentsStore();
   const canvasHydratedRef = React.useRef<string | null>(null);
   const { isDark } = useThemeStore();
@@ -112,6 +116,15 @@ const CanvasInner: React.FC = () => {
   const [isLocked, setIsLocked] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [isCanvasMaterialDragOver, setIsCanvasMaterialDragOver] = useState(false);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+
+  const projectWorkflows = useMemo(
+    () =>
+      projects
+        .filter((item) => String(item.projectId) === String(projectId))
+        .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()),
+    [projectId, projects]
+  );
 
   const currentWorkflow = canvasDocumentId ? getProjectById(canvasDocumentId) : null;
   const workflowName =
@@ -197,6 +210,47 @@ const CanvasInner: React.FC = () => {
     cleanupCanvasTransientUi();
     backTarget.action();
   }, [backTarget, cleanupCanvasTransientUi]);
+
+  const persistCurrentCanvas = useCallback(() => {
+    if (!canvasDocumentId) return;
+    saveProject(updateProjectCanvas);
+    const numericProjectId = Number(projectId);
+    if (Number.isNaN(numericProjectId) || !workflowId) return;
+    const snapshot = useCanvasStore.getState();
+    void workflowsApi.update(numericProjectId, workflowId, {
+      canvasData: {
+        nodes: snapshot.nodes,
+        edges: snapshot.edges,
+        viewport: snapshot.viewport,
+      },
+    });
+  }, [canvasDocumentId, projectId, saveProject, updateProjectCanvas, workflowId]);
+
+  const handleSwitchWorkflow = useCallback(
+    (nextWorkflowId: string) => {
+      if (!projectId || nextWorkflowId === workflowId) {
+        setShowProjectMenu(false);
+        return;
+      }
+      persistCurrentCanvas();
+      cleanupCanvasTransientUi();
+      navigate(`/project/${projectId}/workflows/${nextWorkflowId}`);
+    },
+    [cleanupCanvasTransientUi, navigate, persistCurrentCanvas, projectId, workflowId]
+  );
+
+  const handleSwitchEpisode = useCallback(
+    (nextEpisodeId: number) => {
+      if (!projectId || String(nextEpisodeId) === String(episodeId)) {
+        setShowProjectMenu(false);
+        return;
+      }
+      persistCurrentCanvas();
+      cleanupCanvasTransientUi();
+      navigate(`/project/${projectId}/episode/${nextEpisodeId}/canvas`);
+    },
+    [cleanupCanvasTransientUi, episodeId, navigate, persistCurrentCanvas, projectId]
+  );
 
   // 直接从 nodes 中计算选中的节点
   const selectedNodes = useMemo(() => {
@@ -497,6 +551,18 @@ const CanvasInner: React.FC = () => {
   }, [initProjects]);
 
   useEffect(() => {
+    if (!projectId) return;
+    const numericProjectId = Number(projectId);
+    void syncProjectWorkflows(projectId);
+    if (Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
+    void projectApi.episodes.getAll(numericProjectId).then((response) => {
+      if (response.success) {
+        setEpisodes(response.data || []);
+      }
+    });
+  }, [projectId, syncProjectWorkflows]);
+
+  useEffect(() => {
     if (!projectId || !canvasDocumentId) return;
 
     let cancelled = false;
@@ -789,7 +855,63 @@ const CanvasInner: React.FC = () => {
                   className="fixed inset-0 z-40" 
                   onClick={() => setShowProjectMenu(false)}
                 />
-                <div className="absolute left-0 top-full mt-2 min-w-[180px] rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1.5 shadow-xl shadow-black/5 backdrop-blur-md z-50">
+                <div className="absolute left-0 top-full mt-2 w-[280px] rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1.5 shadow-xl shadow-black/5 backdrop-blur-md z-50">
+                  <div className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--secondary))]">
+                    片段
+                  </div>
+                  {episodes.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有片段</div>
+                  ) : (
+                    episodes.map((item) => {
+                      const active = String(item.id) === String(episodeId) || currentWorkflow?.sourceAssetId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSwitchEpisode(item.id)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left text-sm transition-colors ${
+                            active
+                              ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
+                              : 'hover:bg-[hsl(var(--surface-container-low))]'
+                          }`}
+                        >
+                          <span className="truncate font-medium">{item.name}</span>
+                          <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">{item.code}</span>
+                        </button>
+                      );
+                    })
+                  )}
+
+                  <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
+                  <div className="px-3 pt-1 pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--secondary))]">
+                    工作流
+                  </div>
+                  {projectWorkflows.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有工作流</div>
+                  ) : (
+                    projectWorkflows.map((item) => {
+                      const active = item.id === canvasDocumentId;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSwitchWorkflow(item.id)}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left text-sm transition-colors ${
+                            active
+                              ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
+                              : 'hover:bg-[hsl(var(--surface-container-low))]'
+                          }`}
+                        >
+                          <span className="truncate font-medium">{item.name}</span>
+                          <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">
+                            {item.canvasData?.nodes?.length ?? 0} 节点
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+
+                  <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
                   <button
                     onClick={handleExportWorkflow}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[hsl(var(--surface-container-low))] transition-colors text-left text-sm"
