@@ -17,10 +17,12 @@ import {
   HelpCircle,
   ChevronDown,
   Check,
+  Loader2,
+  Image as ImageIcon,
 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { useImageModels } from "@/features/infinite-canvas/hooks"
+import { useImageModels, useImageGeneration } from "@/features/infinite-canvas/hooks"
 import type { Scene } from "@/types"
 
 export interface SceneCreateData {
@@ -31,6 +33,17 @@ export interface SceneCreateData {
   distance: number
   zoom: number
   status: "draft" | "in-use"
+  referenceImage?: string
+}
+
+type SceneGenTask = {
+  id: string
+  name: string
+  prompt: string
+  status: "running" | "succeeded" | "failed"
+  progress: string
+  imageUrl?: string
+  error?: string
 }
 
 export interface SceneEditData extends SceneCreateData {
@@ -56,9 +69,11 @@ export default function SceneCreator({
 }: SceneCreatorProps) {
   const { notify } = useFeedback()
   const isEditMode = mode === 'edit' && initialData != null
-  // 从全局缓存获取图片模型列表（图像生成模型）
   const { models: imageModels, loading: modelsLoading, error: modelsError, refetch } = useImageModels()
-  const [selectedModel, setSelectedModel] = useState<string>("")
+  const { generate } = useImageGeneration()
+  const [selectedModel, setSelectedModel] = useState<string>("gpt-image-2")
+  const [tasks, setTasks] = useState<SceneGenTask[]>([])
+  const [submitting, setSubmitting] = useState(false)
 
   const [distance, setDistance] = useState([8.0])
   const [zoom, setZoom] = useState(0.6)
@@ -72,9 +87,11 @@ export default function SceneCreator({
   const resetForm = () => {
     setSceneName("")
     setDescription("")
-    setSelectedModel(imageModels[0]?.id ?? "")
+    setSelectedModel(imageModels.find((model) => model.id === "gpt-image-2")?.id || imageModels[0]?.id || "gpt-image-2")
     setDistance([8.0])
     setZoom(0.6)
+    setTasks([])
+    setSubmitting(false)
   }
 
   // 编辑模式下回填数据 / 关闭时重置表单
@@ -103,12 +120,12 @@ export default function SceneCreator({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!sceneName.trim()) {
       notify.warning("请输入场景名称")
       return
     }
-    
+
     if (isEditMode && initialData) {
       const updatedScene: SceneEditData = {
         id: initialData.id,
@@ -118,27 +135,80 @@ export default function SceneCreator({
         description,
         distance: distance[0],
         zoom,
-        status: initialData.status === "in-use" ? "in-use" : "draft"
+        status: initialData.status === "in-use" ? "in-use" : "draft",
       }
       onUpdate?.(updatedScene)
       notify.success("场景已更新")
-    } else {
-      const newScene: SceneCreateData = {
-        name: sceneName,
+      onOpenChange(false)
+      return
+    }
+
+    if (!description.trim()) {
+      notify.warning("请输入场景提示词")
+      return
+    }
+
+    const taskId = `scene_${Date.now()}`
+    const task: SceneGenTask = {
+      id: taskId,
+      name: sceneName.trim(),
+      prompt: description.trim(),
+      status: "running",
+      progress: "准备中...",
+    }
+    setTasks((current) => [task, ...current])
+    setSubmitting(true)
+
+    try {
+      const urls = await generate(
+        {
+          model: selectedModel || "gpt-image-2",
+          prompt: description.trim(),
+          size: "1536x1024",
+          quality: "medium",
+          n: 1,
+        },
+        (status) => {
+          setTasks((current) =>
+            current.map((item) => (item.id === taskId ? { ...item, progress: status } : item))
+          )
+        }
+      )
+      const imageUrl = urls?.[0]
+      if (!imageUrl) {
+        throw new Error("未返回生成结果")
+      }
+
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === taskId
+            ? { ...item, status: "succeeded", progress: "生成完成", imageUrl }
+            : item
+        )
+      )
+      onCreate?.({
+        name: sceneName.trim(),
         genMethod: "model",
-        model: selectedModel,
-        description,
+        model: selectedModel || "gpt-image-2",
+        description: description.trim(),
         distance: distance[0],
         zoom,
-        status: "draft"
-      }
-      onCreate?.(newScene)
-      notify.success("场景创建成功")
+        status: "draft",
+        referenceImage: imageUrl,
+      })
+      notify.success("场景已生成")
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "生成失败"
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === taskId
+            ? { ...item, status: "failed", progress: "生成失败", error: messageText }
+            : item
+        )
+      )
+    } finally {
+      setSubmitting(false)
     }
-    
-    // Reset form
-    resetForm()
-    onOpenChange(false)
   }
 
   return (
@@ -160,8 +230,7 @@ export default function SceneCreator({
         </div>
 
         <div className="flex h-[calc(100vh-70px)]">
-          {/* Left Panel - Form */}
-          <div className="flex h-full w-full flex-col space-y-6 overflow-y-auto p-6 pb-24">
+          <div className="flex h-full w-[52%] flex-col space-y-6 overflow-y-auto border-r border-[hsl(var(--outline-variant))]/15 p-6 pb-24">
             {/* Scene Name */}
             <div className="space-y-2">
               <Input 
@@ -255,19 +324,81 @@ export default function SceneCreator({
                   </p>
                 </div>
               </div>
-
-
           </div>
 
+          <div className="flex h-full min-w-0 flex-1 flex-col bg-[hsl(var(--surface-container-low))]/40">
+            <div className="border-b border-[hsl(var(--outline-variant))]/15 px-6 py-4">
+              <p className="text-sm font-bold text-[hsl(var(--on-surface))]">生成进度与结果</p>
+              <p className="mt-1 text-xs text-[hsl(var(--secondary))]">提交后在这里查看任务状态和出图结果</p>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+              {tasks.length === 0 ? (
+                <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))]/70 px-6 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--surface-container-high))] text-[hsl(var(--secondary))]">
+                    <ImageIcon className="h-6 w-6" />
+                  </div>
+                  <p className="text-sm font-semibold text-[hsl(var(--on-surface))]">还没有生成任务</p>
+                  <p className="mt-2 text-xs leading-5 text-[hsl(var(--secondary))]">
+                    填写名称和提示词后提交，进度和图片会显示在这里。
+                  </p>
+                </div>
+              ) : (
+                tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="overflow-hidden rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-lowest))] shadow-sm"
+                  >
+                    <div className="aspect-[3/2] bg-[hsl(var(--surface-container-low))]">
+                      {task.imageUrl ? (
+                        <img src={task.imageUrl} alt={task.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center gap-3 text-[hsl(var(--secondary))]">
+                          {task.status === "running" ? (
+                            <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--primary))]" />
+                          ) : (
+                            <ImageIcon className="h-8 w-8" />
+                          )}
+                          <p className="text-xs">{task.progress}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="truncate text-sm font-bold text-[hsl(var(--on-surface))]">{task.name}</p>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                            task.status === "succeeded"
+                              ? "bg-[hsl(var(--primary))] text-white"
+                              : task.status === "failed"
+                                ? "bg-red-500 text-white"
+                                : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface-variant))]"
+                          }`}
+                        >
+                          {task.status === "succeeded" ? "已完成" : task.status === "failed" ? "失败" : "生成中"}
+                        </span>
+                      </div>
+                      <p className="line-clamp-2 text-xs leading-5 text-[hsl(var(--secondary))]">{task.prompt}</p>
+                      {task.error ? <p className="text-xs text-red-500">{task.error}</p> : null}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
+        <div className="absolute bottom-0 left-0 w-[52%] p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
           <Button 
-            onClick={handleSubmit}
-            className="w-full py-6 signature-gradient text-white rounded-xl font-bold text-lg border-0"
+            onClick={() => void handleSubmit()}
+            disabled={submitting}
+            className="w-full py-6 signature-gradient text-white rounded-xl font-bold text-lg border-0 disabled:opacity-60"
           >
-            {isEditMode ? "保存修改" : "提交任务"}
+            {submitting ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                生成中...
+              </span>
+            ) : isEditMode ? "保存修改" : "提交任务"}
           </Button>
         </div>
       </SheetContent>
