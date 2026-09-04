@@ -11,9 +11,9 @@ export default function Login() {
   const { notify } = useFeedback()
   const navigate = useNavigate()
   const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState("superadmin@artofhacking.com")
-  const [password, setPassword] = useState("123456")
-  const [username, setUsername] = useState("superadmin")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [username, setUsername] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function Login() {
             MangaCanvas
           </h1>
           <p className="text-[hsl(var(--secondary))]">
-            {isLogin ? "欢迎回来，继续你的创作之旅" : "创建账号，开启漫画创作新纪元"}
+            {isLogin ? "登录" : "注册"}
           </p>
         </div>
 
@@ -83,8 +83,6 @@ export default function Login() {
             <button
               onClick={() => {
                 setIsLogin(true)
-                setEmail("superadmin@artofhacking.com")
-                setPassword("123456")
               }}
               className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 isLogin 
@@ -97,9 +95,6 @@ export default function Login() {
             <button
               onClick={() => {
                 setIsLogin(false)
-                setUsername("newuser")
-                setEmail("newuser@example.com")
-                setPassword("123456")
               }}
               className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 !isLogin 
@@ -112,14 +107,14 @@ export default function Login() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
             {!isLogin && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">用户名</label>
                 <Input 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="请输入用户名"
+                  autoComplete="off"
                   className="bg-[hsl(var(--surface-container-low))] border-none rounded-xl h-12"
                 />
               </div>
@@ -131,7 +126,7 @@ export default function Login() {
                 type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="请输入邮箱或用户名"
+                autoComplete="off"
                 className="bg-[hsl(var(--surface-container-low))] border-none rounded-xl h-12"
               />
             </div>
@@ -142,25 +137,10 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="请输入密码"
+                autoComplete="current-password"
                 className="bg-[hsl(var(--surface-container-low))] border-none rounded-xl h-12"
               />
             </div>
-
-            {isLogin && (
-              <div className="flex justify-end">
-                <Link 
-                  to="#" 
-                  onClick={(e) => {
-                    e.preventDefault()
-                    notify.info("忘记密码流程暂未接入")
-                  }}
-                  className="text-xs text-[hsl(var(--primary))] hover:underline"
-                >
-                  忘记密码？
-                </Link>
-              </div>
-            )}
 
             <Button 
               type="submit"
