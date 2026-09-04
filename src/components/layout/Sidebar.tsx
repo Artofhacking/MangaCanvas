@@ -34,7 +34,7 @@ import { projectsApi } from "@/api"
 // 根据身份返回导航项：员工只有基础权限，管理员和超级管理员有完整权限
 const getNavItems = (identity: IdentityOption, projectId?: number) => {
   const baseItems = [
-    { icon: LayoutGrid, label: "工作台", href: projectId ? `/project/${projectId}/episodes` : "/projects" },
+    { icon: LayoutGrid, label: "工作台", href: projectId ? `/project/${projectId}/dashboard` : "/dashboard" },
     { icon: Box, label: "资产管理", href: projectId ? `/project/${projectId}` : "/projects" },
   ]
 
@@ -160,10 +160,9 @@ export default function Sidebar() {
                   setIsSwitching(true)
                   setCurrentProject(project)
                   setActiveProjectId(project.id)
-                  // 2秒 loading 后跳转到项目工作台（默认显示片段管理）
                   setTimeout(() => {
                     setIsSwitching(false)
-                    navigate(`/project/${project.id}/episodes`, { replace: true })
+                    navigate(`/project/${project.id}/dashboard`, { replace: true })
                   }, 2000)
                 }}
                 className="flex items-center justify-between cursor-pointer"
@@ -191,9 +190,14 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.href || 
-            (item.label === "工作台" && /^\/project\/\d+\/episode\/\d+$/.test(location.pathname)) ||
-            (item.label === "资产管理" && location.pathname.startsWith(item.href) && !/^\/project\/\d+\/episode\/\d+$/.test(location.pathname) && !location.pathname.includes("/dashboard")) ||
+          const isWorkbenchPath =
+            location.pathname === "/dashboard" ||
+            /^\/project\/\d+\/dashboard$/.test(location.pathname) ||
+            /\/workflows\//.test(location.pathname) ||
+            /\/episode\/\d+\/canvas$/.test(location.pathname)
+          const isActive = location.pathname === item.href ||
+            (item.label === "工作台" && isWorkbenchPath) ||
+            (item.label === "资产管理" && location.pathname.startsWith(item.href) && !isWorkbenchPath) ||
             (item.label !== "所有项目" && item.label !== "项目配置" && item.label !== "工作台" && item.label !== "资产管理" && location.pathname.startsWith(item.href) && item.href !== "/projects")
           return (
             <Link
