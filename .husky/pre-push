@@ -1,0 +1,10 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 运行类型检查..."
+npx tsc --noEmit --skipLibCheck || exit 1
+
+echo "🔨 运行构建检查..."
+npm run build || exit 1
+
+echo "✅ 检查通过，准备推送..."

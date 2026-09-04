@@ -1,0 +1,7 @@
+interface:
+  display_name: "UI Layout Stability"
+  short_description: "Capture and reuse UI layout stability fixes."
+  default_prompt: "Use $ui-layout-stability to diagnose a UI interaction that causes layout shift, scrollbar jitter, overlay collision, or panel overlap."
+
+policy:
+  allow_implicit_invocation: true

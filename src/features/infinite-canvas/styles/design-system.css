@@ -1,0 +1,238 @@
+/**
+ * Infinite Canvas Design System
+ * 基于 Material Design 3 设计规范
+ * 融合三个模板页面的统一风格
+ */
+
+/* ============================================
+   1. CSS Variables (Design Tokens)
+   ============================================ */
+:root {
+  /* Primary Colors */
+  --ic-primary: hsl(var(--primary));
+  --ic-primary-dim: #d73b00;
+  --ic-primary-container: hsl(var(--primary-fixed));
+  --ic-on-primary: hsl(var(--primary-foreground));
+  --ic-on-primary-container: hsl(var(--on-primary-fixed));
+  
+  /* Secondary Colors */
+  --ic-secondary: hsl(var(--secondary));
+  --ic-secondary-dim: hsl(var(--secondary));
+  --ic-secondary-container: hsl(var(--surface-container-high));
+  --ic-on-secondary: hsl(var(--secondary-foreground));
+  --ic-on-secondary-container: hsl(var(--on-secondary-fixed-variant));
+  
+  /* Tertiary Colors */
+  --ic-tertiary: #625b77;
+  --ic-tertiary-dim: #564f6b;
+  --ic-tertiary-container: #dfd5f7;
+  --ic-on-tertiary: #fdf7ff;
+  --ic-on-tertiary-container: #4f4964;
+  
+  /* Surface Colors */
+  --ic-surface: hsl(var(--surface));
+  --ic-surface-dim: hsl(var(--surface-container));
+  --ic-surface-bright: hsl(var(--surface));
+  --ic-surface-variant: hsl(var(--surface-container-high));
+  --ic-surface-tint: hsl(var(--primary));
+  
+  /* Surface Container Colors */
+  --ic-surface-container: hsl(var(--surface-container));
+  --ic-surface-container-low: hsl(var(--surface-container-low));
+  --ic-surface-container-lowest: hsl(var(--surface-container-lowest));
+  --ic-surface-container-high: hsl(var(--surface-container-high));
+  --ic-surface-container-highest: hsl(var(--surface-container-highest));
+  
+  /* Background & On Colors */
+  --ic-background: hsl(var(--surface));
+  --ic-on-background: hsl(var(--on-surface));
+  --ic-on-surface: hsl(var(--on-surface));
+  --ic-on-surface-variant: hsl(var(--on-surface-variant));
+  
+  /* Error Colors */
+  --ic-error: #9f403d;
+  --ic-error-dim: #4e0309;
+  --ic-error-container: #fe8983;
+  --ic-on-error: #fff7f6;
+  --ic-on-error-container: #752121;
+  
+  /* Outline */
+  --ic-outline: hsl(var(--secondary));
+  --ic-outline-variant: hsl(var(--outline-variant));
+  
+  /* Inverse Colors */
+  --ic-inverse-surface: #060e20;
+  --ic-inverse-on-surface: #959cb5;
+  --ic-inverse-primary: #6d89fa;
+  
+  /* Typography */
+  --ic-font-headline: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ic-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ic-font-label: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  
+  /* Border Radius */
+  --ic-radius-xs: 0.125rem;
+  --ic-radius-sm: 0.25rem;
+  --ic-radius-md: 0.5rem;
+  --ic-radius-lg: 0.75rem;
+  --ic-radius-xl: 1rem;
+  --ic-radius-full: 9999px;
+  
+  /* Shadows */
+  --ic-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --ic-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --ic-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --ic-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --ic-shadow-primary: 0 10px 25px -5px rgba(172, 46, 0, 0.28);
+  
+  /* Layout */
+  --ic-header-height: 4rem;
+  --ic-sidebar-width: 16rem;
+  --ic-max-content-width: 1280px;
+}
+
+/* Dark Mode */
+.dark {
+  --ic-surface: #060e20;
+  --ic-surface-container: #121b33;
+  --ic-surface-container-low: #0f1724;
+  --ic-surface-container-lowest: #060e20;
+  --ic-surface-container-high: #1a2642;
+  --ic-surface-container-highest: #243152;
+  --ic-background: #060e20;
+  --ic-on-surface: #faf8ff;
+  --ic-on-surface-variant: #98b1f2;
+}
+
+/* ============================================
+   2. Base Styles
+   ============================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--ic-font-body);
+  color: var(--ic-on-surface);
+  background-color: var(--ic-background);
+}
+
+/* ============================================
+   3. Utility Classes
+   ============================================ */
+
+/* Glass Effect */
+.ic-glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.dark .ic-glass {
+  background: rgba(6, 14, 32, 0.8);
+}
+
+/* Hero Gradient */
+.ic-hero-gradient {
+  background: linear-gradient(135deg, var(--ic-primary) 0%, var(--ic-primary-dim) 100%);
+}
+
+/* Content Overlay */
+.ic-content-overlay {
+  background: linear-gradient(to top, rgba(6, 14, 32, 0.8) 0%, transparent 100%);
+}
+
+/* ============================================
+   4. Components
+   ============================================ */
+
+/* Primary Button */
+.ic-btn-primary {
+  @apply px-6 py-2.5 rounded-xl font-semibold text-sm transition-all;
+  background: linear-gradient(135deg, var(--ic-primary) 0%, var(--ic-primary-dim) 100%);
+  color: var(--ic-on-primary);
+  box-shadow: var(--ic-shadow-primary);
+}
+
+.ic-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px -5px rgba(55, 85, 195, 0.5);
+}
+
+.ic-btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* Secondary Button */
+.ic-btn-secondary {
+  @apply px-6 py-2.5 rounded-xl font-semibold text-sm transition-all;
+  background-color: var(--ic-surface-container-high);
+  color: var(--ic-on-surface);
+}
+
+.ic-btn-secondary:hover {
+  background-color: var(--ic-surface-container-highest);
+}
+
+/* Card */
+.ic-card {
+  @apply rounded-xl overflow-hidden transition-all duration-300;
+  background-color: var(--ic-surface-container-lowest);
+  border: 1px solid var(--ic-outline-variant);
+}
+
+.ic-card:hover {
+  box-shadow: var(--ic-shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Input */
+.ic-input {
+  @apply w-full px-4 py-2.5 rounded-xl text-sm transition-all outline-none;
+  background-color: var(--ic-surface-container-low);
+  color: var(--ic-on-surface);
+  border: 1px solid transparent;
+}
+
+.ic-input:focus {
+  border-color: var(--ic-primary);
+  background-color: var(--ic-surface-container-lowest);
+  box-shadow: 0 0 0 3px rgba(55, 85, 195, 0.1);
+}
+
+/* Navigation */
+.ic-nav {
+  @apply fixed top-0 left-0 right-0 z-50 h-16;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--ic-outline-variant);
+}
+
+.dark .ic-nav {
+  background: rgba(6, 14, 32, 0.8);
+}
+
+/* ============================================
+   5. Scrollbar
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ic-surface-container-low);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ic-outline-variant);
+  border-radius: var(--ic-radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ic-outline);
+}

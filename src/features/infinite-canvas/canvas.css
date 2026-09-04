@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   使用 Design System 变量
+   ============================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--ic-font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--ic-background);
+  color: var(--ic-on-surface);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+/* ============================================
+   React Flow Overrides - MangaCanvas Light Theme
+   ============================================ */
+.react-flow__node {
+  cursor: default;
+}
+
+.react-flow__edge-path {
+  stroke: color-mix(in srgb, var(--ic-outline-variant) 78%, transparent);
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--ic-primary);
+}
+
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ic-surface-container-lowest);
+  border: 2px solid var(--ic-primary);
+}
+
+.react-flow__controls {
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid color-mix(in srgb, var(--ic-outline-variant) 72%, transparent) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 40px rgba(55, 38, 29, 0.12) !important;
+  backdrop-filter: blur(18px) !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--ic-outline-variant) 60%, transparent) !important;
+  color: var(--ic-on-surface-variant) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--ic-surface-container-low) !important;
+  color: var(--ic-on-surface) !important;
+}
+
+.react-flow__minimap {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid color-mix(in srgb, var(--ic-outline-variant) 72%, transparent) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 16px 40px rgba(55, 38, 29, 0.12) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--ic-primary) 8%, transparent) !important;
+  stroke: var(--ic-primary) !important;
+  stroke-width: 2 !important;
+}
+
+.react-flow__panel {
+  margin: 16px;
+}
+
+.react-flow__background pattern circle {
+  fill: color-mix(in srgb, var(--ic-outline-variant) 50%, transparent);
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(55, 85, 195, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(55, 85, 195, 0.6);
+  }
+}
+
+/* ============================================
+   Ant Design Overrides
+   ============================================ */
+.image-node .ant-upload {
+  display: block !important;
+  width: 100% !important;
+}
+
+.image-node .ant-upload-wrapper {
+  display: block !important;
+  width: 100% !important;
+}
+
+/* Ant Design Theme Integration */
+.ant-btn-primary,
+.ant-btn-color-primary,
+.ant-btn-variant-solid.ant-btn-color-primary {
+  background: linear-gradient(135deg, var(--ic-primary) 0%, var(--ic-primary-dim) 100%) !important;
+  box-shadow: var(--ic-shadow-primary) !important;
+  border: none !important;
+  color: var(--ic-on-primary) !important;
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus,
+.ant-btn-primary:active,
+.ant-btn-color-primary:hover,
+.ant-btn-color-primary:focus,
+.ant-btn-color-primary:active,
+.ant-btn-variant-solid.ant-btn-color-primary:hover,
+.ant-btn-variant-solid.ant-btn-color-primary:focus,
+.ant-btn-variant-solid.ant-btn-color-primary:active {
+  background: linear-gradient(135deg, #c73700 0%, #e14a08 100%) !important;
+  box-shadow: 0 10px 30px -5px rgba(172, 46, 0, 0.38) !important;
+  border: none !important;
+  color: var(--ic-on-primary) !important;
+}
+
+.ant-btn-primary > span,
+.ant-btn-color-primary > span,
+.ant-btn-variant-solid.ant-btn-color-primary > span,
+.ant-btn-primary .anticon,
+.ant-btn-color-primary .anticon,
+.ant-btn-variant-solid.ant-btn-color-primary .anticon {
+  color: var(--ic-on-primary) !important;
+}
+
+.ant-input:focus,
+.ant-input-focused {
+  border-color: var(--ic-primary);
+  box-shadow: 0 0 0 2px rgba(172, 46, 0, 0.12);
+}
+
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector,
+.ant-select-focused .ant-select-selector,
+.ant-select-open .ant-select-selector {
+  border-color: var(--ic-primary) !important;
+  box-shadow: 0 0 0 2px rgba(172, 46, 0, 0.12) !important;
+}
+
+.ant-select-dropdown .ant-select-item-option-selected,
+.ant-select-dropdown .ant-select-item-option-active {
+  background: color-mix(in srgb, var(--ic-primary) 10%, white) !important;
+}
+
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-content,
+.ant-select-dropdown .ant-select-item-option-active .ant-select-item-option-content,
+.ant-select-dropdown .ant-select-item-option-selected .ant-select-item-option-state {
+  color: var(--ic-primary) !important;
+}
+
+.ant-modal-content {
+  background-color: var(--ic-surface-container-lowest);
+  border-radius: 24px !important;
+}
+
+.ant-modal-header {
+  background-color: var(--ic-surface-container-lowest);
+  border-bottom: 1px solid var(--ic-outline-variant);
+}
+
+.ant-dropdown-menu {
+  background-color: var(--ic-surface-container-lowest);
+  border: 1px solid color-mix(in srgb, var(--ic-outline-variant) 72%, transparent);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(55, 38, 29, 0.12);
+}
+
+.ant-dropdown-menu-item:hover {
+  background-color: var(--ic-surface-container);
+}

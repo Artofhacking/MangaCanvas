@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MangaCanvas Theme Colors */
+    --background: 30 20% 98%;
+    --foreground: 0 0% 11%;
+    --card: 30 20% 98%;
+    --card-foreground: 0 0% 11%;
+    --popover: 30 20% 98%;
+    --popover-foreground: 0 0% 11%;
+    --primary: 14 100% 34%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 37%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 20 9% 89%;
+    --muted-foreground: 0 0% 28%;
+    --accent: 14 100% 34%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 15 45% 81%;
+    --input: 15 45% 81%;
+    --ring: 14 100% 34%;
+    --radius: 0.5rem;
+    
+    /* Custom Theme Variables */
+    --surface: 30 20% 98%;
+    --surface-container: 0 6% 94%;
+    --surface-container-high: 0 5% 91%;
+    --surface-container-highest: 0 3% 89%;
+    --surface-container-low: 20 11% 96%;
+    --surface-container-lowest: 0 0% 100%;
+    --on-surface: 0 0% 11%;
+    --on-surface-variant: 12 26% 29%;
+    --primary-fixed: 14 100% 91%;
+    --primary-fixed-dim: 14 100% 81%;
+    --on-primary-fixed: 14 100% 12%;
+    --outline-variant: 15 45% 81%;
+    --secondary-fixed-dim: 0 1% 78%;
+    --on-secondary-fixed-variant: 0 0% 28%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scrollbar-gutter: stable;
+  }
+  body {
+    @apply bg-[hsl(var(--surface))] text-[hsl(var(--on-surface))];
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-y: scroll;
+    overflow-x: hidden;
+  }
+
+  body.workspace-body-lock {
+    overflow: hidden;
+  }
+
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+    overflow-y: scroll !important;
+    --removed-body-scroll-bar-size: 0px;
+  }
+
+  .workspace-shell {
+    width: 100%;
+    max-width: 100%;
+    padding-right: var(--removed-body-scroll-bar-size, 0px);
+  }
+
+  .workspace-fixed-header {
+    left: 16rem;
+    right: var(--removed-body-scroll-bar-size, 0px);
+    width: auto;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--surface-container-low));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--outline-variant));
+    border-radius: 10px;
+  }
+}
+
+/* Signature gradient */
+.signature-gradient {
+  background: linear-gradient(135deg, #ac2e00 0%, #d73b00 100%);
+}
+
+/* Glass effect */
+.glass-effect {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
