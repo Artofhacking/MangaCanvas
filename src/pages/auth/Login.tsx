@@ -11,7 +11,7 @@ export default function Login() {
   const { notify } = useFeedback()
   const navigate = useNavigate()
   const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState("superadmin@shupivot.com")
+  const [email, setEmail] = useState("superadmin@artofhacking.com")
   const [password, setPassword] = useState("123456")
   const [username, setUsername] = useState("superadmin")
   const [isLoading, setIsLoading] = useState(false)
@@ -83,7 +83,7 @@ export default function Login() {
             <button
               onClick={() => {
                 setIsLogin(true)
-                setEmail("superadmin@shupivot.com")
+                setEmail("superadmin@artofhacking.com")
                 setPassword("123456")
               }}
               className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${

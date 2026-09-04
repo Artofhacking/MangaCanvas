@@ -2,7 +2,7 @@
 
 > **文件**：`BACKEND_API_SPEC_V2.md` — 与仓库内旧版 `BACKEND_API_SPEC.md`（v1.0 接口设计文档）**并存**，不替代其文件名；实现与联调请以本文件与 `schema.sql` 为准。
 >
-> 本文档与 **`docs/database/schema.sql`**（MySQL 8，`shupivot_admin` 库）一一对应，供后端实现与前后端联调使用。  
+> 本文档与 **`docs/database/schema.sql`**（MySQL 8，`artofhacking_admin` 库）一一对应，供后端实现与前后端联调使用。  
 > 字段命名：JSON **camelCase**；库表 **snake_case**（见各资源说明）。  
 > **AI 模型网关**（Chat / Embeddings / Images / Video / Audio / Rerank / Models / Balance / Bills）见 **§15**。
 
