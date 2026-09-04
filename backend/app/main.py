@@ -21,11 +21,12 @@ from .routers import (
     users,
     workflows,
 )
-from .seed import seed_if_empty
+from .seed import seed_demo_content, seed_if_empty
 
 Base.metadata.create_all(bind=engine)
 with SessionLocal() as db:
     seed_if_empty(db)
+    seed_demo_content(db)
     db.commit()
 
 settings.upload_dir.mkdir(parents=True, exist_ok=True)
