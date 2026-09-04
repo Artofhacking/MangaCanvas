@@ -7,6 +7,7 @@ import type { ApiResponse } from './shared'
 const buildScenePayload = (data: SceneCreateData) => ({
   name: data.name,
   description: data.description,
+  image: data.referenceImage,
   genMethod: data.genMethod,
   modelId: data.model,
   camera: {
@@ -16,7 +17,9 @@ const buildScenePayload = (data: SceneCreateData) => ({
     zoom: data.zoom,
   },
   referenceImages: data.referenceImage ? [data.referenceImage] : [],
-  creationMode: 'quick',
+  creationMode: data.creationMode || 'quick',
+  sourceWorkflowId: data.sourceWorkflowId,
+  sourceNodeId: data.sourceNodeId,
 })
 
 export const scenesApi = {

@@ -3,14 +3,14 @@ import { Check, ArrowRight, Wand2, Workflow, Pencil, Trash2, Copy } from "lucide
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
 import { useProjectStore } from "@/store/projectStore"
-import type { ObjectItem, ObjectType } from "@/types"
+import type { CanvasLaunchSource, ObjectItem, ObjectType } from "@/types"
 import { useState } from "react"
 import ObjectCreator from "../ObjectCreator"
 
 interface ObjectsTabProps {
   objects?: ObjectItem[]
   onAddNew?: () => void
-  onOpenCanvas?: () => void
+  onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
   onToggleSelect?: (id: number) => void
@@ -79,9 +79,9 @@ export default function ObjectsTab({
     notify.success("物品已更新")
   }
 
-  const handleOpenCanvas = () => {
+  const handleOpenCanvas = (source?: CanvasLaunchSource) => {
     if (onOpenCanvas) {
-      onOpenCanvas()
+      onOpenCanvas(source)
       return
     }
 
@@ -121,7 +121,7 @@ export default function ObjectsTab({
 
           <button
             type="button"
-            onClick={handleOpenCanvas}
+            onClick={() => handleOpenCanvas()}
             className="flex w-full items-center justify-between rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-3 py-2.5 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
           >
             <div className="flex items-center gap-3">
@@ -176,6 +176,21 @@ export default function ObjectsTab({
               </button>
             ) : (
               <div className={`absolute top-3 right-3 flex flex-col gap-2 transition-all opacity-0 group-hover:opacity-100`}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleOpenCanvas({
+                      id: object.id,
+                      name: object.name,
+                      image: object.image,
+                      description: object.description,
+                    })
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-[hsl(var(--primary))]"
+                  title="打开画布"
+                >
+                  <Workflow className="w-4 h-4" />
+                </button>
                 <button
                   type="button"
                   onClick={() => handleEdit(object)}

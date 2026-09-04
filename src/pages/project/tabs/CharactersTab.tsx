@@ -10,7 +10,7 @@ import { useState } from "react"
 import { Trash2, Check, ArrowRight, Wand2, Workflow, User, Sparkles, Image, Settings, Pencil } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
-import type { Character, CharacterCreateData, CharacterEditData } from "@/types"
+import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
 import CharacterCreator from "../CharacterCreator"
 
 
@@ -18,7 +18,7 @@ interface CharactersTabProps {
   projectId?: number | null
   characters?: Character[]
   onAddNew?: () => void
-  onOpenCanvas?: () => void
+  onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
   onToggleSelect?: (id: number) => void
@@ -94,9 +94,9 @@ export default function CharactersTab({
     notify.success("角色已更新")
   }
 
-  const handleOpenCanvas = () => {
+  const handleOpenCanvas = (source?: CanvasLaunchSource) => {
     if (onOpenCanvas) {
-      onOpenCanvas()
+      onOpenCanvas(source)
       return
     }
 
@@ -146,7 +146,7 @@ export default function CharactersTab({
 
             <button
               type="button"
-              onClick={handleOpenCanvas}
+              onClick={() => handleOpenCanvas()}
               className="flex w-full items-center justify-between rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-3 py-3 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
             >
               <div className="flex items-center gap-3">
@@ -311,10 +311,22 @@ export default function CharactersTab({
                   )}
                 </div>
 
-                {/* Footer */}
-                <div className="mt-6 pt-4 border-t border-[hsl(var(--outline-variant))]/30 flex items-center justify-between text-xs text-[hsl(var(--secondary))]">
+                <div className="mt-6 pt-4 border-t border-[hsl(var(--outline-variant))]/30 flex items-center justify-between gap-3 text-xs text-[hsl(var(--secondary))]">
                   <span>ID: {selectedCharacter.id}</span>
-                  <span>创建于 2024</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleOpenCanvas({
+                        id: selectedCharacter.id,
+                        name: selectedCharacter.name,
+                        image: selectedCharacter.image,
+                        description: selectedCharacter.description,
+                      })
+                    }
+                    className="rounded-xl bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-white"
+                  >
+                    打开画布
+                  </button>
                 </div>
               </div>
             </div>

@@ -18,7 +18,9 @@ const buildObjectPayload = (data: ObjectCreateData) => ({
   image: data.referenceImage,
   genMethod: data.genMethod,
   referenceImages: data.referenceImages || (data.referenceImage ? [data.referenceImage] : []),
-  creationMode: 'quick',
+  creationMode: data.creationMode || 'quick',
+  sourceWorkflowId: data.sourceWorkflowId,
+  sourceNodeId: data.sourceNodeId,
 })
 
 export const objectsApi = {

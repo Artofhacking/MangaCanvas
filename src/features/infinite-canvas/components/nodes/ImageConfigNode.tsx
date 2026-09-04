@@ -145,7 +145,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       if (!sourceNode) return;
 
       if (sourceNode.type === 'text') {
-        const content = sourceNode.data.content;
+        const content = (sourceNode.data.content || sourceNode.data.value || '') as string;
         if (content) prompts.push(content);
       } else if (sourceNode.type === 'image') {
         const imageUrl = sourceNode.data.url || sourceNode.data.base64;

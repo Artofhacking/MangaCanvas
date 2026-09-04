@@ -171,6 +171,9 @@ export interface ObjectDTO {
 export interface EpisodeRelationRef {
   id: number
   name: string
+  image?: string | null
+  role?: string | null
+  type?: string | null
 }
 
 export interface EpisodeDTO {

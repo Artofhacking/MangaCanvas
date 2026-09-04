@@ -18,6 +18,14 @@ export type WorkflowStatus = 'draft' | 'active' | 'archived'
 
 // ==================== 片段 (Episode) ====================
 
+export interface EpisodeRelationItem {
+  id: number
+  name: string
+  image?: string
+  role?: string
+  type?: string
+}
+
 export interface Episode {
   id: number
   name: string
@@ -25,6 +33,20 @@ export interface Episode {
   status: 'completed' | 'in-progress' | 'draft'
   modified: string
   code: string
+  description?: string
+  progress?: number
+  characters?: EpisodeRelationItem[]
+  scenes?: EpisodeRelationItem[]
+  objects?: EpisodeRelationItem[]
+  characterIds?: number[]
+  sceneIds?: number[]
+  objectIds?: number[]
+}
+
+export type CanvasLaunchSource = {
+  id: number
+  name: string
+  image?: string
   description?: string
 }
 
@@ -58,6 +80,9 @@ export interface SceneCreateData {
   model: string
   description: string
   status: 'in-use' | 'draft'
+  sourceWorkflowId?: string
+  sourceNodeId?: string
+  creationMode?: 'quick' | 'workflow'
 }
 
 // ==================== 角色 (Character) ====================
@@ -91,6 +116,9 @@ export interface CharacterCreateData {
   seed?: string
   seedMode?: 'random' | 'fixed'
   quantity?: number
+  sourceWorkflowId?: string
+  sourceNodeId?: string
+  creationMode?: 'quick' | 'workflow'
 }
 
 export interface CharacterEditData extends CharacterCreateData {
@@ -119,6 +147,9 @@ export interface ObjectCreateData {
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3'
   referenceImage?: string
   referenceImages?: string[]
+  sourceWorkflowId?: string
+  sourceNodeId?: string
+  creationMode?: 'quick' | 'workflow'
 }
 
 // ==================== 项目工作台状态 ====================

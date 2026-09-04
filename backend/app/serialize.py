@@ -157,12 +157,40 @@ def episode(db: Session, row: models.Episode) -> dict:
         "creationMode": row.creation_mode,
         "sourceWorkflowId": row.source_workflow_id,
         "sourceNodeId": row.source_node_id,
-        "characters": [{"id": c.id, "name": c.name} for c in chars],
-        "scenes": [{"id": s.id, "name": s.name} for s in scenes],
-        "objects": [{"id": o.id, "name": o.name} for o in objects],
+        "characterIds": char_ids,
+        "sceneIds": scene_ids,
+        "objectIds": object_ids,
+        "characters": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "image": c.avatar,
+                "role": "主角" if c.role == "main" else "配角",
+            }
+            for c in chars
+        ],
+        "scenes": [{"id": s.id, "name": s.name, "image": s.image} for s in scenes],
+        "objects": [{"id": o.id, "name": o.name, "image": o.image, "type": o.type} for o in objects],
         "sceneCount": len(scenes),
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),
+    }
+
+
+def normalize_canvas(canvas: dict | None) -> dict:
+    canvas = canvas or {}
+    nodes = []
+    for raw in canvas.get("nodes") or []:
+        node = dict(raw)
+        data = dict(node.get("data") or {})
+        if node.get("type") == "text" and not data.get("content"):
+            data["content"] = data.get("value") or ""
+        node["data"] = data
+        nodes.append(node)
+    return {
+        "nodes": nodes,
+        "edges": canvas.get("edges") or [],
+        "viewport": canvas.get("viewport") or {"x": 0, "y": 0, "zoom": 1},
     }
 
 
@@ -181,12 +209,7 @@ def workflow(row: models.CanvasWorkflow, include_canvas: bool = True) -> dict:
         "updatedAt": iso(row.updated_at),
     }
     if include_canvas:
-        canvas = row.canvas_data or {}
-        data["canvasData"] = {
-            "nodes": canvas.get("nodes", []),
-            "edges": canvas.get("edges", []),
-            "viewport": canvas.get("viewport") or {"x": 0, "y": 0, "zoom": 1},
-        }
+        data["canvasData"] = normalize_canvas(row.canvas_data)
     return data
 
 

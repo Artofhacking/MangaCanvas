@@ -15,7 +15,9 @@ const buildCharacterPayload = (data: CharacterCreateData) => ({
   referenceImages: data.referenceImage ? [data.referenceImage] : [],
   modelId: data.model,
   seed: data.seed,
-  creationMode: 'quick',
+  creationMode: data.creationMode || 'quick',
+  sourceWorkflowId: data.sourceWorkflowId,
+  sourceNodeId: data.sourceNodeId,
 })
 
 export const charactersApi = {

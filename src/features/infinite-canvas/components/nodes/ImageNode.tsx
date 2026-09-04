@@ -570,7 +570,8 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         onClose={() => setShowSaveToMaterialsModal(false)}
         imageUrl={data?.url}
         initialName={data?.label || '图片素材'}
-        initialCategory={data?.sourceType}
+        initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
+        nodeId={id}
       />
 
       {contextMenu && typeof document !== 'undefined' && createPortal(

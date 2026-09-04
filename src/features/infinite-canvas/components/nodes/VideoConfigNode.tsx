@@ -165,7 +165,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       if (sourceNode.type === 'text') {
         // 文本节点：通过 prompt handle 或默认连接都可以获取提示词
         if (edge.targetHandle === 'prompt' || !edge.targetHandle) {
-          prompt = sourceNode.data.content || '';
+          prompt = (sourceNode.data.content || sourceNode.data.value || '') as string;
         }
       } else if (sourceNode.type === 'image') {
         const imageUrl = sourceNode.data.url || sourceNode.data.base64;

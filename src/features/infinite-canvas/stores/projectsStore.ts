@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { workflowsApi } from '@/features/project/api/workflows';
+import { normalizeCanvasData } from '@/lib/workflows';
 import type { CustomEdge, CustomNode, Project, ProjectsStore } from '../types';
 import * as db from '../utils/indexedDB';
 
@@ -13,11 +14,14 @@ const toCanvasData = (canvasData?: {
   nodes?: unknown[];
   edges?: unknown[];
   viewport?: { x: number; y: number; zoom: number };
-}): Project['canvasData'] => ({
-  nodes: (canvasData?.nodes || []) as CustomNode[],
-  edges: (canvasData?.edges || []) as CustomEdge[],
-  viewport: canvasData?.viewport || { x: 100, y: 50, zoom: 0.8 },
-});
+}): Project['canvasData'] => {
+  const normalized = normalizeCanvasData(canvasData);
+  return {
+    nodes: normalized.nodes as CustomNode[],
+    edges: normalized.edges as CustomEdge[],
+    viewport: normalized.viewport,
+  };
+};
 
 // 保存操作的防抖延迟
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;

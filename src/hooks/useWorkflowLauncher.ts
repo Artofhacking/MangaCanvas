@@ -1,19 +1,13 @@
-import { useCallback } from "react"
+import { useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { workflowsApi } from "@/features/project/api/workflows"
-import { useCanvasDocumentsStore } from "@/features/infinite-canvas/stores/projectsStore"
-import { createWorkflowId, createWorkflowName, createWorkflowPath } from "@/lib/workflows"
-import type { WorkflowSourceType } from "@/types"
-import { useNavigate } from "react-router-dom"
-
-interface LaunchWorkflowOptions {
-  projectId: string
-  sourceType: WorkflowSourceType
-  sourceName?: string
-  sourceAssetId?: number
-  successMessage?: string
-}
+import { useFeedback } from '@/components/feedback/FeedbackProvider'
+import { useCanvasDocumentsStore } from '@/features/infinite-canvas/stores/projectsStore'
+import {
+  createWorkflowPath,
+  openOrCreateWorkflow,
+  type OpenWorkflowOptions,
+} from '@/lib/workflows'
 
 export const useWorkflowLauncher = () => {
   const navigate = useNavigate()
@@ -21,47 +15,27 @@ export const useWorkflowLauncher = () => {
   const { createWorkflowDocument } = useCanvasDocumentsStore()
 
   return useCallback(
-    async ({
-      projectId,
-      sourceType,
-      sourceName,
-      sourceAssetId,
-      successMessage = "已创建新的工作流画布",
-    }: LaunchWorkflowOptions) => {
-      const name = createWorkflowName(sourceType, sourceName)
-      const canvasData = {
-        nodes: [],
-        edges: [],
-        viewport: { x: 100, y: 50, zoom: 0.8 },
-      }
-      let workflowId = createWorkflowId()
-      const numericProjectId = Number(projectId)
-
-      if (!Number.isNaN(numericProjectId) && numericProjectId > 0) {
-        const response = await workflowsApi.create(numericProjectId, {
-          name,
-          sourceType: sourceType as 'blank' | 'episode' | 'scene' | 'character' | 'object',
-          sourceAssetId,
-          canvasData,
-        })
-        if (!response.success || !response.data?.id) {
-          notify.error(response.message || "创建工作流失败")
-          return
-        }
-        workflowId = response.data.id
+    async (options: OpenWorkflowOptions & { successMessage?: string }) => {
+      const result = await openOrCreateWorkflow(options)
+      if (!result) {
+        notify.error('打开工作流失败')
+        return null
       }
 
       createWorkflowDocument({
-        id: workflowId,
-        name,
-        projectId,
-        sourceType,
-        sourceAssetId,
-        canvasData,
+        id: result.id,
+        name: result.name,
+        projectId: options.projectId,
+        sourceType: options.sourceType,
+        sourceAssetId: options.sourceAssetId,
+        canvasData: result.canvasData as never,
       })
 
-      navigate(createWorkflowPath(projectId, workflowId))
-      notify.success(successMessage)
+      navigate(createWorkflowPath(options.projectId, result.id))
+      notify.success(
+        options.successMessage || (result.created ? '已创建新的工作流画布' : '已打开工作流')
+      )
+      return result
     },
     [createWorkflowDocument, navigate, notify]
   )

@@ -207,6 +207,7 @@ def delete_character(
     row = db.query(models.Character).filter_by(id=character_id, project_id=project_id).first()
     if not row:
         fail(1004, "角色不存在", 404)
+    db.query(models.EpisodeCharacter).filter_by(character_id=character_id).delete()
     db.delete(row)
     return ok(True)
 
@@ -306,6 +307,7 @@ def delete_scene(project_id: int, scene_id: int, user: models.User = Depends(cur
     row = db.query(models.Scene).filter_by(id=scene_id, project_id=project_id).first()
     if not row:
         fail(1004, "场景不存在", 404)
+    db.query(models.EpisodeScene).filter_by(scene_id=scene_id).delete()
     db.delete(row)
     return ok(True)
 
@@ -403,6 +405,7 @@ def delete_object(
     row = db.query(models.ProjectObject).filter_by(id=object_id, project_id=project_id).first()
     if not row:
         fail(1004, "物品不存在", 404)
+    db.query(models.EpisodeObject).filter_by(object_id=object_id).delete()
     db.delete(row)
     return ok(True)
 

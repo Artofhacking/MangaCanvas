@@ -26,7 +26,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { useProjectStore } from "@/store/projectStore"
 
-import type { WorkflowSourceType } from "@/types"
+import type { CanvasLaunchSource, WorkflowSourceType } from "@/types"
 import type { ProjectTab } from "@/types"
 
 // Tabs
@@ -223,14 +223,20 @@ export default function ProjectDetail() {
     setBatchMode(false)
   }
 
-  const handleOpenInfiniteCanvas = (sourceType: WorkflowSourceType, sourceName?: string, sourceAssetId?: number) => {
+  const handleOpenInfiniteCanvas = (
+    sourceType: WorkflowSourceType,
+    source?: CanvasLaunchSource
+  ) => {
     if (!projectId) return
 
     launchWorkflow({
       projectId,
       sourceType,
-      sourceName,
-      sourceAssetId,
+      sourceName: source?.name,
+      sourceAssetId: source?.id,
+      seedImage: source?.image,
+      seedPrompt: source?.description,
+      forceNew: !source?.id,
     })
   }
 
@@ -253,7 +259,7 @@ export default function ProjectDetail() {
           <ScenesTab
             scenes={sortedAssets.scenes}
             onAddNew={() => openDrawer('scene')}
-            onOpenCanvas={() => handleOpenInfiniteCanvas("scene")}
+            onOpenCanvas={(source) => handleOpenInfiniteCanvas("scene", source)}
             projectId={numericProjectId}
             batchMode={batchMode}
             selectedIds={selectedIds}
@@ -265,7 +271,7 @@ export default function ProjectDetail() {
           <CharactersTab
             characters={sortedAssets.characters}
             onAddNew={() => openDrawer('character')}
-            onOpenCanvas={() => handleOpenInfiniteCanvas("character")}
+            onOpenCanvas={(source) => handleOpenInfiniteCanvas("character", source)}
             projectId={numericProjectId}
             batchMode={batchMode}
             selectedIds={selectedIds}
@@ -277,7 +283,7 @@ export default function ProjectDetail() {
           <ObjectsTab
             objects={sortedAssets.objects}
             onAddNew={() => openDrawer('object')}
-            onOpenCanvas={() => handleOpenInfiniteCanvas("object")}
+            onOpenCanvas={(source) => handleOpenInfiniteCanvas("object", source)}
             batchMode={batchMode}
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}

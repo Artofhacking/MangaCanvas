@@ -38,6 +38,7 @@ import { useThemeStore } from './stores/themeStore';
 import { getAllProjects } from './utils/indexedDB';
 import { workflowsApi } from '@/features/project/api/workflows';
 import { projectApi } from '@/api/projectApi';
+import { openOrCreateWorkflow, type WorkflowSeedAsset } from '@/lib/workflows';
 import type { Episode } from '@/types';
 
 import TextNode from './components/nodes/TextNode';
@@ -77,7 +78,28 @@ const CanvasInner: React.FC = () => {
   }>();
   const navigate = useNavigate();
   const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
-  const canvasDocumentId = workflowId || (projectId && episodeId ? `episode-${projectId}-${episodeId}` : undefined);
+  const canvasDocumentId = workflowId;
+
+  const toEpisodeSeedAssets = (episode?: Episode | null): WorkflowSeedAsset[] => [
+    ...(episode?.characters || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      image: item.image,
+      category: 'character' as const,
+    })),
+    ...(episode?.scenes || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      image: item.image,
+      category: 'scene' as const,
+    })),
+    ...(episode?.objects || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      image: item.image,
+      category: 'object' as const,
+    })),
+  ];
 
   const {
     nodes,
@@ -240,16 +262,24 @@ const CanvasInner: React.FC = () => {
   );
 
   const handleSwitchEpisode = useCallback(
-    (nextEpisodeId: number) => {
-      if (!projectId || String(nextEpisodeId) === String(episodeId)) {
-        setShowProjectMenu(false);
-        return;
-      }
+    async (nextEpisodeId: number) => {
+      if (!projectId) return;
       persistCurrentCanvas();
       cleanupCanvasTransientUi();
-      navigate(`/project/${projectId}/episode/${nextEpisodeId}/canvas`);
+      const episodeResponse = await projectApi.episodes.getById(Number(projectId), nextEpisodeId);
+      const result = await openOrCreateWorkflow({
+        projectId,
+        sourceType: 'episode',
+        sourceName: episodeResponse.data?.name,
+        sourceAssetId: nextEpisodeId,
+        seedPrompt: episodeResponse.data?.description,
+        relatedAssets: toEpisodeSeedAssets(episodeResponse.data),
+      });
+      if (result) {
+        navigate(`/project/${projectId}/workflows/${result.id}`);
+      }
     },
-    [cleanupCanvasTransientUi, episodeId, navigate, persistCurrentCanvas, projectId]
+    [cleanupCanvasTransientUi, navigate, persistCurrentCanvas, projectId]
   );
 
   // 直接从 nodes 中计算选中的节点
@@ -561,6 +591,28 @@ const CanvasInner: React.FC = () => {
       }
     });
   }, [projectId, syncProjectWorkflows]);
+
+  useEffect(() => {
+    if (!projectId || workflowId || !episodeId) return;
+    let cancelled = false;
+    void (async () => {
+      const episodeResponse = await projectApi.episodes.getById(Number(projectId), Number(episodeId));
+      const result = await openOrCreateWorkflow({
+        projectId,
+        sourceType: 'episode',
+        sourceName: episodeResponse.data?.name,
+        sourceAssetId: Number(episodeId),
+        seedPrompt: episodeResponse.data?.description,
+        relatedAssets: toEpisodeSeedAssets(episodeResponse.data),
+      });
+      if (!cancelled && result) {
+        navigate(`/project/${projectId}/workflows/${result.id}`, { replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [episodeId, navigate, projectId, workflowId]);
 
   useEffect(() => {
     if (!projectId || !canvasDocumentId) return;

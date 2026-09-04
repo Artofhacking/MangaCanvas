@@ -475,7 +475,7 @@ def seed_demo_content(db: Session) -> None:
                     "id": "node_prompt",
                     "type": "text",
                     "position": {"x": 80, "y": 140},
-                    "data": {"label": "提示词", "value": "青羽立于雾中，持折扇，水墨少年，电影感"},
+                    "data": {"label": "提示词", "content": "青羽立于雾中，持折扇，水墨少年，电影感", "value": "青羽立于雾中，持折扇，水墨少年，电影感"},
                 },
                 {
                     "id": "node_image",
@@ -504,7 +504,7 @@ def seed_demo_content(db: Session) -> None:
                     "id": "node_ep",
                     "type": "text",
                     "position": {"x": 60, "y": 80},
-                    "data": {"label": "本集", "value": "EP02 夜雨：长街遇袭，第一次联手"},
+                    "data": {"label": "本集", "content": "EP02 夜雨：长街遇袭，第一次联手", "value": "EP02 夜雨：长街遇袭，第一次联手"},
                 },
                 {
                     "id": "node_street",

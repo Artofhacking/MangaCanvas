@@ -103,6 +103,27 @@ export const episodesApi = {
     )
   },
 
+  async updateRelations(
+    projectId: number,
+    id: number,
+    data: { characterIds?: number[]; sceneIds?: number[]; objectIds?: number[] }
+  ): Promise<ApiResponse<Episode | null>> {
+    return toApiResponse<EpisodeDTO | null>(
+      {
+        url: `/projects/${projectId}/episodes/${id}/relations`,
+        method: 'PATCH',
+        data,
+      },
+      null,
+      '更新片段关联失败',
+      (result) => (result ? (mapEpisode(result) as unknown as EpisodeDTO) : null)
+    ).then((response) =>
+      response.success
+        ? successResponse((response.data as unknown as Episode | null) ?? null)
+        : errorResponse(response.message || '更新片段关联失败', null)
+    )
+  },
+
   async duplicate(projectId: number, id: number): Promise<ApiResponse<Episode | null>> {
     const episodeResponse = await this.getById(projectId, id)
     if (!episodeResponse.success || !episodeResponse.data) {

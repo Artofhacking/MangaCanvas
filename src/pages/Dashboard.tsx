@@ -24,6 +24,8 @@ import { projectsApi } from "@/api"
 import { getCurrentUser, setActiveProjectId } from "@/lib/session"
 import { mapProjectCard, mapProjectStats } from "@/lib/projectMappers"
 import { useProjectsStore } from "@/store/projectsStore"
+import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
+import { workflowsApi } from "@/features/project/api/workflows"
 
 const activities = [
   {
@@ -111,6 +113,7 @@ export default function Dashboard() {
   // 使用全局缓存的项目列表
   const { projects: allProjects, isLoaded: projectsLoaded, isLoading: projectsLoading, fetchProjects } = useProjectsStore()
   const isLoading = !projectsLoaded || projectsLoading
+  const launchWorkflow = useWorkflowLauncher()
   
   // 获取当前项目
   const currentProject = projects.find(p => p.id === Number(projectId)) || projects[0]
@@ -172,9 +175,19 @@ export default function Dashboard() {
     setProjects((prev) => [{ id: mapped.id, name: mapped.name, image: mapped.image, status: mapped.status, updated: mapped.modified }, ...prev])
   }
 
-  // 进入无限画布
-  const handleEnterCanvas = () => {
-    navigate(`/project/${currentProject?.id || projectId}/workflows`)
+  const handleEnterCanvas = async () => {
+    const pid = currentProject?.id || Number(projectId)
+    if (!pid) return
+    const list = await workflowsApi.getAll(pid, { page: 1, size: 1 })
+    if (list.success && list.data.list[0]) {
+      navigate(`/project/${pid}/workflows/${list.data.list[0].id}`)
+      return
+    }
+    await launchWorkflow({
+      projectId: String(pid),
+      sourceType: "blank",
+      successMessage: "已创建空白工作流",
+    })
   }
 
   return (

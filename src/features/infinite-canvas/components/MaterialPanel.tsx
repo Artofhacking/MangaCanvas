@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CloseOutlined, InboxOutlined, SoundOutlined } from '@ant-design/icons';
+import { CloseOutlined, InboxOutlined } from '@ant-design/icons';
+import { useParams } from 'react-router-dom';
+import { projectApi } from '@/api/projectApi';
 import type { CanvasMaterialItem } from '../types';
 
 interface MaterialPanelProps {
@@ -9,7 +11,7 @@ interface MaterialPanelProps {
 }
 
 type LibraryTab = 'materials' | 'subjects';
-type CategoryTab = 'all' | 'character' | 'scene' | 'object' | 'style' | 'sound' | 'other';
+type CategoryTab = 'all' | 'character' | 'scene' | 'object';
 
 const libraryTabs: Array<{ key: LibraryTab; label: string }> = [
   { key: 'materials', label: '我的素材' },
@@ -21,132 +23,18 @@ const categoryTabs: Array<{ key: CategoryTab; label: string }> = [
   { key: 'character', label: '人物' },
   { key: 'scene', label: '场景' },
   { key: 'object', label: '物品' },
-  { key: 'sound', label: '音效' },
-];
-
-const mockItems: CanvasMaterialItem[] = [
-  {
-    id: 'material-character-1',
-    library: 'materials',
-    category: 'character',
-    title: '银发调查员',
-    subtitle: '半身设定图',
-    status: '已精修',
-    cover: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 'material-character-2',
-    library: 'materials',
-    category: 'character',
-    title: '机械信使',
-    subtitle: '动作参考',
-    status: '待入库',
-    cover: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 'material-scene-1',
-    library: 'materials',
-    category: 'scene',
-    title: '雨夜街巷',
-    subtitle: '4K 场景底图',
-    status: '常用',
-    cover: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 'material-scene-2',
-    library: 'materials',
-    category: 'scene',
-    title: '旧港仓库',
-    subtitle: '透视参考',
-    status: '草稿',
-    cover: 'https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 'material-object-1',
-    library: 'materials',
-    category: 'object',
-    title: '折叠终端箱',
-    subtitle: '道具主视图',
-    status: '已完成',
-    cover: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=700&q=80',
-  },
-  {
-    id: 'material-object-2',
-    library: 'materials',
-    category: 'object',
-    title: '磁吸配枪',
-    subtitle: '材质参考',
-    status: '常用',
-    cover: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=700&q=80',
-  },
-  {
-    id: 'material-sound-1',
-    library: 'materials',
-    category: 'sound',
-    title: '城市环境氛围',
-    subtitle: '32s Loop',
-    status: '音效',
-  },
-  {
-    id: 'material-sound-2',
-    library: 'materials',
-    category: 'sound',
-    title: '金属开合声',
-    subtitle: '8 variations',
-    status: '音效',
-  },
-  {
-    id: 'subject-character-1',
-    library: 'subjects',
-    category: 'character',
-    title: '主角：林雾',
-    subtitle: '角色主体',
-    status: '绑定 6 场戏',
-    cover: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 'subject-character-2',
-    library: 'subjects',
-    category: 'character',
-    title: '配角：阿彻',
-    subtitle: '替身主体',
-    status: '绑定 3 场戏',
-    cover: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 'subject-scene-1',
-    library: 'subjects',
-    category: 'scene',
-    title: '废墟高台',
-    subtitle: '主场景主体',
-    status: '已锁定',
-    cover: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 'subject-object-1',
-    library: 'subjects',
-    category: 'object',
-    title: '能量核心',
-    subtitle: '关键道具主体',
-    status: '已复用',
-    cover: 'https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?auto=format&fit=crop&w=700&q=80',
-  },
-  {
-    id: 'subject-sound-1',
-    library: 'subjects',
-    category: 'sound',
-    title: '角色出场提示音',
-    subtitle: '1.6s Logo Hit',
-    status: '已绑定',
-  },
 ];
 
 const MATERIAL_DRAG_MIME = 'application/x-mangacanvas-material';
 
 const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelectMaterial }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { projectId, id } = useParams();
+  const numericProjectId = Number(projectId || id);
   const [activeLibrary, setActiveLibrary] = useState<LibraryTab>('materials');
-  const [activeCategory, setActiveCategory] = useState<CategoryTab>('character');
+  const [activeCategory, setActiveCategory] = useState<CategoryTab>('all');
+  const [items, setItems] = useState<CanvasMaterialItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -166,18 +54,60 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
     };
   }, [visible, onClose]);
 
-  const emptyText = useMemo(
-    () => (activeLibrary === 'materials' ? '暂无素材' : '暂无主体'),
-    [activeLibrary]
-  );
+  useEffect(() => {
+    if (!visible || Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
+    let cancelled = false;
+    setLoading(true);
+    void Promise.all([
+      projectApi.characters.getAll(numericProjectId),
+      projectApi.scenes.getAll(numericProjectId),
+      projectApi.objects.getAll(numericProjectId),
+    ]).then(([characters, scenes, objects]) => {
+      if (cancelled) return;
+      const next: CanvasMaterialItem[] = [
+        ...(characters.data || []).map((item) => ({
+          id: `character-${item.id}`,
+          library: 'subjects' as const,
+          category: 'character' as const,
+          title: item.name,
+          subtitle: item.role,
+          status: item.role,
+          cover: item.image,
+        })),
+        ...(scenes.data || []).map((item) => ({
+          id: `scene-${item.id}`,
+          library: 'materials' as const,
+          category: 'scene' as const,
+          title: item.name,
+          subtitle: item.status === 'in-use' ? '使用中' : '草稿',
+          status: item.status,
+          cover: item.image,
+        })),
+        ...(objects.data || []).map((item) => ({
+          id: `object-${item.id}`,
+          library: 'materials' as const,
+          category: 'object' as const,
+          title: item.name,
+          subtitle: item.type,
+          status: item.status,
+          cover: item.image,
+        })),
+      ];
+      setItems(next);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [numericProjectId, visible]);
 
   const visibleItems = useMemo(() => {
-    return mockItems.filter((item) => {
-      if (item.library !== activeLibrary) return false;
-      if (activeCategory === 'all') return true;
-      return item.category === activeCategory;
+    return items.filter((item) => {
+      if (activeLibrary === 'subjects' && item.category !== 'character') return false;
+      if (activeCategory !== 'all' && item.category !== activeCategory) return false;
+      return Boolean(item.cover);
     });
-  }, [activeCategory, activeLibrary]);
+  }, [activeCategory, activeLibrary, items]);
 
   const handleItemDragStart = (event: React.DragEvent<HTMLButtonElement>, item: CanvasMaterialItem) => {
     if (!item.cover) return;
@@ -222,46 +152,41 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
 
         <div className="border-b border-[hsl(var(--outline-variant))]/10 px-4 py-3">
           <div className="flex flex-wrap gap-2">
-          {categoryTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveCategory(tab.key)}
-              className={`rounded-full px-3.5 py-2 text-[13px] font-medium leading-none transition-all ${
-                activeCategory === tab.key
-                  ? 'bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] shadow-sm'
-                  : 'text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+            {categoryTabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveCategory(tab.key)}
+                className={`rounded-full px-3.5 py-2 text-[13px] font-medium leading-none transition-all ${
+                  activeCategory === tab.key
+                    ? 'bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] shadow-sm'
+                    : 'text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {visibleItems.length > 0 ? (
+          {loading ? (
+            <div className="flex h-full items-center justify-center text-sm text-[hsl(var(--secondary))]">加载素材中...</div>
+          ) : visibleItems.length > 0 ? (
             <div className="grid grid-cols-6 gap-2">
               {visibleItems.map((item) => (
                 <button
                   key={item.id}
-                  className={`group text-left ${item.cover ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+                  className="group cursor-grab text-left active:cursor-grabbing"
                   title={`${item.title} · ${item.subtitle}`}
                   onClick={() => item.cover && onSelectMaterial(item)}
                   draggable={Boolean(item.cover)}
                   onDragStart={(event) => handleItemDragStart(event, item)}
                 >
-                  {item.cover ? (
-                    <div className="overflow-hidden rounded-2xl border border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-low))] transition-all group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--outline-variant))]/30 group-hover:shadow-md">
-                      <div className="aspect-square overflow-hidden bg-[hsl(var(--surface-container-high))]">
-                        <img src={item.cover} alt={item.title} className="h-full w-full object-cover" />
-                      </div>
+                  <div className="overflow-hidden rounded-2xl border border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-low))] transition-all group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--outline-variant))]/30 group-hover:shadow-md">
+                    <div className="aspect-square overflow-hidden bg-[hsl(var(--surface-container-high))]">
+                      <img src={item.cover} alt={item.title} className="h-full w-full object-cover" />
                     </div>
-                  ) : (
-                    <div className="flex aspect-square items-center justify-center rounded-2xl border border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-low))] text-[hsl(var(--secondary))] transition-all group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--outline-variant))]/30 group-hover:shadow-md">
-                      <SoundOutlined style={{ fontSize: 18 }} />
-                    </div>
-                  )}
-
+                  </div>
                   <div className="px-0.5 pt-1">
                     <div className="line-clamp-1 text-[11px] font-medium leading-4 text-[hsl(var(--on-surface))]">
                       {item.title}
@@ -276,11 +201,9 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--surface-container-high))] text-[hsl(var(--secondary))]">
                   <InboxOutlined style={{ fontSize: 22 }} />
                 </div>
-                <div className="text-[17px] font-semibold text-[hsl(var(--on-surface))]">{emptyText}</div>
+                <div className="text-[17px] font-semibold text-[hsl(var(--on-surface))]">暂无素材</div>
                 <div className="mt-2 text-[13px] leading-6 text-[hsl(var(--secondary))]">
-                  {activeLibrary === 'materials'
-                    ? '后续可在这里快速插入人物、场景、物品等素材。'
-                    : '后续可在这里管理可复用的主体资产。'}
+                  在资产管理中创建角色、场景或物品后，就可以拖进画布。
                 </div>
               </div>
             </div>
@@ -290,14 +213,8 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
 
       <style>{`
         @keyframes materialPanelSlideIn {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
     </div>

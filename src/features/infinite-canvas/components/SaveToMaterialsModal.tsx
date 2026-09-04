@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Input, Select, Tabs, Button, message } from 'antd';
+import { useParams } from 'react-router-dom';
+import { persistMedia } from '@/api/aigc/imageService';
+import { projectAssetsApi } from '@/api/projectAssetsApi';
+import { projectApi } from '@/api/projectApi';
+import { useProjectStore } from '@/store/projectStore';
 
 type MaterialCategory = 'character' | 'scene' | 'object';
 type SaveMode = 'create' | 'existing';
@@ -10,18 +15,13 @@ interface SaveToMaterialsModalProps {
   imageUrl?: string;
   initialName?: string;
   initialCategory?: string;
+  nodeId?: string;
 }
 
 const categoryOptions = [
   { label: '人物', value: 'character' },
   { label: '场景', value: 'scene' },
   { label: '物品', value: 'object' },
-];
-
-const existingFolderOptions = [
-  { label: '角色设定素材', value: 'folder-character' },
-  { label: '场景参考图库', value: 'folder-scene' },
-  { label: '物品道具库', value: 'folder-object' },
 ];
 
 const normalizeCategory = (value?: string): MaterialCategory => {
@@ -37,11 +37,16 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   imageUrl,
   initialName,
   initialCategory,
+  nodeId,
 }) => {
+  const { projectId, workflowId, id } = useParams();
+  const numericProjectId = Number(projectId || id);
+  const loadProjectAssets = useProjectStore((state) => state.loadProjectAssets);
   const [mode, setMode] = useState<SaveMode>('create');
   const [name, setName] = useState(initialName || '');
   const [category, setCategory] = useState<MaterialCategory>(normalizeCategory(initialCategory));
-  const [targetFolder, setTargetFolder] = useState<string>();
+  const [targetId, setTargetId] = useState<number>();
+  const [existingOptions, setExistingOptions] = useState<Array<{ label: string; value: number }>>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -49,12 +54,31 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
     setMode('create');
     setName(initialName || '图片素材');
     setCategory(normalizeCategory(initialCategory));
-    setTargetFolder(undefined);
+    setTargetId(undefined);
     setSubmitting(false);
   }, [open, initialCategory, initialName]);
 
+  useEffect(() => {
+    if (!open || Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
+    const loader =
+      category === 'character'
+        ? projectApi.characters.getAll(numericProjectId)
+        : category === 'scene'
+          ? projectApi.scenes.getAll(numericProjectId)
+          : projectApi.objects.getAll(numericProjectId);
+    void loader.then((response) => {
+      if (!response.success) return;
+      setExistingOptions(
+        (response.data || []).map((item) => ({
+          label: item.name,
+          value: item.id,
+        }))
+      );
+    });
+  }, [category, numericProjectId, open]);
+
   const modalTitle = useMemo(
-    () => (mode === 'create' ? '创建素材文件夹' : '添加到已有素材文件'),
+    () => (mode === 'create' ? '保存为新素材' : '添加到已有素材'),
     [mode]
   );
 
@@ -63,30 +87,95 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
       message.warning('当前图片节点没有可保存的图片');
       return;
     }
-
-    if (mode === 'create') {
-      if (!name.trim()) {
-        message.warning('请输入素材名称');
-        return;
-      }
-
-      if (!category) {
-        message.warning('请选择素材分类');
-        return;
-      }
+    if (Number.isNaN(numericProjectId) || numericProjectId <= 0) {
+      message.error('当前项目信息缺失');
+      return;
     }
-
-    if (mode === 'existing' && !targetFolder) {
-      message.warning('请选择要添加到的素材文件');
+    if (mode === 'create' && !name.trim()) {
+      message.warning('请输入素材名称');
+      return;
+    }
+    if (mode === 'existing' && !targetId) {
+      message.warning('请选择要添加到的素材');
       return;
     }
 
     setSubmitting(true);
-    window.setTimeout(() => {
-      message.success(mode === 'create' ? '素材文件夹已创建' : '已添加到现有素材文件');
-      setSubmitting(false);
+    try {
+      let persistedUrl = imageUrl;
+      try {
+        persistedUrl = await persistMedia(imageUrl);
+      } catch {
+        persistedUrl = imageUrl;
+      }
+      const creationMode = workflowId ? 'workflow' : 'quick';
+      if (mode === 'create') {
+        if (category === 'character') {
+          const created = await projectApi.characters.create(numericProjectId, {
+            name: name.trim(),
+            gender: 'unknown',
+            ageGroup: 'young',
+            role: 'support',
+            genMethod: 'ai',
+            model: 'wan2.6-t2i',
+            description: '',
+            referenceImage: persistedUrl,
+            creationMode,
+            sourceWorkflowId: workflowId,
+            sourceNodeId: nodeId,
+          });
+          if (!created.success) throw new Error(created.message || '保存角色失败');
+        } else if (category === 'scene') {
+          const created = await projectApi.scenes.create(numericProjectId, {
+            name: name.trim(),
+            genMethod: 'ai',
+            model: 'wan2.6-t2i',
+            description: '',
+            distance: 20,
+            status: 'draft',
+            referenceImage: persistedUrl,
+            creationMode,
+            sourceWorkflowId: workflowId,
+            sourceNodeId: nodeId,
+          });
+          if (!created.success) throw new Error(created.message || '保存场景失败');
+        } else {
+          const created = await projectApi.objects.create(numericProjectId, {
+            name: name.trim(),
+            genMethod: 'upload',
+            prompt: '',
+            referenceImage: persistedUrl,
+            creationMode,
+            sourceWorkflowId: workflowId,
+            sourceNodeId: nodeId,
+          });
+          if (!created.success) throw new Error(created.message || '保存物品失败');
+        }
+      } else if (targetId) {
+        if (category === 'character') {
+          await projectApi.characters.update(numericProjectId, targetId, { image: persistedUrl });
+        } else if (category === 'scene') {
+          await projectApi.scenes.update(numericProjectId, targetId, { image: persistedUrl });
+        } else {
+          await projectApi.objects.update(numericProjectId, targetId, { image: persistedUrl });
+        }
+      }
+
+      await projectAssetsApi.create(numericProjectId, {
+        name: name.trim() || initialName || '画布素材',
+        sourceType: 'workflow',
+        sourceId: workflowId || nodeId || `node-${Date.now()}`,
+        url: persistedUrl,
+        metadata: { category, nodeId },
+      });
+      await loadProjectAssets(numericProjectId, true);
+      message.success(mode === 'create' ? '已保存到项目素材库' : '已更新已有素材');
       onClose();
-    }, 300);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '保存素材失败');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -113,8 +202,8 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             activeKey={mode}
             onChange={(key) => setMode(key as SaveMode)}
             items={[
-              { key: 'create', label: '创建素材文件夹' },
-              { key: 'existing', label: '添加到已有素材文件' },
+              { key: 'create', label: '保存为新素材' },
+              { key: 'existing', label: '添加到已有素材' },
             ]}
             className="[&_.ant-tabs-nav]:mb-0 [&_.ant-tabs-tab]:px-0 [&_.ant-tabs-tab]:pb-4 [&_.ant-tabs-tab]:pt-0 [&_.ant-tabs-tab+.ant-tabs-tab]:ml-8 [&_.ant-tabs-tab-btn]:text-base [&_.ant-tabs-tab-active_.ant-tabs-tab-btn]:font-semibold"
           />
@@ -140,7 +229,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             <div className="mb-6">
               <div className="text-2xl font-bold text-[hsl(var(--on-surface))]">{modalTitle}</div>
               <div className="mt-2 text-sm text-[hsl(var(--secondary))]">
-                将当前图片节点保存为素材，便于后续在画布中重复使用。
+                将当前图片写回角色、场景或物品库，之后可在素材面板和片段中继续使用。
               </div>
             </div>
 
@@ -157,7 +246,6 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
                     className="h-12 rounded-2xl bg-[hsl(var(--surface-container-low))] px-4"
                   />
                 </div>
-
                 <div>
                   <label className="mb-2 block text-sm font-medium text-[hsl(var(--on-surface))]">
                     分类 <span className="text-red-500">*</span>
@@ -174,25 +262,27 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             ) : (
               <div className="space-y-6">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[hsl(var(--on-surface))]">
-                    素材文件
-                  </label>
+                  <label className="mb-2 block text-sm font-medium text-[hsl(var(--on-surface))]">分类</label>
                   <Select
-                    value={targetFolder}
-                    onChange={(value) => setTargetFolder(value)}
-                    options={existingFolderOptions}
-                    placeholder="请选择已有素材文件"
+                    value={category}
+                    onChange={(value) => {
+                      setCategory(value);
+                      setTargetId(undefined);
+                    }}
+                    options={categoryOptions}
                     className="w-full"
                     size="large"
                   />
                 </div>
-
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[hsl(var(--on-surface))]">当前图片名称</label>
-                  <Input
-                    value={initialName || ''}
-                    readOnly
-                    className="h-12 rounded-2xl bg-[hsl(var(--surface-container-low))] px-4"
+                  <label className="mb-2 block text-sm font-medium text-[hsl(var(--on-surface))]">已有素材</label>
+                  <Select
+                    value={targetId}
+                    onChange={(value) => setTargetId(value)}
+                    options={existingOptions}
+                    placeholder="请选择已有素材"
+                    className="w-full"
+                    size="large"
                   />
                 </div>
               </div>
@@ -202,8 +292,8 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
               <Button onClick={onClose} size="large" className="rounded-2xl px-6">
                 取消
               </Button>
-              <Button type="primary" onClick={handleSubmit} loading={submitting} size="large" className="rounded-2xl px-8">
-                {mode === 'create' ? '创建' : '保存'}
+              <Button type="primary" onClick={() => void handleSubmit()} loading={submitting} size="large" className="rounded-2xl px-8">
+                {mode === 'create' ? '保存' : '更新'}
               </Button>
             </div>
           </div>

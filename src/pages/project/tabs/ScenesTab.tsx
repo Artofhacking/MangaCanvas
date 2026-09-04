@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
-import type { Scene } from "@/types"
+import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
 import SceneCreator from "../SceneCreator"
 
@@ -17,7 +17,7 @@ interface ScenesTabProps {
   projectId?: number | null
   scenes?: Scene[]
   onAddNew?: () => void
-  onOpenCanvas?: () => void
+  onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
   onToggleSelect?: (id: number) => void
@@ -80,9 +80,9 @@ export default function ScenesTab({
     setEditScene(null)
   }
 
-  const handleOpenCanvas = () => {
+  const handleOpenCanvas = (source?: CanvasLaunchSource) => {
     if (onOpenCanvas) {
-      onOpenCanvas()
+      onOpenCanvas(source)
       return
     }
 
@@ -122,7 +122,7 @@ export default function ScenesTab({
 
           <button
             type="button"
-            onClick={handleOpenCanvas}
+            onClick={() => handleOpenCanvas()}
             className="flex w-full items-center justify-between rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-3 py-3 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
           >
             <div className="flex items-center gap-3">
@@ -180,10 +180,26 @@ export default function ScenesTab({
                 <Button 
                   variant="secondary" 
                   size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleOpenCanvas({
+                      id: scene.id,
+                      name: scene.name,
+                      image: scene.image,
+                      description: scene.description,
+                    })
+                  }}
+                  className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                >
+                  打开画布
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
                   onClick={() => handleEdit(scene)}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
-                  {scene.status === "in-use" ? "编辑详情" : "继续工作"}
+                  编辑
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

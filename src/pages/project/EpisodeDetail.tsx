@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Sidebar from "@/components/layout/Sidebar"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { projectApi } from "@/api/projectApi"
-import type { Episode } from "@/types"
+import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
+import type { Character, Episode, EpisodeRelationItem, ObjectItem, Scene } from "@/types"
 import {
   ChevronLeft,
   Clapperboard,
@@ -16,66 +17,120 @@ import {
   Users,
 } from "lucide-react"
 
-const fallbackEpisode = {
-  id: 1,
-  name: "序章：觉醒",
-  code: "EP_001",
-  status: "in-progress",
-  description: "主角在梦中觉醒超能力，发现隐藏的世界真相。这一集将揭示故事的核心设定，为后续剧情埋下伏笔。",
-  progress: 65,
-  sceneCount: 12,
-  modified: "2 小时前",
-}
-
-const relatedCharacters = [
-  { id: 1, name: "龙崎真治", role: "主角", image: "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=200&h=200&fit=crop" },
-  { id: 2, name: "月城雪兔", role: "配角", image: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&h=200&fit=crop" },
-  { id: 3, name: "神乐千鹤", role: "配角", image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&h=200&fit=crop" },
-]
-
-const relatedScenes = [
-  { id: 1, name: "赛博街区 7 号扇区", image: "https://images.unsplash.com/photo-1614726365723-49cfae927846?w=300&h=200&fit=crop" },
-  { id: 2, name: "黄昏教室 2B", image: "https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=300&h=200&fit=crop" },
-]
-
-const relatedObjects = [
-  { id: 1, name: "光子武士刀", type: "武器", image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?w=200&h=200&fit=crop" },
-  { id: 2, name: "古董怀表", type: "道具", image: "https://images.unsplash.com/photo-1509048191080-d2984bad6ae5?w=200&h=200&fit=crop" },
-]
-
 export default function EpisodeDetail() {
   const { projectId, episodeId } = useParams()
   const navigate = useNavigate()
   const { notify } = useFeedback()
+  const launchWorkflow = useWorkflowLauncher()
   const [episode, setEpisode] = useState<Episode | null>(null)
+  const [catalog, setCatalog] = useState<{ characters: Character[]; scenes: Scene[]; objects: ObjectItem[] }>({
+    characters: [],
+    scenes: [],
+    objects: [],
+  })
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<{ characterIds: number[]; sceneIds: number[]; objectIds: number[] }>({
+    characterIds: [],
+    sceneIds: [],
+    objectIds: [],
+  })
+
+  const reload = async () => {
+    if (!projectId || !episodeId) return
+    const [episodeResponse, characters, scenes, objects] = await Promise.all([
+      projectApi.episodes.getById(Number(projectId), Number(episodeId)),
+      projectApi.characters.getAll(Number(projectId)),
+      projectApi.scenes.getAll(Number(projectId)),
+      projectApi.objects.getAll(Number(projectId)),
+    ])
+    if (!episodeResponse.success || !episodeResponse.data) {
+      notify.error(episodeResponse.message || "片段不存在")
+      navigate(`/project/${projectId}/episodes`, { replace: true })
+      return
+    }
+    setEpisode(episodeResponse.data)
+    setDraft({
+      characterIds: episodeResponse.data.characterIds || [],
+      sceneIds: episodeResponse.data.sceneIds || [],
+      objectIds: episodeResponse.data.objectIds || [],
+    })
+    setCatalog({
+      characters: characters.data || [],
+      scenes: scenes.data || [],
+      objects: objects.data || [],
+    })
+  }
 
   useEffect(() => {
-    if (!projectId || !episodeId) return
-    void projectApi.episodes.getById(Number(projectId), Number(episodeId)).then((response) => {
-      if (response.success && response.data) {
-        setEpisode(response.data)
-        return
-      }
-      notify.error(response.message || "片段不存在")
-      navigate(`/project/${projectId}/episodes`, { replace: true })
+    void reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episodeId, projectId])
+
+  const relatedCharacters = episode?.characters || []
+  const relatedScenes = episode?.scenes || []
+  const relatedObjects = episode?.objects || []
+
+  const openCanvas = async () => {
+    if (!projectId || !episodeId || !episode) return
+    await launchWorkflow({
+      projectId,
+      sourceType: "episode",
+      sourceName: episode.name,
+      sourceAssetId: Number(episodeId),
+      seedPrompt: episode.description,
+      relatedAssets: [
+        ...relatedCharacters.map((item) => ({
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          category: "character" as const,
+        })),
+        ...relatedScenes.map((item) => ({
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          category: "scene" as const,
+        })),
+        ...relatedObjects.map((item) => ({
+          id: item.id,
+          name: item.name,
+          image: item.image,
+          category: "object" as const,
+        })),
+      ],
     })
-  }, [episodeId, navigate, notify, projectId])
-
-  const currentEpisode = {
-    ...fallbackEpisode,
-    ...episode,
-    name: (episode?.name as string) || fallbackEpisode.name,
-    code: (episode?.code as string) || fallbackEpisode.code,
-    status: (episode?.status as string) || fallbackEpisode.status,
-    description: (episode?.description as string) || fallbackEpisode.description,
-    count: (episode?.count as number) || fallbackEpisode.sceneCount,
-    modified: (episode?.modified as string) || fallbackEpisode.modified,
   }
 
-  const openCanvas = () => {
+  const saveRelations = async () => {
     if (!projectId || !episodeId) return
-    navigate(`/project/${projectId}/episode/${episodeId}/canvas`)
+    const response = await projectApi.episodes.updateRelations(Number(projectId), Number(episodeId), draft)
+    if (!response.success || !response.data) {
+      notify.error(response.message || "保存关联失败")
+      return
+    }
+    setEpisode(response.data)
+    setEditing(false)
+    notify.success("片段关联已更新")
   }
+
+  const toggleId = (key: "characterIds" | "sceneIds" | "objectIds", id: number) => {
+    setDraft((prev) => ({
+      ...prev,
+      [key]: prev[key].includes(id) ? prev[key].filter((item) => item !== id) : [...prev[key], id],
+    }))
+  }
+
+  const progress = episode?.progress ?? 0
+  const relationPreview = useMemo(
+    () => ({
+      characters: relatedCharacters as EpisodeRelationItem[],
+      scenes: relatedScenes as EpisodeRelationItem[],
+      objects: relatedObjects as EpisodeRelationItem[],
+    }),
+    [relatedCharacters, relatedObjects, relatedScenes]
+  )
+
+  if (!episode) return null
 
   return (
     <div className="min-h-screen bg-[hsl(var(--surface))]">
@@ -87,7 +142,7 @@ export default function EpisodeDetail() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(`/project/${projectId}`)}
+              onClick={() => navigate(`/project/${projectId}/episodes`)}
               className="mb-5 gap-2 text-[hsl(var(--secondary))]"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -96,21 +151,21 @@ export default function EpisodeDetail() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Badge className="border-0 bg-[hsl(var(--surface-container-high))] px-3 py-1 text-[hsl(var(--secondary))]">
-                工作台
+                片段
               </Badge>
               <Badge className="signature-gradient border-0 px-3 py-1 text-white">
-                进行中
+                {episode.status === "completed" ? "已完成" : episode.status === "draft" ? "草稿" : "进行中"}
               </Badge>
             </div>
 
             <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] text-[hsl(var(--on-surface))]">
-              {currentEpisode.name}
+              {episode.name}
             </h1>
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-[hsl(var(--secondary))]">
-              <span className="font-mono">{currentEpisode.code}</span>
-              <span>{currentEpisode.count} 个场景</span>
-              <span>完成度 {fallbackEpisode.progress}%</span>
-              <span>修改于 {currentEpisode.modified}</span>
+              <span className="font-mono">{episode.code}</span>
+              <span>{episode.count} 个场景</span>
+              <span>完成度 {progress}%</span>
+              <span>修改于 {episode.modified}</span>
             </div>
           </div>
         </div>
@@ -123,17 +178,17 @@ export default function EpisodeDetail() {
                   <Sparkles className="h-4 w-4" />
                   本集创作中枢
                 </div>
-                <h2 className="mt-5 max-w-[10ch] text-5xl font-black leading-[0.96] tracking-[-0.06em]">
-                  先进入无限画布，再展开创作
+                <h2 className="mt-5 max-w-[12ch] text-5xl font-black leading-[0.96] tracking-[-0.06em]">
+                  用本集资产进入无限画布
                 </h2>
                 <p className="mt-5 max-w-2xl text-base leading-7 text-white/85">
-                  工作台首页的第一件事，不应该是看详情，而应该是立刻进入编排。无限画布是这集的主入口，角色、场景、道具都围绕它服务。
+                  {episode.description || "先把角色、场景和道具挂到这一集，再进入画布生成和回写素材。"}
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-3">
                   <Button
                     size="lg"
-                    onClick={openCanvas}
+                    onClick={() => void openCanvas()}
                     className="h-14 rounded-full bg-white px-8 text-base font-bold text-[#a22d08] hover:bg-white/92"
                   >
                     <Clapperboard className="mr-2 h-5 w-5" />
@@ -142,10 +197,10 @@ export default function EpisodeDetail() {
                   <Button
                     size="lg"
                     variant="outline"
-                    onClick={() => notify.info("工作流分支功能开发中")}
+                    onClick={() => setEditing((value) => !value)}
                     className="h-14 rounded-full border-white/30 bg-white/10 px-8 text-base font-semibold text-white hover:bg-white/16 hover:text-white"
                   >
-                    新建分支
+                    {editing ? "取消编辑" : "编辑关联"}
                   </Button>
                 </div>
               </div>
@@ -155,33 +210,85 @@ export default function EpisodeDetail() {
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-white/10 p-4">
                     <div className="text-xs text-white/60">当前片段</div>
-                    <div className="mt-2 text-2xl font-black">{currentEpisode.code}</div>
+                    <div className="mt-2 text-2xl font-black">{episode.code}</div>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4">
                     <div className="text-xs text-white/60">场景数量</div>
-                    <div className="mt-2 text-2xl font-black">{currentEpisode.count}</div>
+                    <div className="mt-2 text-2xl font-black">{relationPreview.scenes.length}</div>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4">
                     <div className="text-xs text-white/60">角色素材</div>
-                    <div className="mt-2 text-2xl font-black">{relatedCharacters.length}</div>
+                    <div className="mt-2 text-2xl font-black">{relationPreview.characters.length}</div>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4">
                     <div className="text-xs text-white/60">道具素材</div>
-                    <div className="mt-2 text-2xl font-black">{relatedObjects.length}</div>
-                  </div>
-                </div>
-                <div className="mt-4 rounded-2xl bg-white/10 p-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">制作推进</span>
-                    <span className="font-bold text-white">{fallbackEpisode.progress}%</span>
-                  </div>
-                  <div className="mt-3 h-2 rounded-full bg-white/15">
-                    <div className="h-2 rounded-full bg-white" style={{ width: `${fallbackEpisode.progress}%` }} />
+                    <div className="mt-2 text-2xl font-black">{relationPreview.objects.length}</div>
                   </div>
                 </div>
               </div>
             </div>
           </section>
+
+          {editing ? (
+            <section className="mt-6 rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-lowest))] p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[hsl(var(--on-surface))]">选择本集关联资产</h3>
+                <Button onClick={() => void saveRelations()} className="signature-gradient rounded-xl border-0 text-white">
+                  保存关联
+                </Button>
+              </div>
+              <div className="grid gap-6 lg:grid-cols-3">
+                <div>
+                  <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">角色</div>
+                  <div className="space-y-2">
+                    {catalog.characters.map((item) => (
+                      <label key={item.id} className="flex items-center gap-3 rounded-xl bg-[hsl(var(--surface-container-low))] p-3">
+                        <input
+                          type="checkbox"
+                          checked={draft.characterIds.includes(item.id)}
+                          onChange={() => toggleId("characterIds", item.id)}
+                        />
+                        <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">场景</div>
+                  <div className="space-y-2">
+                    {catalog.scenes.map((item) => (
+                      <label key={item.id} className="flex items-center gap-3 rounded-xl bg-[hsl(var(--surface-container-low))] p-3">
+                        <input
+                          type="checkbox"
+                          checked={draft.sceneIds.includes(item.id)}
+                          onChange={() => toggleId("sceneIds", item.id)}
+                        />
+                        <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">物品</div>
+                  <div className="space-y-2">
+                    {catalog.objects.map((item) => (
+                      <label key={item.id} className="flex items-center gap-3 rounded-xl bg-[hsl(var(--surface-container-low))] p-3">
+                        <input
+                          type="checkbox"
+                          checked={draft.objectIds.includes(item.id)}
+                          onChange={() => toggleId("objectIds", item.id)}
+                        />
+                        <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr_1fr]">
             <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
@@ -190,19 +297,32 @@ export default function EpisodeDetail() {
                 <span className="text-xs font-semibold uppercase tracking-[0.24em]">登场角色</span>
               </div>
               <div className="mt-5 space-y-3">
-                {relatedCharacters.map((char) => (
-                  <button
-                    key={char.id}
-                    onClick={() => notify.info(`查看角色：${char.name}`)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-[hsl(var(--surface-container-high))] p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
-                  >
-                    <img src={char.image} alt={char.name} className="h-12 w-12 rounded-xl object-cover" />
-                    <div>
-                      <div className="text-sm font-bold text-[hsl(var(--on-surface))]">{char.name}</div>
-                      <div className="text-xs text-[hsl(var(--secondary))]">{char.role}</div>
-                    </div>
-                  </button>
-                ))}
+                {relationPreview.characters.length === 0 ? (
+                  <p className="text-sm text-[hsl(var(--secondary))]">还没有关联角色</p>
+                ) : (
+                  relationPreview.characters.map((char) => (
+                    <button
+                      key={char.id}
+                      onClick={() =>
+                        projectId &&
+                        void launchWorkflow({
+                          projectId,
+                          sourceType: "character",
+                          sourceName: char.name,
+                          sourceAssetId: char.id,
+                          seedImage: char.image,
+                        })
+                      }
+                      className="flex w-full items-center gap-3 rounded-2xl bg-[hsl(var(--surface-container-high))] p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
+                    >
+                      <img src={char.image} alt={char.name} className="h-12 w-12 rounded-xl object-cover" />
+                      <div>
+                        <div className="text-sm font-bold text-[hsl(var(--on-surface))]">{char.name}</div>
+                        <div className="text-xs text-[hsl(var(--secondary))]">{char.role}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -212,16 +332,31 @@ export default function EpisodeDetail() {
                 <span className="text-xs font-semibold uppercase tracking-[0.24em]">场景参考</span>
               </div>
               <div className="mt-5 space-y-3">
-                {relatedScenes.map((scene) => (
-                  <button
-                    key={scene.id}
-                    onClick={() => notify.info(`查看场景：${scene.name}`)}
-                    className="block w-full overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-high))] text-left"
-                  >
-                    <img src={scene.image} alt={scene.name} className="aspect-[16/9] w-full object-cover" />
-                    <div className="p-3 text-sm font-semibold text-[hsl(var(--on-surface))]">{scene.name}</div>
-                  </button>
-                ))}
+                {relationPreview.scenes.length === 0 ? (
+                  <p className="text-sm text-[hsl(var(--secondary))]">还没有关联场景</p>
+                ) : (
+                  relationPreview.scenes.map((scene) => (
+                    <button
+                      key={scene.id}
+                      onClick={() =>
+                        projectId &&
+                        void launchWorkflow({
+                          projectId,
+                          sourceType: "scene",
+                          sourceName: scene.name,
+                          sourceAssetId: scene.id,
+                          seedImage: scene.image,
+                        })
+                      }
+                      className="block w-full overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-high))] text-left"
+                    >
+                      {scene.image ? (
+                        <img src={scene.image} alt={scene.name} className="aspect-[16/9] w-full object-cover" />
+                      ) : null}
+                      <div className="p-3 text-sm font-semibold text-[hsl(var(--on-surface))]">{scene.name}</div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -231,28 +366,43 @@ export default function EpisodeDetail() {
                 <span className="text-xs font-semibold uppercase tracking-[0.24em]">道具与操作</span>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                {relatedObjects.map((obj) => (
-                  <button
-                    key={obj.id}
-                    onClick={() => notify.info(`查看物品：${obj.name}`)}
-                    className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-2 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
-                  >
-                    <img src={obj.image} alt={obj.name} className="aspect-square w-full rounded-xl object-cover" />
-                    <div className="px-1 pb-1 pt-3">
-                      <div className="text-sm font-bold text-[hsl(var(--on-surface))]">{obj.name}</div>
-                      <div className="text-xs text-[hsl(var(--secondary))]">{obj.type}</div>
-                    </div>
-                  </button>
-                ))}
+                {relationPreview.objects.length === 0 ? (
+                  <p className="col-span-2 text-sm text-[hsl(var(--secondary))]">还没有关联物品</p>
+                ) : (
+                  relationPreview.objects.map((obj) => (
+                    <button
+                      key={obj.id}
+                      onClick={() =>
+                        projectId &&
+                        void launchWorkflow({
+                          projectId,
+                          sourceType: "object",
+                          sourceName: obj.name,
+                          sourceAssetId: obj.id,
+                          seedImage: obj.image,
+                        })
+                      }
+                      className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-2 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
+                    >
+                      {obj.image ? (
+                        <img src={obj.image} alt={obj.name} className="aspect-square w-full rounded-xl object-cover" />
+                      ) : null}
+                      <div className="px-1 pb-1 pt-3">
+                        <div className="text-sm font-bold text-[hsl(var(--on-surface))]">{obj.name}</div>
+                        <div className="text-xs text-[hsl(var(--secondary))]">{obj.type}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
 
               <div className="mt-5 rounded-2xl bg-[hsl(var(--surface-container-high))] p-4">
                 <div className="text-sm font-semibold text-[hsl(var(--on-surface))]">本集创作建议</div>
                 <p className="mt-2 text-sm leading-6 text-[hsl(var(--secondary))]">
-                  先把“觉醒前后”的两个关键场景拖进无限画布，再把主角和核心道具挂上去，镜头关系会更容易展开。
+                  先确认本集角色、场景和道具，再进入画布生成，最后把结果保存回素材库。
                 </p>
                 <Button
-                  onClick={openCanvas}
+                  onClick={() => void openCanvas()}
                   className="mt-4 h-11 w-full rounded-2xl signature-gradient text-white"
                 >
                   打开画布继续

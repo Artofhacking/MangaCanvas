@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import models, serialize
+from ..serialize import normalize_canvas
 from ..db import get_db
 from ..deps import current_user, require_project_access
 from ..errors import fail, ok
@@ -69,7 +70,7 @@ def create_workflow(
         thumbnail=body.thumbnail,
         source_type=body.sourceType or "blank",
         source_asset_id=body.sourceAssetId,
-        canvas_data=body.canvasData or _default_canvas(),
+        canvas_data=normalize_canvas(body.canvasData or _default_canvas()),
         created_by=user.id,
     )
     db.add(row)
@@ -111,7 +112,7 @@ def update_workflow(
     if body.status is not None:
         row.status = body.status
     if body.canvasData is not None:
-        row.canvas_data = body.canvasData
+        row.canvas_data = normalize_canvas(body.canvasData)
     row.updated_at = now()
     return ok(serialize.workflow(row))
 

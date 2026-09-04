@@ -64,6 +64,27 @@ export const mapEpisode = (episode: EpisodeDTO): Episode => ({
   modified: relativeTime(episode.updatedAt),
   code: episode.code,
   description: episode.description || undefined,
+  progress: episode.progress ?? 0,
+  characters: (episode.characters || []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    image: item.image || undefined,
+    role: item.role || undefined,
+  })),
+  scenes: (episode.scenes || []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    image: item.image || undefined,
+  })),
+  objects: (episode.objects || []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    image: item.image || undefined,
+    type: item.type || undefined,
+  })),
+  characterIds: episode.characters?.map((item) => item.id) ?? [],
+  sceneIds: episode.scenes?.map((item) => item.id) ?? [],
+  objectIds: episode.objects?.map((item) => item.id) ?? [],
 })
 
 export const mapScene = (scene: SceneDTO): Scene => ({
