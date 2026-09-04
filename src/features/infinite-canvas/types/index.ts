@@ -218,7 +218,9 @@ export interface ProjectsStore {
     projectId: string;
     sourceType: string;
     sourceAssetId?: number;
+    canvasData?: Project['canvasData'];
   }) => void;
+  syncProjectWorkflows: (projectId: string) => Promise<void>;
   updateProject: (id: string, data: Partial<Project>) => void;
   getProjectById: (id: string) => Project | null;
   updateProjectCanvas: (id: string, canvasData: Partial<Project['canvasData']>) => void;

@@ -406,11 +406,11 @@ function App() {
           <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="/project/:id/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="/projects" element={<RequireAuth><ProjectsList /></RequireAuth>} />
+          <Route path="/project/:projectId/workflows/:workflowId" element={<RequireAuth><WorkflowCanvas /></RequireAuth>} />
+          <Route path="/project/:projectId/episode/:episodeId/canvas" element={<RequireAuth><WorkflowCanvas /></RequireAuth>} />
           <Route path="/project/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
           <Route path="/project/:id/:tab" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
-          <Route path="/project/:projectId/workflows/:workflowId" element={<RequireAuth><WorkflowCanvas /></RequireAuth>} />
           <Route path="/project/:projectId/episode/:episodeId" element={<RequireAuth><EpisodeDetail /></RequireAuth>} />
-          <Route path="/project/:projectId/episode/:episodeId/canvas" element={<RequireAuth><WorkflowCanvas /></RequireAuth>} />
           <Route path="/project/:projectId/permissions" element={<RequireAuth><ProjectPermissions /></RequireAuth>} />
           <Route path="/members" element={<RequireAuth><Members /></RequireAuth>} />
           <Route path="/assets" element={<RequireAuth><Assets /></RequireAuth>} />

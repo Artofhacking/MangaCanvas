@@ -1,6 +1,23 @@
 import { create } from 'zustand';
-import type { Project, ProjectsStore } from '../types';
+import { workflowsApi } from '@/features/project/api/workflows';
+import type { CustomEdge, CustomNode, Project, ProjectsStore } from '../types';
 import * as db from '../utils/indexedDB';
+
+const emptyCanvasData = (): Project['canvasData'] => ({
+  nodes: [],
+  edges: [],
+  viewport: { x: 100, y: 50, zoom: 0.8 },
+});
+
+const toCanvasData = (canvasData?: {
+  nodes?: unknown[];
+  edges?: unknown[];
+  viewport?: { x: number; y: number; zoom: number };
+}): Project['canvasData'] => ({
+  nodes: (canvasData?.nodes || []) as CustomNode[],
+  edges: (canvasData?.edges || []) as CustomEdge[],
+  viewport: canvasData?.viewport || { x: 100, y: 50, zoom: 0.8 },
+});
 
 // 保存操作的防抖延迟
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -69,7 +86,7 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
     return newProject.id;
   },
 
-  createWorkflowDocument: ({ id, name, projectId, sourceType, sourceAssetId }) => {
+  createWorkflowDocument: ({ id, name, projectId, sourceType, sourceAssetId, canvasData }) => {
     const existingProject = get().projects.find((p) => p.id === id);
     if (existingProject) {
       set({
@@ -81,6 +98,7 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
                 projectId,
                 sourceType,
                 sourceAssetId,
+                canvasData: canvasData ? toCanvasData(canvasData) : project.canvasData,
                 updatedAt: new Date(),
               }
             : project
@@ -99,11 +117,7 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
       projectId,
       sourceType,
       sourceAssetId,
-      canvasData: {
-        nodes: [],
-        edges: [],
-        viewport: { x: 100, y: 50, zoom: 0.8 },
-      },
+      canvasData: canvasData ? toCanvasData(canvasData) : emptyCanvasData(),
     };
 
     const newProjects = [workflowProject, ...get().projects];
@@ -111,6 +125,34 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
     db.saveAllProjects(newProjects as unknown as Record<string, unknown>[]).catch((error) => {
       console.error('Failed to save workflow document:', error);
     });
+  },
+
+  syncProjectWorkflows: async (projectId: string) => {
+    const numericId = Number(projectId);
+    if (!projectId || Number.isNaN(numericId)) {
+      return;
+    }
+
+    const response = await workflowsApi.getAll(numericId, { page: 1, size: 100 });
+    if (!response.success) {
+      return;
+    }
+
+    const remoteDocuments: Project[] = response.data.list.map((workflow) => ({
+      id: workflow.id,
+      name: workflow.name,
+      thumbnail: workflow.thumbnail || '',
+      createdAt: new Date(workflow.modified),
+      updatedAt: new Date(workflow.modified),
+      projectId: String(workflow.projectId),
+      sourceType: workflow.sourceType,
+      sourceAssetId: workflow.sourceAssetId,
+      canvasData: toCanvasData(workflow.canvasData),
+    }));
+
+    const others = get().projects.filter((item) => String(item.projectId) !== String(projectId));
+    set({ projects: [...remoteDocuments, ...others] });
+    get().saveProjects();
   },
 
   // Update project

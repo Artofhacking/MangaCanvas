@@ -36,6 +36,7 @@ import { useCanvasStore } from './stores/canvasStore';
 import { useCanvasDocumentsStore } from './stores/projectsStore';
 import { useThemeStore } from './stores/themeStore';
 import { getAllProjects } from './utils/indexedDB';
+import { workflowsApi } from '@/features/project/api/workflows';
 
 import TextNode from './components/nodes/TextNode';
 import ImageNode from './components/nodes/ImageNode';
@@ -93,7 +94,14 @@ const CanvasInner: React.FC = () => {
     canRedo,
   } = useCanvasStore();
 
-  const { projects, getProjectById, getProjectCanvas, updateProjectCanvas, initProjects } = useCanvasDocumentsStore();
+  const {
+    getProjectById,
+    getProjectCanvas,
+    updateProjectCanvas,
+    initProjects,
+    createWorkflowDocument,
+  } = useCanvasDocumentsStore();
+  const canvasHydratedRef = React.useRef<string | null>(null);
   const { isDark } = useThemeStore();
 
   const [showApiSettings, setShowApiSettings] = useState(false);
@@ -484,24 +492,92 @@ const CanvasInner: React.FC = () => {
     return () => document.removeEventListener('paste', handlePaste);
   }, [viewport, addNode, isLocked]);
 
-  // 初始化 projects
   useEffect(() => {
-    initProjects();
+    void initProjects();
   }, [initProjects]);
 
   useEffect(() => {
-    if (canvasDocumentId && projects.length > 0) {
+    if (!projectId || !canvasDocumentId) return;
+
+    let cancelled = false;
+    canvasHydratedRef.current = null;
+
+    const hydrate = async () => {
+      const numericProjectId = Number(projectId);
+      if (!Number.isNaN(numericProjectId) && workflowId) {
+        const response = await workflowsApi.getById(numericProjectId, workflowId);
+        if (cancelled) return;
+        if (response.success && response.data) {
+          createWorkflowDocument({
+            id: response.data.id,
+            name: response.data.name,
+            projectId: String(projectId),
+            sourceType: response.data.sourceType,
+            sourceAssetId: response.data.sourceAssetId,
+            canvasData: {
+              nodes: (response.data.canvasData?.nodes || []) as import('./types').CustomNode[],
+              edges: (response.data.canvasData?.edges || []) as import('./types').CustomEdge[],
+              viewport: response.data.canvasData?.viewport || { x: 100, y: 50, zoom: 0.8 },
+            },
+          });
+        } else {
+          createWorkflowDocument({
+            id: canvasDocumentId,
+            name: `工作流 ${canvasDocumentId.replace(/^workflow_/, '').slice(0, 8)}`,
+            projectId: String(projectId),
+            sourceType: episodeId ? 'episode' : 'blank',
+            sourceAssetId: episodeId ? Number(episodeId) : undefined,
+          });
+        }
+      } else {
+        createWorkflowDocument({
+          id: canvasDocumentId,
+          name: episodeId ? `片段工作流 ${episodeId}` : `工作流 ${canvasDocumentId.slice(-6)}`,
+          projectId: String(projectId),
+          sourceType: episodeId ? 'episode' : 'blank',
+          sourceAssetId: episodeId ? Number(episodeId) : undefined,
+        });
+      }
+
+      if (cancelled) return;
       loadProject(canvasDocumentId, getProjectCanvas);
-    }
-  }, [canvasDocumentId, projects.length, loadProject, getProjectCanvas]);
+      canvasHydratedRef.current = canvasDocumentId;
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canvasDocumentId,
+    createWorkflowDocument,
+    episodeId,
+    getProjectCanvas,
+    loadProject,
+    projectId,
+    workflowId,
+  ]);
 
   useEffect(() => {
-    if (!canvasDocumentId) return;
+    if (!canvasDocumentId || !projectId) return;
+    if (canvasHydratedRef.current !== canvasDocumentId) return;
+
     const timer = setInterval(() => {
       saveProject(updateProjectCanvas);
-    }, 5000);
+      const numericProjectId = Number(projectId);
+      if (Number.isNaN(numericProjectId) || !workflowId) return;
+      const { nodes: currentNodes, edges: currentEdges, viewport: currentViewport } = useCanvasStore.getState();
+      void workflowsApi.update(numericProjectId, workflowId, {
+        canvasData: {
+          nodes: currentNodes,
+          edges: currentEdges,
+          viewport: currentViewport,
+        },
+      });
+    }, 2500);
+
     return () => clearInterval(timer);
-  }, [canvasDocumentId, nodes, edges, saveProject, updateProjectCanvas]);
+  }, [canvasDocumentId, projectId, saveProject, updateProjectCanvas, workflowId]);
 
   const handleAddNode = (type: string) => {
     const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;

@@ -15,6 +15,12 @@ interface ListData<T> {
 /**
  * 将后端 WorkflowDTO 映射为前端 Workflow 类型
  */
+const emptyCanvas = {
+  nodes: [] as unknown[],
+  edges: [] as unknown[],
+  viewport: { x: 100, y: 50, zoom: 0.8 },
+}
+
 const mapWorkflow = (dto: WorkflowDTO): Workflow => ({
   id: dto.id,
   projectId: String(dto.projectId),
@@ -24,7 +30,11 @@ const mapWorkflow = (dto: WorkflowDTO): Workflow => ({
   status: (dto.status as Workflow['status']) || 'draft',
   modified: dto.updatedAt || dto.createdAt || new Date().toISOString(),
   thumbnail: dto.thumbnail ?? undefined,
-  canvasData: dto.canvasData,
+  canvasData: {
+    nodes: dto.canvasData?.nodes ?? emptyCanvas.nodes,
+    edges: dto.canvasData?.edges ?? emptyCanvas.edges,
+    viewport: dto.canvasData?.viewport ?? emptyCanvas.viewport,
+  },
 })
 
 export const workflowsApi = {

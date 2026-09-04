@@ -51,7 +51,7 @@ def list_workflows(
         .order_by(models.CanvasWorkflow.updated_at.desc())
         .all()
     )
-    items = [serialize.workflow(r, include_canvas=False) for r in rows]
+    items = [serialize.workflow(r, include_canvas=True) for r in rows]
     sliced, pagination = paginate(items, page, size)
     return ok({"list": sliced, "pagination": pagination})
 

@@ -55,15 +55,21 @@ export default function WorkflowsTab() {
   const launchWorkflow = useWorkflowLauncher()
   const projects = useCanvasDocumentsStore((state) => state.projects)
   const initProjects = useCanvasDocumentsStore((state) => state.initProjects)
+  const syncProjectWorkflows = useCanvasDocumentsStore((state) => state.syncProjectWorkflows)
 
   useEffect(() => {
     void initProjects()
   }, [initProjects])
 
+  useEffect(() => {
+    if (!projectId) return
+    void syncProjectWorkflows(projectId)
+  }, [projectId, syncProjectWorkflows])
+
   const workflows = useMemo(
     () =>
       projects
-        .filter((project) => project.projectId === projectId)
+        .filter((project) => String(project.projectId) === String(projectId))
         .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()),
     [projectId, projects]
   )
@@ -137,7 +143,7 @@ export default function WorkflowsTab() {
           <div className="mt-5 space-y-3">
             {workflows.slice(0, 3).map((workflow) => {
               const sourceType = (workflow.sourceType as WorkflowSourceType | undefined) ?? "blank"
-              const meta = sourceTypeMeta[sourceType]
+              const meta = sourceTypeMeta[sourceType] ?? sourceTypeMeta.blank
               const Icon = meta.icon
 
               return (
@@ -179,7 +185,7 @@ export default function WorkflowsTab() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
           {workflows.map((workflow) => {
             const sourceType = (workflow.sourceType as WorkflowSourceType | undefined) ?? "blank"
-            const meta = sourceTypeMeta[sourceType]
+            const meta = sourceTypeMeta[sourceType] ?? sourceTypeMeta.blank
             const Icon = meta.icon
 
             return (
@@ -214,13 +220,13 @@ export default function WorkflowsTab() {
                   <div className="mt-3 flex items-center justify-between text-xs">
                     <span className="text-[hsl(var(--secondary))]">节点数量</span>
                     <span className="font-semibold text-[hsl(var(--on-surface))]">
-                      {workflow.canvasData.nodes.length} 个
+                      {workflow.canvasData?.nodes?.length ?? 0} 个
                     </span>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
                     <span className="text-[hsl(var(--secondary))]">连线数量</span>
                     <span className="font-semibold text-[hsl(var(--on-surface))]">
-                      {workflow.canvasData.edges.length} 条
+                      {workflow.canvasData?.edges?.length ?? 0} 条
                     </span>
                   </div>
                 </div>
