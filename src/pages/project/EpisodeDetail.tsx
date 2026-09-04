@@ -52,11 +52,14 @@ export default function EpisodeDetail() {
   useEffect(() => {
     if (!projectId || !episodeId) return
     void projectApi.episodes.getById(Number(projectId), Number(episodeId)).then((response) => {
-      if (response.success) {
+      if (response.success && response.data) {
         setEpisode(response.data)
+        return
       }
+      notify.error(response.message || "片段不存在")
+      navigate(`/project/${projectId}/episodes`, { replace: true })
     })
-  }, [episodeId, projectId])
+  }, [episodeId, navigate, notify, projectId])
 
   const currentEpisode = {
     ...fallbackEpisode,

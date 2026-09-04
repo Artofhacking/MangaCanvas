@@ -174,7 +174,7 @@ export default function Dashboard() {
 
   // 进入无限画布
   const handleEnterCanvas = () => {
-    navigate(`/project/${currentProject?.id || projectId}/episode/1/canvas`)
+    navigate(`/project/${currentProject?.id || projectId}/workflows`)
   }
 
   return (

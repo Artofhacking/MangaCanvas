@@ -34,7 +34,7 @@ import { projectsApi } from "@/api"
 // 根据身份返回导航项：员工只有基础权限，管理员和超级管理员有完整权限
 const getNavItems = (identity: IdentityOption, projectId?: number) => {
   const baseItems = [
-    { icon: LayoutGrid, label: "工作台", href: projectId ? `/project/${projectId}/episode/1` : "/projects" },
+    { icon: LayoutGrid, label: "工作台", href: projectId ? `/project/${projectId}/episodes` : "/projects" },
     { icon: Box, label: "资产管理", href: projectId ? `/project/${projectId}` : "/projects" },
   ]
 
@@ -163,7 +163,7 @@ export default function Sidebar() {
                   // 2秒 loading 后跳转到项目工作台（默认显示片段管理）
                   setTimeout(() => {
                     setIsSwitching(false)
-                    navigate(`/project/${project.id}/episode/1`, { replace: true })
+                    navigate(`/project/${project.id}/episodes`, { replace: true })
                   }, 2000)
                 }}
                 className="flex items-center justify-between cursor-pointer"
