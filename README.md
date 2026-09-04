@@ -11,6 +11,17 @@ npm run dev
 
 默认开发地址：`http://localhost:5174`
 
+## 发布到生产
+
+GitHub Actions 不负责发版。在能 SSH 到服务器的开发机上：
+
+```bash
+export MANGACANVAS_SSH_KEY=/path/to/your.pem
+npm run deploy
+```
+
+脚本会构建前端、同步后端代码、重启服务，并做健康检查。不会覆盖服务器上的 `backend/.env`（数据库和模型 Key 留在机器上）。可选环境变量见 `scripts/deploy.env.example`。
+
 常用命令：
 
 ```bash

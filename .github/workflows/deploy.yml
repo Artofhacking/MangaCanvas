@@ -1,81 +1,18 @@
 name: Deploy
 
+# GitHub-hosted runners cannot reach the ECS on port 22.
+# Publish from a developer machine:
+#   MANGACANVAS_SSH_KEY=/path/to/key.pem npm run deploy
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: deploy-production
-  cancel-in-progress: true
-
 jobs:
-  deploy:
+  notice:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Install frontend deps
-        run: npm ci
-        env:
-          HUSKY: "0"
-
-      - name: Build frontend
-        run: npm run build
-        env:
-          CI: "true"
-          VITE_MOCK_MODE: "false"
-          VITE_APP_API_BASE_URL: /api/v1
-
-      - name: Upload frontend
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: dist/*
-          target: /tmp/mangacanvas-dist
-          strip_components: 1
-          overwrite: true
-          rm: true
-
-      - name: Upload backend
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: backend/app,backend/requirements.txt
-          target: /tmp/mangacanvas-backend
-          overwrite: true
-          rm: true
-
-      - name: Upload release script
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: scripts/release-on-server.sh
-          target: /tmp
-          overwrite: true
-
-      - name: Restart services
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            chmod +x /tmp/scripts/release-on-server.sh
-            /tmp/scripts/release-on-server.sh /tmp/mangacanvas-dist /tmp/mangacanvas-backend/backend
+      - name: Use the local deploy script
+        run: |
+          echo "Do not deploy from GitHub Actions."
+          echo "On a machine that can SSH to the server:"
+          echo "  MANGACANVAS_SSH_KEY=/path/to/key.pem npm run deploy"
+          exit 1
