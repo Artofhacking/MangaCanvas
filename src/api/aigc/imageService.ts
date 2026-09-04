@@ -31,6 +31,7 @@ export const imageService = {
         prompt: options.prompt,
         n: options.n ?? 1,
         size: options.size ?? '1024x1024',
+        quality: options.quality,
         images: options.images,
         negative_prompt: options.negativePrompt,
       },

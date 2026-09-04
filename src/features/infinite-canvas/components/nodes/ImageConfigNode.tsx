@@ -14,9 +14,9 @@ const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
 // 从尺寸字符串解析比例
 const getSizeRatio = (size: string): string => {
   const ratioMap: Record<string, string> = {
-    '1280*1280': '1:1', '1024*1024': '1:1', '1440*1440': '1:1', '960*960': '1:1',
-    '1696*960': '16:9', '1280*720': '16:9',
-    '960*1696': '9:16', '720*1280': '9:16',
+    '1280*1280': '1:1', '1024*1024': '1:1', '1024x1024': '1:1', '1440*1440': '1:1', '960*960': '1:1',
+    '1696*960': '16:9', '1280*720': '16:9', '1536x1024': '3:2',
+    '960*1696': '9:16', '720*1280': '9:16', '1024x1536': '2:3',
     '1472*1104': '4:3', '1280*960': '4:3', '1088*832': '4:3',
     '1104*1472': '3:4', '960*1280': '3:4', '832*1088': '3:4',
     '1200*800': '3:2', '800*1200': '2:3', '1344*576': '21:9',
@@ -64,12 +64,12 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
   // Get initial model and its default params
   const getInitialValues = () => {
-    const modelKey = data.model || 'wan2.6-t2i';
+    const modelKey = data.model || 'gpt-image-2';
     const model = IMAGE_MODELS.find((m) => m.key === modelKey);
     return {
       model: modelKey,
-      quality: data.quality || model?.defaultParams?.quality || 'standard',
-      size: data.size || model?.defaultParams?.size || '1280*1280',
+      quality: data.quality || model?.defaultParams?.quality || 'medium',
+      size: data.size || model?.defaultParams?.size || '1024x1024',
     };
   };
 
@@ -227,7 +227,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         size: localSize,
         quality: localQuality,
         image: refImages[0],
-        images: isI2I ? refImages : undefined,
+        images: refImages.length ? refImages : undefined,
         n: 1,
       });
 

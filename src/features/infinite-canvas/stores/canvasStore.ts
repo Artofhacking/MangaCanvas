@@ -12,9 +12,9 @@ const getDefaultNodeData = (type: string): NodeData => {
     case 'imageConfig':
       return {
         prompt: '',
-        model: 'wan2.6-t2i',
-        size: '1280*1280',
-        quality: 'standard',
+        model: 'gpt-image-2',
+        size: '1024x1024',
+        quality: 'medium',
         label: '文生图',
       };
     case 'image':

@@ -8,6 +8,10 @@ from ..ai_media import (
     dashscope_async,
     dashscope_chat,
     extract_media_url,
+    openai_image_generate,
+    openai_quality,
+    openai_size,
+    persist_openai_images,
     persist_placeholder,
     persist_remote_url,
 )
@@ -44,19 +48,16 @@ async def _persist_or_placeholder(url: str | None) -> str:
 @router.post("/images/generations")
 async def images(request: Request, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     body = await request.json()
-    model = body.get("model") or "wan2.6-t2i"
+    model = body.get("model") or "gpt-image-2"
     prompt = body.get("prompt") or ""
-    size = str(body.get("size") or "1280*1280").replace("x", "*")
-    images = body.get("images") or ([] if not body.get("image") else [body.get("image")])
+    images = [item for item in (body.get("images") or ([] if not body.get("image") else [body.get("image")])) if item]
     n = int(body.get("n") or 1)
+    quality = body.get("quality")
     _record_usage(db, user, prompt, "ai_image")
 
-    if not settings.dashscope_api_key:
-        urls = [persist_placeholder() for _ in range(max(n, 1))]
-        return ok({"created": int(time.time()), "data": [{"url": url} for url in urls]})
-
     try:
-        if str(model).startswith("wan"):
+        if str(model).startswith("wan") and settings.dashscope_api_key:
+            size = str(body.get("size") or "1280*1280").replace("x", "*")
             content = []
             if prompt:
                 content.append({"text": prompt})
@@ -80,20 +81,28 @@ async def images(request: Request, user: models.User = Depends(current_user), db
             persisted = await _persist_or_placeholder(url)
             return ok({"created": int(time.time()), "data": [{"url": persisted}]})
 
-        import httpx
-
-        async with httpx.AsyncClient(timeout=120) as client:
-            resp = await client.post(
-                f"{settings.dashscope_base_url.rstrip('/')}/images/generations",
-                headers={"Authorization": f"Bearer {settings.dashscope_api_key}"},
-                json=body,
+        if settings.openai_api_key:
+            payload = await openai_image_generate(
+                prompt=prompt,
+                model="gpt-image-2" if str(model).startswith("wan") else model,
+                size=openai_size(body.get("size")),
+                n=n,
+                quality=openai_quality(quality),
+                images=images or None,
             )
-            if resp.status_code >= 400:
-                fail(3001, f"生成任务失败: {resp.text}", 502)
-            payload = resp.json()
-            url = extract_media_url(payload)
-            persisted = await _persist_or_placeholder(url)
-            return ok({"created": int(time.time()), "data": [{"url": persisted}]})
+            urls = persist_openai_images(payload)
+            if not urls:
+                remote = extract_media_url(payload)
+                urls = [await _persist_or_placeholder(remote)]
+            else:
+                persisted = []
+                for url in urls:
+                    persisted.append(url if url.startswith(settings.public_base_url) else await _persist_or_placeholder(url))
+                urls = persisted
+            return ok({"created": int(time.time()), "data": [{"url": url} for url in urls]})
+
+        urls = [persist_placeholder() for _ in range(max(n, 1))]
+        return ok({"created": int(time.time()), "data": [{"url": url} for url in urls]})
     except ApiError:
         raise
     except Exception as exc:
@@ -211,11 +220,11 @@ def models_list(_user: models.User = Depends(current_user)):
     return ok(
         {
             "list": [
+                {"id": "gpt-image-2", "owned_by": "nexcor", "modality": "image"},
                 {"id": "wan2.6-t2i", "owned_by": "dashscope", "modality": "image"},
                 {"id": "wan2.6-image", "owned_by": "dashscope", "modality": "image"},
                 {"id": "wan2.6-t2v", "owned_by": "dashscope", "modality": "video"},
                 {"id": "wan2.6-i2v-flash", "owned_by": "dashscope", "modality": "video"},
-                {"id": "qwen-image-2.0", "owned_by": "dashscope", "modality": "image"},
                 {"id": "qwen-plus", "owned_by": "dashscope", "modality": "text"},
             ]
         }

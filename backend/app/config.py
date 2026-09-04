@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     refresh_expire_seconds: int = 2592000
     dashscope_api_key: str = ""
     dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    openai_api_key: str = ""
+    openai_base_url: str = "https://cc.nexcor.ai/v1"
     seed_email: str = "superadmin@artofhacking.com"
     seed_password: str = "123456"
     seed_username: str = "superadmin"

@@ -103,6 +103,112 @@ async def persist_remote_url(url: str) -> str:
         return persist_bytes(resp.content, suffix)
 
 
+def persist_b64_image(b64_data: str, suffix: str = ".png") -> str:
+    return persist_bytes(base64.b64decode(b64_data), suffix)
+
+
+def openai_size(size: str | None) -> str:
+    raw = str(size or "1024x1024").replace("*", "x").lower()
+    mapping = {
+        "1280x1280": "1024x1024",
+        "1440x1440": "1024x1024",
+        "1024x1024": "1024x1024",
+        "1696x960": "1536x1024",
+        "1280x720": "1536x1024",
+        "1472x1104": "1536x1024",
+        "1280x960": "1536x1024",
+        "960x1696": "1024x1536",
+        "720x1280": "1024x1536",
+        "1104x1472": "1024x1536",
+        "960x1280": "1024x1536",
+        "1024x1536": "1024x1536",
+        "1536x1024": "1536x1024",
+    }
+    return mapping.get(raw, raw if "x" in raw else "1024x1024")
+
+
+def openai_quality(quality: str | None) -> str:
+    raw = (quality or "medium").lower()
+    mapping = {
+        "standard": "medium",
+        "hd": "high",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+    }
+    return mapping.get(raw, "medium")
+
+
+async def load_image_bytes(url: str) -> bytes:
+    if url.startswith("data:"):
+        _, _, payload = url.partition(",")
+        return base64.b64decode(payload)
+    local = local_file_for_url(url)
+    if local:
+        return local.read_bytes()
+    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+        resp = await client.get(url, headers={"User-Agent": "MangaCanvas/1.0"})
+        if resp.status_code >= 400:
+            fail(3001, f"读取参考图失败: {resp.status_code}", 502)
+        return resp.content
+
+
+def persist_openai_images(payload: dict) -> list[str]:
+    urls: list[str] = []
+    for item in payload.get("data") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("b64_json"):
+            fmt = str(payload.get("output_format") or "png").lower()
+            suffix = ".jpg" if fmt in {"jpeg", "jpg"} else f".{fmt}" if fmt in {"png", "webp"} else ".png"
+            urls.append(persist_b64_image(item["b64_json"], suffix))
+        elif item.get("url"):
+            urls.append(item["url"])
+    return urls
+
+
+async def openai_image_generate(
+    *,
+    prompt: str,
+    model: str,
+    size: str,
+    n: int,
+    quality: str,
+    images: list[str] | None = None,
+) -> dict:
+    if not settings.openai_api_key:
+        fail(3001, "未配置图片模型 API Key", 503)
+    base = settings.openai_base_url.rstrip("/")
+    headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
+    async with httpx.AsyncClient(timeout=180) as client:
+        if images:
+            image_bytes = await load_image_bytes(images[0])
+            files = {"image": ("reference.png", image_bytes, "image/png")}
+            data = {
+                "model": model,
+                "prompt": prompt or "edit this image",
+                "n": str(max(n, 1)),
+                "size": size,
+                "quality": quality,
+            }
+            resp = await client.post(f"{base}/images/edits", headers=headers, files=files, data=data)
+        else:
+            resp = await client.post(
+                f"{base}/images/generations",
+                headers={**headers, "Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "prompt": prompt or "manga still",
+                    "n": max(n, 1),
+                    "size": size,
+                    "quality": quality,
+                },
+            )
+        if resp.status_code >= 400:
+            fail(3001, f"生成任务失败: {resp.text[:500]}", 502)
+        return resp.json()
+
+
 def extract_media_url(payload: dict) -> str | None:
     output = payload.get("output") if isinstance(payload, dict) else None
     if isinstance(output, dict):

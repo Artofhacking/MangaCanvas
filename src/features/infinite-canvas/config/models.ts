@@ -2,6 +2,28 @@ import type { ModelConfig, SizeOption } from '../types';
 
 export const IMAGE_MODELS: ModelConfig[] = [
   {
+    key: 'gpt-image-2',
+    label: 'GPT Image 2 文生图',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '低', key: 'low' },
+      { label: '中', key: 'medium' },
+      { label: '高', key: 'high' },
+    ],
+    defaultParams: {
+      size: '1024x1024',
+      quality: 'medium',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1024x1024)', key: '1024x1024' },
+        { label: '3:4 (1024x1536)', key: '1024x1536' },
+        { label: '4:3 (1536x1024)', key: '1536x1024' },
+      ];
+    },
+  },
+  {
     key: 'wan2.6-t2i',
     label: '万相 2.6 文生图',
     type: 'image',
