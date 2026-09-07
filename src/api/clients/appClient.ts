@@ -5,7 +5,7 @@ import { redirectToLogin } from '@/lib/session'
 
 export const appClient = createHttpClient({
   baseURL: DEFAULT_APP_API_BASE_URL,
-  timeout: 300000,
+  timeout: 600000,
   headers: {
     'Content-Type': 'application/json',
   },

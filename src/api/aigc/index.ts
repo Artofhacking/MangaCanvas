@@ -9,7 +9,7 @@
  *   const urls = await imageService.generate({ model: 'wan2.6-t2i', prompt: '...' })
  *
  *   // 生成视频
- *   const videoUrl = await videoService.generate({ model: 'wan2.6-i2v-flash', prompt: '...' })
+ *   const videoUrl = await videoService.generate({ model: 'happyhorse-1.1-i2v', prompt: '...' })
  *
  *   // 聊天
  *   const answer = await chatService.complete({ model: 'qwen-plus', messages: [...] })

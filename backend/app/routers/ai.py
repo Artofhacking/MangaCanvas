@@ -11,9 +11,12 @@ from ..ai_media import (
     openai_image_generate,
     openai_quality,
     openai_size,
+    openai_video_generate,
+    openai_video_size,
     persist_openai_images,
     persist_placeholder,
     persist_remote_url,
+    video_template_prompt,
 )
 from ..config import settings
 from ..db import get_db
@@ -112,7 +115,7 @@ async def images(request: Request, user: models.User = Depends(current_user), db
 @router.post("/videos/generations")
 async def videos(request: Request, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     body = await request.json()
-    model = body.get("model") or "wan2.6-t2v"
+    model = body.get("model") or "happyhorse-1.1-t2v"
     prompt = body.get("prompt") or ""
     size = str(body.get("size") or "1280*720").replace("x", "*")
     resolution = body.get("resolution") or "720P"
@@ -122,8 +125,29 @@ async def videos(request: Request, user: models.User = Depends(current_user), db
     template = body.get("template")
     _record_usage(db, user, prompt, "ai_video")
 
+    if settings.openai_api_key:
+        try:
+            if template:
+                if not first_frame:
+                    fail(3001, "特效视频需要首帧图片", 400)
+                prompt = video_template_prompt(template, prompt)
+                model = "happyhorse-1.1-i2v"
+            url = await openai_video_generate(
+                prompt=prompt,
+                model=model,
+                size=openai_video_size(size, resolution),
+                duration=duration,
+                first_frame=first_frame,
+            )
+            persisted = await persist_remote_url(url)
+            return ok({"url": persisted})
+        except ApiError:
+            raise
+        except Exception as exc:
+            fail(3001, f"视频生成失败: {exc}", 502)
+
     if not settings.dashscope_api_key:
-        fail(3001, "未配置 DashScope API Key，无法生成视频", 503)
+        fail(3001, "未配置视频模型 API Key", 503)
 
     try:
         if template and first_frame:
@@ -221,11 +245,11 @@ def models_list(_user: models.User = Depends(current_user)):
         {
             "list": [
                 {"id": "gpt-image-2", "owned_by": "nexcor", "modality": "image"},
+                {"id": "happyhorse-1.1-t2v", "owned_by": "nexcor", "modality": "video"},
+                {"id": "happyhorse-1.1-i2v", "owned_by": "nexcor", "modality": "video"},
                 {"id": "wan2.6-t2i", "owned_by": "dashscope", "modality": "image"},
                 {"id": "wan2.6-image", "owned_by": "dashscope", "modality": "image"},
-                {"id": "wan2.6-t2v", "owned_by": "dashscope", "modality": "video"},
-                {"id": "wan2.6-i2v-flash", "owned_by": "dashscope", "modality": "video"},
-                {"id": "qwen-plus", "owned_by": "dashscope", "modality": "text"},
+                {"id": "qwen-plus", "owned_by": "nexcor", "modality": "text"},
             ]
         }
     )

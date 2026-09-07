@@ -2,9 +2,9 @@ import { appClient } from '@/api/clients/appClient'
 import { requestData } from '@/api/core/response'
 import type { VideoGenerateOptions } from './types'
 
-export const isT2VModel = (model: string) => model.startsWith('wan') && model.includes('t2v')
-export const isI2VModel = (model: string) => model.startsWith('wan') && model.includes('i2v')
-export const isKF2VModel = (model: string) => model.startsWith('wan') && model.includes('kf2v')
+export const isT2VModel = (model: string) => model.includes('t2v')
+export const isI2VModel = (model: string) => model.includes('i2v')
+export const isKF2VModel = (model: string) => model.includes('kf2v')
 export const isVideoModel = (model: string) => isT2VModel(model) || isI2VModel(model) || isKF2VModel(model)
 
 export const videoService = {
@@ -13,6 +13,7 @@ export const videoService = {
     const result = await requestData<{ url: string }>(appClient, {
       url: '/ai/videos/generations',
       method: 'POST',
+      timeout: 600000,
       data: {
         model: options.model,
         prompt: options.prompt,

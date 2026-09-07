@@ -199,7 +199,7 @@ export const useWorkflowOrchestrator = (): UseWorkflowOrchestratorReturn => {
           'videoConfig',
           { x: startX + 800, y: startY + 100 },
           {
-            model: 'wan2.6-i2v-flash',
+            model: 'happyhorse-1.1-i2v',
             resolution: '720P',
             duration: 5,
           }

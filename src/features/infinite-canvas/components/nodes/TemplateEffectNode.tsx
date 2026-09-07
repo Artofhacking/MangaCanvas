@@ -67,7 +67,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
     updateNode(id, {
       resolution: localResolution,
       template: localTemplate,
-      model: 'wan2.6-i2v-flash',
+      model: 'happyhorse-1.1-i2v',
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localResolution, localTemplate]);
@@ -147,8 +147,8 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       {
         label: getTemplateLabel(localTemplate),
         loading: true,
-        model: 'wan2.6-i2v-flash',
-        modelLabel: '万相 2.6 图生视频',
+        model: 'happyhorse-1.1-i2v',
+        modelLabel: 'HappyHorse 图生视频',
         template: localTemplate,
         templateLabel: getTemplateLabel(localTemplate),
         resolution: localResolution,
@@ -159,7 +159,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
 
     try {
       const videoUrl = await generate({
-        model: 'wan2.6-i2v-flash',
+        model: 'happyhorse-1.1-i2v',
         prompt: '',
         first_frame_image: imageUrl,
         resolution: localResolution as string,

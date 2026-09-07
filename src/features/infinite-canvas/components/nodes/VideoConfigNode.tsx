@@ -4,7 +4,7 @@ import { Button, Select, message, Input } from 'antd';
 import { PlayCircleOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useVideoGeneration } from '../../hooks';
-import { VIDEO_MODELS } from '../../config/models';
+import { VIDEO_MODELS, remapVideoModel } from '../../config/models';
 import { isT2VModel, isKF2VModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
 
@@ -63,7 +63,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
   // Get initial values based on model
   const getInitialValues = () => {
-    const modelKey = data.model || 'wan2.6-t2v';
+    const modelKey = remapVideoModel(data.model);
     const model = VIDEO_MODELS.find((m) => m.key === modelKey);
     return {
       model: modelKey,

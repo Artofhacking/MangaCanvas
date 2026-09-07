@@ -22,7 +22,7 @@ const getDefaultNodeData = (type: string): NodeData => {
     case 'videoConfig':
       return {
         prompt: '',
-        model: 'wan2.6-t2v',
+        model: 'happyhorse-1.1-t2v',
         size: '1280*720',
         duration: 5,
         label: '视频生成',

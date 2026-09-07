@@ -283,7 +283,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         position: { x: startPosition.x + 1220, y: startPosition.y + 280 },
         data: {
           label: '图生视频',
-          model: 'wan2.6-i2v-flash',
+          model: 'happyhorse-1.1-i2v',
           resolution: '720P',
           duration: 5,
         },
@@ -392,7 +392,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
             label: '图生视频-特效',
             resolution: '720P',
             template: config.template,
-            model: 'wan2.6-i2v-flash',
+            model: 'happyhorse-1.1-i2v',
           },
         });
 

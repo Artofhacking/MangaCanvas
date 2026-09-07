@@ -49,7 +49,7 @@ COPYFILE_DISABLE=1 tar czf - -C "$ROOT/backend" app requirements.txt | ssh_cmd \
   "mkdir -p /tmp/mangacanvas-release && rm -rf /tmp/mangacanvas-release/* && tar xzf - -C /tmp/mangacanvas-release && test -f /tmp/mangacanvas-release/app/main.py && test -f /tmp/mangacanvas-release/requirements.txt && cp -a /tmp/mangacanvas-release/app/. '$APP_ROOT/app/' && cp /tmp/mangacanvas-release/requirements.txt '$APP_ROOT/requirements.txt'"
 
 echo "==> install deps and restart"
-ssh_cmd "cd '$APP_ROOT' && .venv/bin/pip install -r requirements.txt -q && sudo systemctl restart mangacanvas && sudo systemctl reload nginx"
+ssh_cmd "cd '$APP_ROOT' && .venv/bin/pip install -r requirements.txt -q && sudo systemctl restart mangacanvas && sudo sed -i 's/proxy_read_timeout [0-9]\\+s;/proxy_read_timeout 600s;/' /etc/nginx/conf.d/mangacanvas.conf && sudo nginx -t && sudo systemctl reload nginx"
 
 echo "==> health check"
 ok=0
