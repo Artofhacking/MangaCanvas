@@ -71,7 +71,7 @@ export default function SceneCreator({
   const isEditMode = mode === 'edit' && initialData != null
   const { models: imageModels, loading: modelsLoading, error: modelsError, refetch } = useImageModels()
   const { generate } = useImageGeneration()
-  const [selectedModel, setSelectedModel] = useState<string>("gpt-image-2")
+  const [selectedModel, setSelectedModel] = useState<string>("")
   const [tasks, setTasks] = useState<SceneGenTask[]>([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -83,11 +83,21 @@ export default function SceneCreator({
   const initializedRef = useRef(false)
   const prevOpenRef = useRef(open)
 
+  useEffect(() => {
+    if (!imageModels.length) {
+      if (!modelsLoading) setSelectedModel("")
+      return
+    }
+    if (!selectedModel || !imageModels.some((model) => model.id === selectedModel)) {
+      setSelectedModel(imageModels[0].id)
+    }
+  }, [imageModels, modelsLoading, selectedModel])
+
   // 重置表单的函数
   const resetForm = () => {
     setSceneName("")
     setDescription("")
-    setSelectedModel(imageModels.find((model) => model.id === "gpt-image-2")?.id || imageModels[0]?.id || "gpt-image-2")
+    setSelectedModel(imageModels[0]?.id || "")
     setDistance([8.0])
     setZoom(0.6)
     setTasks([])
@@ -148,6 +158,11 @@ export default function SceneCreator({
       return
     }
 
+    if (!selectedModel) {
+      notify.warning("暂无可用生图模型")
+      return
+    }
+
     const taskId = `scene_${Date.now()}`
     const task: SceneGenTask = {
       id: taskId,
@@ -162,7 +177,7 @@ export default function SceneCreator({
     try {
       const urls = await generate(
         {
-          model: selectedModel || "gpt-image-2",
+          model: selectedModel,
           prompt: description.trim(),
           size: "1536x1024",
           quality: "medium",
@@ -189,7 +204,7 @@ export default function SceneCreator({
       onCreate?.({
         name: sceneName.trim(),
         genMethod: "model",
-        model: selectedModel || "gpt-image-2",
+        model: selectedModel,
         description: description.trim(),
         distance: distance[0],
         zoom,
@@ -198,6 +213,7 @@ export default function SceneCreator({
       })
       notify.success("场景已生成")
     } catch (error) {
+      refetch()
       const messageText = error instanceof Error ? error.message : "生成失败"
       setTasks((current) =>
         current.map((item) =>

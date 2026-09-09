@@ -3,8 +3,8 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Button, Select, message, Input } from 'antd';
 import { PlayCircleOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
-import { useVideoGeneration } from '../../hooks';
-import { VIDEO_MODELS, remapVideoModel } from '../../config/models';
+import { useVideoGeneration, useVideoModels } from '../../hooks';
+import { VIDEO_MODELS, remapVideoModel, filterLiveModels } from '../../config/models';
 import { isT2VModel, isKF2VModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
 
@@ -32,6 +32,11 @@ const RESOLUTIONS = ['1080P', '720P'];
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { nodes, edges, updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore();
   const { generate } = useVideoGeneration();
+  const { models: liveVideoModels, loading: liveModelsLoading } = useVideoModels();
+  const pickerModels = useMemo(
+    () => filterLiveModels(VIDEO_MODELS, liveVideoModels.map((item) => item.id)),
+    [liveVideoModels]
+  );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '视频生成');
 
@@ -99,6 +104,15 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (liveModelsLoading || pickerModels.length === 0) return
+    if (!pickerModels.some((model) => model.key === localModel)) {
+      const next = pickerModels[0]
+      setLocalModel(next.key)
+      updateNode(id, { model: next.key })
+    }
+  }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
 
   const currentModel = useMemo(() => VIDEO_MODELS.find((m) => m.key === localModel), [localModel]);
   const isT2V = useMemo(() => isT2VModel(localModel), [localModel]);
@@ -403,7 +417,9 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               value={localModel}
               onChange={handleModelChange}
               style={{ width: '100%' }}
-              options={VIDEO_MODELS.map((m) => ({ label: m.label, value: m.key }))}
+              options={pickerModels.map((m) => ({ label: m.label, value: m.key }))}
+              placeholder={liveModelsLoading ? '检测可用模型...' : '暂无可用模型'}
+              loading={liveModelsLoading}
               popupClassName="nodrag nowheel"
             />
           </div>

@@ -64,7 +64,7 @@ export const useModelsStore = create<ModelsState>()(
         
         // 如果已成功且未过期，不重复请求（除非强制刷新）
         if (!force && status === 'success' && lastFetchedAt) {
-          const CACHE_TTL = 5 * 60 * 1000  // 5分钟
+          const CACHE_TTL = 60 * 1000
           const isExpired = Date.now() - lastFetchedAt > CACHE_TTL
           if (!isExpired) return
         }

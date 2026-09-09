@@ -22,6 +22,7 @@ from ..config import settings
 from ..db import get_db
 from ..deps import current_user
 from ..errors import ApiError, fail, ok
+from ..model_probe import available_models, note_upstream_result
 
 router = APIRouter(prefix="/ai")
 
@@ -85,9 +86,12 @@ async def images(request: Request, user: models.User = Depends(current_user), db
             return ok({"created": int(time.time()), "data": [{"url": persisted}]})
 
         if settings.openai_api_key:
+            resolved = model
+            if str(model).startswith("wan") and not str(model).startswith("wan2.7"):
+                resolved = "wan2.7-image"
             payload = await openai_image_generate(
                 prompt=prompt,
-                model="gpt-image-2" if str(model).startswith("wan") else model,
+                model=resolved,
                 size=openai_size(body.get("size")),
                 n=n,
                 quality=openai_quality(quality),
@@ -109,6 +113,7 @@ async def images(request: Request, user: models.User = Depends(current_user), db
     except ApiError:
         raise
     except Exception as exc:
+        note_upstream_result(str(model), 0, str(exc))
         fail(3001, f"生成任务失败: {exc}", 502)
 
 
@@ -144,6 +149,7 @@ async def videos(request: Request, user: models.User = Depends(current_user), db
         except ApiError:
             raise
         except Exception as exc:
+            note_upstream_result(str(model), 0, str(exc))
             fail(3001, f"视频生成失败: {exc}", 502)
 
     if not settings.dashscope_api_key:
@@ -240,19 +246,11 @@ async def chat(request: Request, user: models.User = Depends(current_user), db: 
 
 
 @router.get("/models")
-def models_list(_user: models.User = Depends(current_user)):
-    return ok(
-        {
-            "list": [
-                {"id": "gpt-image-2", "owned_by": "nexcor", "modality": "image"},
-                {"id": "happyhorse-1.1-t2v", "owned_by": "nexcor", "modality": "video"},
-                {"id": "happyhorse-1.1-i2v", "owned_by": "nexcor", "modality": "video"},
-                {"id": "wan2.6-t2i", "owned_by": "dashscope", "modality": "image"},
-                {"id": "wan2.6-image", "owned_by": "dashscope", "modality": "image"},
-                {"id": "qwen-plus", "owned_by": "nexcor", "modality": "text"},
-            ]
-        }
-    )
+async def models_list(modality: str | None = None, _user: models.User = Depends(current_user)):
+    kind = (modality or "").strip().lower() or None
+    if kind not in {None, "image", "video", "text"}:
+        kind = None
+    return ok({"list": await available_models(kind)})
 
 
 @router.get("/balance")

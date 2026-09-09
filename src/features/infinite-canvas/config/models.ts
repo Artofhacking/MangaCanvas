@@ -24,6 +24,90 @@ export const IMAGE_MODELS: ModelConfig[] = [
     },
   },
   {
+    key: 'wan2.7-image',
+    label: '万相 2.7 文生图',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '标准', key: 'standard' },
+    ],
+    defaultParams: {
+      size: '1280*1280',
+      quality: 'standard',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1280*1280)', key: '1280*1280' },
+        { label: '3:4 (1104*1472)', key: '1104*1472' },
+        { label: '4:3 (1472*1104)', key: '1472*1104' },
+        { label: '9:16 (960*1696)', key: '960*1696' },
+        { label: '16:9 (1696*960)', key: '1696*960' },
+      ];
+    },
+  },
+  {
+    key: 'wan2.7-image-pro',
+    label: '万相 2.7 文生图 Pro',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '标准', key: 'standard' },
+    ],
+    defaultParams: {
+      size: '1280*1280',
+      quality: 'standard',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1280*1280)', key: '1280*1280' },
+        { label: '3:4 (1104*1472)', key: '1104*1472' },
+        { label: '4:3 (1472*1104)', key: '1472*1104' },
+        { label: '9:16 (960*1696)', key: '960*1696' },
+        { label: '16:9 (1696*960)', key: '1696*960' },
+      ];
+    },
+  },
+  {
+    key: 'qwen-image-2.0',
+    label: '通义千问生图',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '标准', key: 'standard' },
+    ],
+    defaultParams: {
+      size: '1024x1024',
+      quality: 'standard',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1024x1024)', key: '1024x1024' },
+        { label: '3:4 (1024x1536)', key: '1024x1536' },
+        { label: '4:3 (1536x1024)', key: '1536x1024' },
+      ];
+    },
+  },
+  {
+    key: 'qwen-image-2.0-pro',
+    label: '通义千问生图 Pro',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '标准', key: 'standard' },
+    ],
+    defaultParams: {
+      size: '1024x1024',
+      quality: 'standard',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1024x1024)', key: '1024x1024' },
+        { label: '3:4 (1024x1536)', key: '1024x1536' },
+        { label: '4:3 (1536x1024)', key: '1536x1024' },
+      ];
+    },
+  },
+  {
     key: 'wan2.6-t2i',
     label: '万相 2.6 文生图',
     type: 'image',
@@ -114,6 +198,11 @@ export const VIDEO_MODELS: ModelConfig[] = [
     },
   },
 ];
+
+export function filterLiveModels<T extends { key: string }>(all: T[], liveIds: string[]): T[] {
+  const set = new Set(liveIds)
+  return all.filter((item) => set.has(item.key))
+}
 
 export function remapVideoModel(key: string | undefined): string {
   const name = key || 'happyhorse-1.1-t2v'

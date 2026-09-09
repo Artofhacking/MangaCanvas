@@ -3,8 +3,8 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Button, Select, message, Input } from 'antd';
 import { ThunderboltOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
-import { useImageGeneration } from '../../hooks';
-import { IMAGE_MODELS } from '../../config/models';
+import { useImageGeneration, useImageModels } from '../../hooks';
+import { IMAGE_MODELS, filterLiveModels } from '../../config/models';
 import { isI2IModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
 
@@ -33,6 +33,11 @@ const getShortLabelFromModel = (modelLabel: string): string => {
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { nodes, edges, updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore();
   const { generate } = useImageGeneration();
+  const { models: liveImageModels, loading: liveModelsLoading } = useImageModels();
+  const pickerModels = useMemo(
+    () => filterLiveModels(IMAGE_MODELS, liveImageModels.map((item) => item.id)),
+    [liveImageModels]
+  );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '文生图');
 
@@ -78,6 +83,15 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [localQuality, setLocalQuality] = useState(initialValues.quality);
   const [localSize, setLocalSize] = useState(initialValues.size);
   const [localRatio, setLocalRatio] = useState(getSizeRatio(initialValues.size));
+
+  useEffect(() => {
+    if (liveModelsLoading || pickerModels.length === 0) return
+    if (!pickerModels.some((model) => model.key === localModel)) {
+      const next = pickerModels[0]
+      setLocalModel(next.key)
+      updateNode(id, { model: next.key })
+    }
+  }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
 
   const currentModel = useMemo(() => IMAGE_MODELS.find((m) => m.key === localModel), [localModel]);
   const isI2I = useMemo(() => isI2IModel(localModel), [localModel]);
@@ -344,7 +358,9 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             value={localModel}
             onChange={handleModelChange}
             style={{ width: '100%' }}
-            options={IMAGE_MODELS.map((m) => ({ label: m.label, value: m.key }))}
+            options={pickerModels.map((m) => ({ label: m.label, value: m.key }))}
+            placeholder={liveModelsLoading ? '检测可用模型...' : '暂无可用模型'}
+            loading={liveModelsLoading}
             popupClassName="nodrag nowheel"
           />
         </div>

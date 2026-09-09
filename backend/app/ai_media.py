@@ -205,6 +205,9 @@ async def openai_image_generate(
                 },
             )
         if resp.status_code >= 400:
+            from .model_probe import note_upstream_result
+
+            note_upstream_result(model, resp.status_code, resp.text)
             fail(3001, f"生成任务失败: {resp.text[:500]}", 502)
         return resp.json()
 
@@ -384,6 +387,9 @@ async def openai_video_generate(
     async with httpx.AsyncClient(timeout=60) as client:
         submit = await client.post(f"{base}/video/generations", headers=headers, json=body)
         if submit.status_code >= 400:
+            from .model_probe import note_upstream_result
+
+            note_upstream_result(resolved, submit.status_code, submit.text)
             fail(3001, f"视频任务提交失败: {submit.text[:500]}", 502)
         submitted = submit.json()
         task_id = _video_task_id(submitted)
