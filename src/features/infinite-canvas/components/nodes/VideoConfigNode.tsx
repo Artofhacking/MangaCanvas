@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Button, message, Input } from 'antd';
-import { PlayCircleOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { message, Input } from 'antd';
+import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
-import { useVideoGeneration, useVideoModels } from '../../hooks';
+import { useVideoModels } from '../../hooks';
 import { VIDEO_MODELS, remapVideoModel, resolvePickerModels } from '../../config/models';
-import { isT2VModel, isI2VModel, isKF2VModel, isSeedanceModel, isMiniMaxModel } from '@/api/aigc';
-import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { isT2VModel, isKF2VModel, isSeedanceModel, isMiniMaxModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
-import { collectGenerateInputs } from '../../utils/generateSlots';
 import NodeSelect from '../NodeSelect';
 
 // 尺寸映射表
@@ -34,16 +32,13 @@ const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
 const RESOLUTIONS = ['1080P', '720P'];
 
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore(
+  const { updateNode, duplicateNode, removeNode } = useCanvasStore(
     useShallow((state) => ({
       updateNode: state.updateNode,
-      addNode: state.addNode,
-      addEdgeManually: state.addEdgeManually,
       duplicateNode: state.duplicateNode,
       removeNode: state.removeNode,
     }))
   );
-  const { generate } = useVideoGeneration();
   const { models: liveVideoModels, loading: liveModelsLoading } = useVideoModels();
   const pickerModels = useMemo(
     () => resolvePickerModels(VIDEO_MODELS, liveVideoModels.map((item) => item.id), liveModelsLoading),
@@ -65,11 +60,11 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     [pickerModels, incomingImageCount]
   );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
-  const [editLabel, setEditLabel] = useState(data.label || '视频生成');
+  const [editLabel, setEditLabel] = useState(data.label || '视频节点');
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditLabel(data.label || '视频生成');
+    setEditLabel(data.label || '视频节点');
     setIsEditingLabel(true);
   }, [data.label]);
 
@@ -89,7 +84,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       handleLabelBlur();
     } else if (e.key === 'Escape') {
       setIsEditingLabel(false);
-      setEditLabel(data.label || '视频生成');
+      setEditLabel(data.label || '视频节点');
     }
   }, [handleLabelBlur, data.label]);
 
@@ -174,6 +169,22 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     updateNode(id, { duration: next })
   }, [currentModel, localDuration, id, updateNode])
 
+  useEffect(() => {
+    if (typeof data.model === 'string' && data.model) {
+      const nextModel = remapVideoModel(data.model)
+      if (nextModel !== localModel) setLocalModel(nextModel)
+    }
+    if (typeof data.size === 'string' && data.size && data.size !== localSize) {
+      setLocalSize(data.size)
+    }
+    if (typeof data.resolution === 'string' && data.resolution && data.resolution !== localResolution) {
+      setLocalResolution(data.resolution)
+    }
+    if (typeof data.duration === 'number' && data.duration && data.duration !== localDuration) {
+      setLocalDuration(data.duration)
+    }
+  }, [data.duration, data.model, data.resolution, data.size, localDuration, localModel, localResolution, localSize])
+
   // Handle model change
   const handleModelChange = (value: string) => {
     setLocalModel(value);
@@ -238,106 +249,6 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const handleDurationChange = (value: number) => {
     setLocalDuration(value);
     updateNode(id, { duration: value });
-  };
-
-  const getConnectedInputs = () => {
-    const { nodes, edges } = useCanvasStore.getState();
-    return collectGenerateInputs(id, nodes, edges, {
-      includeCamera: true,
-      localPrompt: typeof data.prompt === 'string' ? data.prompt : '',
-    });
-  };
-
-  const handleGenerate = async () => {
-    const { prompt, firstFrameImage, lastFrameImage, refImages, slots } = getConnectedInputs();
-    const referenceImages = refImages.length ? refImages : [firstFrameImage, lastFrameImage].filter(Boolean);
-    const hasImages = referenceImages.length > 0;
-    const imageNames = slots.filter((slot) => slot.kind === 'image').map((slot) => slot.label);
-
-    // 关键帧生视频需要首帧和尾帧
-    if (isKF2V) {
-      if (!firstFrameImage) {
-        message.warning('请连接首帧图片节点');
-        return;
-      }
-      if (!lastFrameImage) {
-        message.warning('请连接尾帧图片节点');
-        return;
-      }
-    } else if (!prompt && !hasImages) {
-      message.warning('请连接剧情文本或参考图');
-      return;
-    }
-
-    // 文生视频需要文本输入
-    if (isT2V && !prompt) {
-      message.warning('请先填写提示词，或连入文本节点');
-      return;
-    }
-
-    const { nodes, edges } = useCanvasStore.getState();
-    const node = nodes.find((n) => n.id === id);
-    if (!node) return;
-
-    const outgoing = edges.filter((e) => e.source === id);
-    const xOffset = outgoing.length * 320;
-
-    // 获取模型名称
-    const modelLabel = VIDEO_MODELS.find(m => m.key === localModel)?.label || localModel;
-
-    const videoNodeId = addNode(
-      'video',
-      { x: node.position.x + 400 + xOffset, y: node.position.y },
-      { 
-        label: '视频生成结果', 
-        loading: true,
-        // 保存生成参数
-        prompt: prompt || '',
-        model: localModel,
-        modelLabel,
-        size: localSize,
-        resolution: localResolution as string,
-        duration: localDuration,
-      }
-    );
-
-    addEdgeManually({ source: id, target: videoNodeId });
-
-    try {
-      const videoUrl = await generate({
-        model: hasImages
-          ? referenceImages.length >= 2
-            ? 'happyhorse-1.1-r2v'
-            : isI2VModel(localModel)
-              ? localModel
-              : 'happyhorse-1.1-i2v'
-          : localModel,
-        prompt: prompt || '',
-        first_frame_image: referenceImages[0] || firstFrameImage,
-        last_frame_image: lastFrameImage,
-        images: hasImages ? referenceImages.slice(0, 3) : undefined,
-        imageNames: hasImages ? imageNames.slice(0, 3) : undefined,
-        seconds: localDuration,
-        size: localSize,
-        resolution: localResolution,
-      });
-
-      if (videoUrl) {
-        updateNode(videoNodeId, { url: videoUrl, loading: false, updatedAt: Date.now() });
-      } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败' });
-      }
-      persistOpenCanvas();
-    } catch (err: unknown) {
-      // 处理 429 错误 - 删除节点并显示友好提示
-      if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
-        removeNode(videoNodeId);
-        message.warning('请求过于频繁，请稍后重试');
-      } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败' });
-      }
-      persistOpenCanvas();
-    }
   };
 
   const handleDuplicate = (e: React.MouseEvent) => {
@@ -421,7 +332,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               onDoubleClick={handleLabelDoubleClick}
               title="双击编辑"
             >
-              🎬 {data.label || '视频生成'}
+              🎬 {data.label || '视频节点'}
             </span>
           )}
           <div className="flex items-center gap-1">
@@ -447,7 +358,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         <div className="p-4 space-y-3 nodrag">
           {incomingImageCount > 0 ? (
             <div className="text-xs leading-5" style={{ color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))' }}>
-              已连接 {incomingImageCount} 张参考图，将用图片+文字直接生成视频
+              已连接 {incomingImageCount} 张参考图，用底部生成栏发送
             </div>
           ) : (
             <div>
@@ -597,15 +508,15 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             />
           </div>
 
-          {/* Generate Button */}
-          <Button
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            onClick={handleGenerate}
-            block
+          <div
+            className="rounded-lg px-3 py-2 text-[11px] leading-5"
+            style={{
+              backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))',
+              color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))',
+            }}
           >
-            生成视频
-          </Button>
+            选中后用底部生成栏发送
+          </div>
         </div>
       </div>
 

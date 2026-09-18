@@ -38,7 +38,7 @@ const ImageLoadingAnimation: React.FC = () => (
 );
 
 const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { updateNode, removeNode, duplicateNode, addNode, addEdgeManually, nodes } = useCanvasStore();
+  const { updateNode, removeNode, duplicateNode, addNode, addEdgeManually, selectNode, nodes } = useCanvasStore();
   const [uploading, setUploading] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -160,7 +160,8 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
     const configNodeId = addNode('videoConfig', { x: nodeX + 400, y: nodeY }, { label: '图生视频' });
     addEdgeManually({ source: id, target: configNodeId });
-  }, [id, nodes, addNode, addEdgeManually]);
+    selectNode(configNodeId);
+  }, [id, nodes, addNode, addEdgeManually, selectNode]);
 
   const handleImageGen = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -170,7 +171,8 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
     const configNodeId = addNode('imageConfig', { x: nodeX + 400, y: nodeY - 100 }, { label: '图生图', model: 'wan2.6-image' });
     addEdgeManually({ source: id, target: configNodeId });
-  }, [id, nodes, addNode, addEdgeManually]);
+    selectNode(configNodeId);
+  }, [id, nodes, addNode, addEdgeManually, selectNode]);
 
   const handleTemplateEffect = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

@@ -1,14 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Button, message, Input } from 'antd';
-import { ThunderboltOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { message, Input } from 'antd';
+import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
-import { useImageGeneration, useImageModels } from '../../hooks';
+import { useImageModels } from '../../hooks';
 import { IMAGE_MODELS, resolvePickerModels } from '../../config/models';
-import { isI2IModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
-import { collectGenerateInputs } from '../../utils/generateSlots';
 import NodeSelect from '../NodeSelect';
 
 // 画面比例选项
@@ -34,16 +32,13 @@ const getShortLabelFromModel = (modelLabel: string): string => {
 };
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore(
+  const { updateNode, duplicateNode, removeNode } = useCanvasStore(
     useShallow((state) => ({
       updateNode: state.updateNode,
-      addNode: state.addNode,
-      addEdgeManually: state.addEdgeManually,
       duplicateNode: state.duplicateNode,
       removeNode: state.removeNode,
     }))
   );
-  const { generate } = useImageGeneration();
   const { models: liveImageModels, loading: liveModelsLoading } = useImageModels();
   const pickerModels = useMemo(
     () => resolvePickerModels(IMAGE_MODELS, liveImageModels.map((item) => item.id), liveModelsLoading),
@@ -54,11 +49,11 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     [pickerModels]
   );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
-  const [editLabel, setEditLabel] = useState(data.label || '文生图');
+  const [editLabel, setEditLabel] = useState(data.label || '画面节点');
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditLabel(data.label || '文生图');
+    setEditLabel(data.label || '画面节点');
     setIsEditingLabel(true);
   }, [data.label]);
 
@@ -78,7 +73,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       handleLabelBlur();
     } else if (e.key === 'Escape') {
       setIsEditingLabel(false);
-      setEditLabel(data.label || '文生图');
+      setEditLabel(data.label || '画面节点');
     }
   }, [handleLabelBlur, data.label]);
 
@@ -109,7 +104,19 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
 
   const currentModel = useMemo(() => IMAGE_MODELS.find((m) => m.key === localModel), [localModel]);
-  const isI2I = useMemo(() => isI2IModel(localModel), [localModel]);
+
+  useEffect(() => {
+    if (typeof data.model === 'string' && data.model && data.model !== localModel) {
+      setLocalModel(data.model)
+    }
+    if (typeof data.size === 'string' && data.size && data.size !== localSize) {
+      setLocalSize(data.size)
+      setLocalRatio(getSizeRatio(data.size))
+    }
+    if (typeof data.quality === 'string' && data.quality && data.quality !== localQuality) {
+      setLocalQuality(data.quality)
+    }
+  }, [data.model, data.quality, data.size, localModel, localQuality, localSize])
   
   // Get size options based on current model and quality
   const sizeOptions = useMemo(() => {
@@ -159,96 +166,6 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     if (matchingSize) {
       setLocalSize(matchingSize.key);
       updateNode(id, { size: matchingSize.key });
-    }
-  };
-
-  const getConnectedInputs = () => {
-    const { nodes, edges } = useCanvasStore.getState();
-    return collectGenerateInputs(id, nodes, edges, {
-      includeCamera: false,
-      localPrompt: typeof data.prompt === 'string' ? data.prompt : '',
-    });
-  };
-
-  const handleGenerate = async () => {
-    const { prompt, refImages } = getConnectedInputs();
-
-    // 图生图模式需要参考图片
-    if (isI2I && refImages.length === 0) {
-      message.warning('图生图模式需要连接图片节点（参考图）');
-      return;
-    }
-
-    // 文生图模式需要提示词
-    if (!isI2I && !prompt) {
-      message.warning('请先填写提示词，或连入文本节点');
-      return;
-    }
-
-    const { nodes, edges } = useCanvasStore.getState();
-    const node = nodes.find((n) => n.id === id);
-    if (!node) return;
-
-    const outgoing = edges.filter((e) => e.source === id);
-    const xOffset = outgoing.length * 320;
-
-    // 获取模型名称
-    const modelLabel = IMAGE_MODELS.find(m => m.key === localModel)?.label || localModel;
-
-    const imageNodeId = addNode(
-      'image',
-      { x: node.position.x + 400 + xOffset, y: node.position.y },
-      { 
-        url: '', 
-        loading: true, 
-        label: '图像生成结果',
-        // 保存生成参数
-        prompt: prompt || '',
-        model: localModel,
-        modelLabel,
-        size: localSize,
-        ratio: localRatio,
-      }
-    );
-
-    addEdgeManually({ source: id, target: imageNodeId });
-
-    try {
-      // Generate image
-      const result = await generate({
-        model: localModel,
-        prompt,
-        size: localSize,
-        quality: localQuality,
-        image: refImages[0],
-        images: refImages.length ? refImages : undefined,
-        n: 1,
-      });
-
-      if (result && result.length > 0) {
-        updateNode(imageNodeId, {
-          url: result[0],
-          loading: false,
-          updatedAt: Date.now(),
-        });
-        message.success('图片生成成功！');
-      } else {
-        updateNode(imageNodeId, {
-          loading: false,
-          error: '生成失败',
-        });
-      }
-    } catch (err: unknown) {
-      // 处理 429 错误 - 删除节点并显示友好提示
-      if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
-        removeNode(imageNodeId);
-        message.warning('请求过于频繁，请稍后重试');
-      } else {
-        updateNode(imageNodeId, {
-          loading: false,
-          error: '生成失败',
-        });
-      }
     }
   };
 
@@ -305,7 +222,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               onDoubleClick={handleLabelDoubleClick}
               title="双击编辑"
             >
-              🎨 {data.label || '文生图'}
+              🎨 {data.label || '画面节点'}
             </span>
           )}
           <div className="flex items-center gap-1">
@@ -402,15 +319,15 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
           </div>
         </div>
 
-        {/* Generate Button */}
-        <Button
-          type="primary"
-          icon={<ThunderboltOutlined />}
-          onClick={handleGenerate}
-          block
+        <div
+          className="rounded-lg px-3 py-2 text-[11px] leading-5"
+          style={{
+            backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))',
+            color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))',
+          }}
         >
-          生成图片
-        </Button>
+          选中后用底部生成栏发送
+        </div>
       </div>
       </div>
 

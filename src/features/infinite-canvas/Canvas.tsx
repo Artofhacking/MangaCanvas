@@ -57,6 +57,7 @@ import ApiSettings from './components/ApiSettings';
 import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
 import NodeGenerateBar from './components/NodeGenerateBar';
+import { isGenerateNodeType } from './utils/generateSlots';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -115,6 +116,7 @@ const CanvasInner: React.FC = () => {
     onEdgesChange,
     onConnect,
     addNode,
+    selectNode,
     loadProject,
     updateViewport,
     undo,
@@ -723,7 +725,10 @@ const CanvasInner: React.FC = () => {
   const handleAddNode = (type: string) => {
     const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
     const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
-    addNode(type, { x: viewportCenterX - 100, y: viewportCenterY - 100 });
+    const nodeId = addNode(type, { x: viewportCenterX - 100, y: viewportCenterY - 100 });
+    if (isGenerateNodeType(type)) {
+      selectNode(nodeId);
+    }
     setShowNodeMenu(false);
   };
 
@@ -805,14 +810,16 @@ const CanvasInner: React.FC = () => {
     };
   }, []);
 
-  const nodeTypeOptions = [
-    { type: 'text', name: '文本节点', icon: <FileTextOutlined />, color: '#ac2e00' },
-    { type: 'imageConfig', name: '文生图配置', icon: <BgColorsOutlined />, color: '#c2410c' },
-    { type: 'videoConfig', name: '视频生成配置', icon: <VideoCameraOutlined />, color: '#9a3412' },
+  const primaryNodeTypes = [
+    { type: 'imageConfig', name: '画面节点', icon: <BgColorsOutlined />, color: '#c2410c' },
+    { type: 'videoConfig', name: '视频节点', icon: <VideoCameraOutlined />, color: '#9a3412' },
+    { type: 'image', name: '图片节点', icon: <PictureOutlined />, color: '#ea580c' },
+    { type: 'video', name: '视频结果', icon: <VideoCameraOutlined />, color: '#b45309' },
+  ];
+  const extraNodeTypes = [
+    { type: 'text', name: '旁白', icon: <FileTextOutlined />, color: '#ac2e00' },
     { type: 'effectConfig', name: '效果配置', icon: <BgColorsOutlined />, color: '#d97706' },
     { type: 'templateEffect', name: '视频特效', icon: <BgColorsOutlined />, color: '#b45309' },
-    { type: 'image', name: '图片节点', icon: <PictureOutlined />, color: '#ea580c' },
-    { type: 'video', name: '视频节点', icon: <VideoCameraOutlined />, color: '#b45309' },
   ];
 
   // 导出工作流
@@ -1098,6 +1105,43 @@ const CanvasInner: React.FC = () => {
         </ReactFlow>
         <NodeGenerateBar />
 
+        {nodes.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center p-6">
+            <div className="pointer-events-auto w-[min(420px,calc(100%-2rem))] rounded-[28px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/95 p-6 text-center shadow-[0_18px_50px_rgba(42,28,24,0.12)] backdrop-blur-md">
+              <p className="text-lg font-bold text-[hsl(var(--on-surface))]">从画面或视频节点开始</p>
+              <p className="mt-1.5 text-sm leading-6 text-[hsl(var(--secondary))]">
+                选中节点后用底部生成栏发送。也可从左侧素材库拖入资产。
+              </p>
+              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => handleAddNode('imageConfig')}
+                  className="h-11 flex-1 rounded-xl signature-gradient text-sm font-bold text-white"
+                >
+                  添加画面节点
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddNode('videoConfig')}
+                  className="h-11 flex-1 rounded-xl bg-[hsl(var(--surface-container-high))] text-sm font-bold text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]"
+                >
+                  添加视频节点
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMaterialPanel(true);
+                  setShowWorkflowPanel(false);
+                }}
+                className="mt-3 text-xs font-medium text-[hsl(var(--secondary))] hover:text-[hsl(var(--primary))]"
+              >
+                打开素材库拖入
+              </button>
+            </div>
+          </div>
+        )}
+
         <aside className="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-1 rounded-[20px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/90 p-2 shadow-xl shadow-black/5 backdrop-blur-md">
           <Tooltip title="添加节点" placement="right">
             <button
@@ -1161,7 +1205,21 @@ const CanvasInner: React.FC = () => {
 
         {showNodeMenu && (
           <div className="absolute left-20 top-1/2 z-20 -translate-y-1/2 rounded-[24px] border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-2 shadow-xl shadow-black/5 backdrop-blur-md">
-            {nodeTypeOptions.map((nodeType) => (
+            {primaryNodeTypes.map((nodeType) => (
+              <button
+                key={nodeType.type}
+                onClick={() => handleAddNode(nodeType.type)}
+                className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-[hsl(var(--surface-container-low))]"
+              >
+                <span style={{ color: nodeType.color, fontSize: 20 }}>{nodeType.icon}</span>
+                <span className="text-sm text-[hsl(var(--on-surface))]">{nodeType.name}</span>
+              </button>
+            ))}
+            <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
+            <div className="px-3 pb-1 pt-0.5 text-[11px] font-semibold text-[hsl(var(--secondary))]">
+              可选
+            </div>
+            {extraNodeTypes.map((nodeType) => (
               <button
                 key={nodeType.type}
                 onClick={() => handleAddNode(nodeType.type)}

@@ -210,9 +210,10 @@ export function collectGenerateInputs(
   const effectSuffix = effectSuffixFromParams(effectParams, options.includeCamera === true)
   const connectedPrompt = textSnippets.join('\n\n')
   const localPrompt = (options.localPrompt || '').trim()
+  // bar：只使用底部输入（含已解析的 @ 提及），不再把连入文本静默拼进 prompt
   const mergedBase =
     options.promptSource === 'bar'
-      ? localPrompt || connectedPrompt
+      ? localPrompt
       : [localPrompt, connectedPrompt].filter(Boolean).join('\n\n')
   const prompt = effectSuffix
     ? mergedBase
