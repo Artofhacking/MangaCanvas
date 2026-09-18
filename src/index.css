@@ -74,6 +74,20 @@
     width: 100%;
     max-width: 100%;
     padding-right: var(--removed-body-scroll-bar-size, 0px);
+    word-break: keep-all;
+    overflow-wrap: normal;
+  }
+
+  .cn-keep {
+    word-break: keep-all;
+    overflow-wrap: normal;
+    line-break: strict;
+  }
+
+  .cn-nowrap {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
   }
 
   .workspace-fixed-header {

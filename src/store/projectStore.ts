@@ -167,6 +167,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       })
     } catch (error) {
       set({
+        initializedProjectId: projectId,
         isLoading: false,
         error: error instanceof Error ? error.message : '加载项目资产失败',
       })

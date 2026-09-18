@@ -117,7 +117,7 @@ export default function EpisodesTab({
           <Plus className="w-6 h-6 text-[hsl(var(--primary))]" />
         </div>
         <span className="text-sm font-bold text-[hsl(var(--on-surface-variant))]">添加新片段</span>
-        <span className="text-[10px] text-[hsl(var(--secondary))] mt-1 uppercase tracking-tighter">组织故事章节</span>
+        <span className="text-[13px] text-[hsl(var(--secondary))] mt-1">组织故事章节</span>
       </div>
 
       {episodes.map((episode, index) => {
@@ -226,8 +226,8 @@ export default function EpisodesTab({
               </div>
             </div>
           </div>
-          <div className="p-4">
-            <h3 className="text-sm font-extrabold text-[hsl(var(--on-surface))] mb-1">{episode.name}</h3>
+          <div className="p-3">
+            <h3 className="cn-keep text-sm font-extrabold text-[hsl(var(--on-surface))] mb-1">{episode.name}</h3>
             {episode.description ? (
               <p className="mb-2 text-xs leading-5 text-[hsl(var(--on-surface-variant))] line-clamp-3">
                 {episode.description}
@@ -236,7 +236,7 @@ export default function EpisodesTab({
               <p className="mb-2 text-xs text-[hsl(var(--secondary))]">暂无剧情</p>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-[hsl(var(--secondary))] font-medium">{episode.count} 个场景 · 修改于 {episode.modified}</span>
+              <span className="text-[13px] text-[hsl(var(--secondary))] font-medium">{episode.count} 个场景 · 修改于 {episode.modified}</span>
               <Badge variant="secondary" className="text-[10px] bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))] px-2 py-0.5 rounded-full font-bold border-0">
                 {episode.code}
               </Badge>

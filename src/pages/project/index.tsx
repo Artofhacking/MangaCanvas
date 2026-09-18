@@ -43,6 +43,7 @@ import EpisodeCreator from "./EpisodeCreator"
 import CharacterCreator from "./CharacterCreator"
 import ObjectCreator from "./ObjectCreator"
 import CharacterBatchUploadDialog from "./CharacterBatchUploadDialog"
+import { CardGridSkeleton } from "@/components/feedback/ListQueryState"
 
 const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects", "workflows"]
 const defaultProjectTab: ProjectTab = "scenes"
@@ -84,6 +85,7 @@ export default function ProjectDetail() {
   const storeActiveTab = useProjectStore((state) => state.activeTab)
   const currentPage = useProjectStore((state) => state.currentPage)
   const isLoading = useProjectStore((state) => state.isLoading)
+  const initializedProjectId = useProjectStore((state) => state.initializedProjectId)
   const ui = useProjectStore((state) => state.ui)
   const assets = useProjectStore((state) => state.assets)
   const { 
@@ -106,6 +108,7 @@ export default function ProjectDetail() {
 
   const routeTab = isProjectTab(tabParam) ? tabParam : undefined
   const activeTab = routeTab ?? storeActiveTab
+  const assetsReady = numericProjectId != null && initializedProjectId === numericProjectId && !isLoading
 
   const assetType = useMemo(() => {
     switch (activeTab) {
@@ -199,6 +202,10 @@ export default function ProjectDetail() {
       characters: sorted.characters.filter((character) => character.gender === genderFilter),
     }
   }, [assets.characters, assets.episodes, assets.objects, assets.scenes, genderFilter, sortBy])
+
+  const currentAssetCount = assetType ? sortedAssets[assetType].length : 0
+  const showBulkDelete = assetsReady && Boolean(assetType) && currentAssetCount > 0
+  const showPagination = assetsReady && Boolean(assetType) && currentAssetCount > 0
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((current) =>
@@ -411,9 +418,9 @@ export default function ProjectDetail() {
 
         {/* Content Canvas */}
         <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-          <div className="flex min-h-full flex-col px-8 pb-12 pt-24">
+          <div className="flex min-h-full flex-col px-6 pb-8 pt-20">
             {/* Secondary Toolbar */}
-            <div className="mb-8 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+            <div className="mb-5 flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[hsl(var(--secondary))]">排序:</span>
                 <DropdownMenu>
@@ -485,10 +492,11 @@ export default function ProjectDetail() {
                     上传角色
                   </Button>
                 )}
-                {assetType && (
+                {showBulkDelete && (
                   <Button
+                    variant="outline"
                     onClick={handleBatchDelete}
-                    className="flex items-center gap-2 rounded-xl border-0 bg-[hsl(var(--primary))] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-90"
+                    className="flex items-center gap-2 rounded-xl border-[hsl(var(--destructive))]/40 bg-transparent px-5 py-2.5 text-xs font-bold text-[hsl(var(--destructive))] shadow-none hover:bg-[hsl(var(--destructive))]/10 hover:text-[hsl(var(--destructive))]"
                   >
                     <Trash2 className="w-4 h-4" />
                     {batchMode ? `删除所选${selectedIds.length ? ` (${selectedIds.length})` : ""}` : "批量删除"}
@@ -498,48 +506,47 @@ export default function ProjectDetail() {
             </div>
 
             <div className="flex flex-1 flex-col">
-              {isLoading ? (
-                <div className="mb-4 rounded-xl bg-[hsl(var(--surface-container-low))] px-4 py-3 text-sm text-[hsl(var(--secondary))]">
-                  正在加载项目资产...
-                </div>
-              ) : null}
-              {/* Tab Content */}
               <div className="flex-1">
-                {renderTabContent()}
+                {!assetsReady && activeTab !== "workflows" ? (
+                  <CardGridSkeleton count={8} />
+                ) : (
+                  renderTabContent()
+                )}
               </div>
 
-              {/* Pagination */}
-              <div className="mt-16 flex justify-center">
-                <div className="flex items-center gap-1 rounded-xl bg-[hsl(var(--surface-container-low))] p-1.5">
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="w-8 h-8 rounded-lg"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  {[1, 2, 3].map((page) => (
-                    <Button
-                      key={page}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-8 h-8 rounded-lg text-xs ${currentPage === page ? "bg-[hsl(var(--primary))] text-white" : ""}`}
+              {showPagination ? (
+                <div className="mt-10 flex justify-center">
+                  <div className="flex items-center gap-1 rounded-xl bg-[hsl(var(--surface-container-low))] p-1.5">
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="w-8 h-8 rounded-lg"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     >
-                      {page}
+                      <ChevronLeft className="w-4 h-4" />
                     </Button>
-                  ))}
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="w-8 h-8 rounded-lg"
-                    onClick={() => setCurrentPage(Math.min(3, currentPage + 1))}
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+                    {[1, 2, 3].map((page) => (
+                      <Button
+                        key={page}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-xs ${currentPage === page ? "bg-[hsl(var(--primary))] text-white" : ""}`}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="w-8 h-8 rounded-lg"
+                      onClick={() => setCurrentPage(Math.min(3, currentPage + 1))}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
 
             {/* Footer */}
@@ -547,7 +554,7 @@ export default function ProjectDetail() {
               <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
                 <div>
                   <span className="text-sm font-bold text-[hsl(var(--on-surface))]">MangaCanvas</span>
-                  <p className="mt-1 text-xs text-[hsl(var(--on-secondary-fixed-variant))]">© 2024 Kinetic Gallery. 保留所有权利。</p>
+                  <p className="mt-1 text-xs text-[hsl(var(--on-secondary-fixed-variant))]">© 2024 MangaCanvas. 保留所有权利。</p>
                 </div>
                 <div className="flex gap-6">
                   <Link to="/privacy" className="text-xs text-[hsl(var(--secondary))] transition-colors hover:text-[hsl(var(--primary))]">

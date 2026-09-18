@@ -37,7 +37,7 @@ export default function ProjectHeader({
   ]
 
   return (
-    <header className="workspace-fixed-header fixed top-0 z-40 flex h-16 items-center justify-between border-b border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-lowest))]/80 px-8 backdrop-blur-md">
+    <header className="workspace-fixed-header fixed top-0 z-40 flex h-14 items-center justify-between border-b border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-lowest))]/80 px-6 backdrop-blur-md">
       {/* Left spacer for balance */}
       <div className="w-48" />
 

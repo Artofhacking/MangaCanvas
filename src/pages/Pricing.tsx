@@ -208,7 +208,7 @@ export default function Pricing() {
           <div>
             <span className="text-xl font-black text-[hsl(var(--on-surface))]">MangaCanvas</span>
             <p className="text-xs text-[hsl(var(--secondary))] mt-1">
-              © 2024 Kinetic Gallery. All rights reserved.
+              © 2024 MangaCanvas. All rights reserved.
             </p>
           </div>
           <div className="flex gap-8">

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -43,6 +43,7 @@ export default function CharacterCreator({
   const valuesRef = useRef<CharacterFormValues | null>(null)
   const taskPanelRef = useRef<HTMLDivElement>(null)
   const [highlightTasks, setHighlightTasks] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
   const allTasks = useAssetGenerationStore((state) => state.tasks)
   const storeTasks = tasksForAsset(allTasks, "character", projectId, initialData?.id)
   const tasks = withExistingAssetResult(storeTasks, {
@@ -62,10 +63,22 @@ export default function CharacterCreator({
     valuesRef.current = values
   }, [])
 
+  useEffect(() => {
+    if (open) setPanelOpen(false)
+  }, [open])
+
   const handleOpenTaskList = () => {
-    taskPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
-    setHighlightTasks(true)
-    window.setTimeout(() => setHighlightTasks(false), 1600)
+    setPanelOpen((current) => {
+      const next = !current
+      if (next) {
+        window.setTimeout(() => {
+          taskPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+        }, 50)
+        setHighlightTasks(true)
+        window.setTimeout(() => setHighlightTasks(false), 1600)
+      }
+      return next
+    })
   }
 
   const currentValues = () => valuesRef.current
@@ -124,7 +137,7 @@ export default function CharacterCreator({
       notify.warning("缺少项目信息，无法生成")
       return
     }
-    handleOpenTaskList()
+    setPanelOpen(true)
     void startGeneration({
       kind: "character",
       projectId: Number(projectId),
@@ -157,11 +170,21 @@ export default function CharacterCreator({
             </Button>
             <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{isEditMode ? "编辑角色" : "创建角色"}</h2>
           </div>
-          <GenerationTaskListButton label="角色生成任务列表" count={tasks.length} onClick={handleOpenTaskList} />
+          <GenerationTaskListButton
+            label="角色生成任务列表"
+            count={tasks.length}
+            running={submitting || tasks.some((task) => task.status === "running")}
+            expanded={panelOpen}
+            onClick={handleOpenTaskList}
+          />
         </div>
 
         <div className="flex h-[calc(100vh-70px)]">
-          <div className="flex h-full w-[52%] flex-col overflow-y-auto border-r border-[hsl(var(--outline-variant))]/15 p-6 pb-24">
+          <div
+            className={`flex h-full flex-col overflow-y-auto p-6 pb-24 ${
+              panelOpen ? "w-[52%] border-r border-[hsl(var(--outline-variant))]/15" : "w-full"
+            }`}
+          >
             <CharacterForm
               mode={mode}
               initialData={initialData}
@@ -169,10 +192,16 @@ export default function CharacterCreator({
               onValuesChange={handleValuesChange}
             />
           </div>
-          <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+          {panelOpen ? (
+            <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+          ) : null}
         </div>
 
-        <div className="absolute bottom-0 left-0 w-[52%] p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
+        <div
+          className={`absolute bottom-0 left-0 p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent ${
+            panelOpen ? "w-[52%]" : "w-full"
+          }`}
+        >
           <AssetEditorActions
             hasExisting={Boolean(initialData)}
             submitting={submitting}

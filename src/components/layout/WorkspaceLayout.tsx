@@ -20,7 +20,7 @@ export default function WorkspaceLayout({ header, children }: WorkspaceLayoutPro
       <Sidebar />
       <div className="ml-64 flex h-full min-w-0 flex-col">
         {header}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto px-8 pb-12 pt-24">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto px-6 pb-8 pt-20">
           {children}
         </main>
       </div>

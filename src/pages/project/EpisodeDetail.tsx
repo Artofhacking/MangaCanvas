@@ -19,6 +19,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react"
+import { QuerySpinner } from "@/components/feedback/ListQueryState"
 
 export default function EpisodeDetail() {
   const { projectId, episodeId } = useParams()
@@ -141,7 +142,16 @@ export default function EpisodeDetail() {
     [relatedCharacters, relatedObjects, relatedScenes]
   )
 
-  if (!episode) return null
+  if (!episode) {
+    return (
+      <div className="min-h-screen bg-[hsl(var(--surface))]">
+        <Sidebar />
+        <main className="ml-64 min-h-screen">
+          <QuerySpinner label="正在加载片段..." />
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[hsl(var(--surface))]">
@@ -169,7 +179,7 @@ export default function EpisodeDetail() {
               </Badge>
             </div>
 
-            <h1 className="mt-4 text-4xl font-black tracking-[-0.05em] text-[hsl(var(--on-surface))]">
+            <h1 className="mt-4 text-3xl font-black cn-keep text-[hsl(var(--on-surface))]">
               {episode.name}
             </h1>
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-[hsl(var(--secondary))]">
@@ -189,7 +199,7 @@ export default function EpisodeDetail() {
                   <Sparkles className="h-4 w-4" />
                   本集创作中枢
                 </div>
-                <h2 className="mt-5 max-w-[12ch] text-5xl font-black leading-[0.96] tracking-[-0.06em]">
+                <h2 className="mt-5 max-w-[12ch] text-4xl font-black leading-[1.05] cn-keep">
                   用本集资产进入无限画布
                 </h2>
                 <p className="mt-5 max-w-2xl text-base leading-7 text-white/85">
@@ -245,7 +255,7 @@ export default function EpisodeDetail() {
           <section className="mt-6 rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-lowest))] p-6">
             <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
               <FileText className="h-4 w-4" />
-              <span className="text-xs font-semibold uppercase tracking-[0.24em]">本集剧情</span>
+              <span className="text-[13px] font-semibold">本集剧情</span>
             </div>
             {episode.description ? (
               <div className="mt-4 max-h-[420px] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-[hsl(var(--on-surface))]">
@@ -330,7 +340,7 @@ export default function EpisodeDetail() {
             <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
               <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
                 <Users className="h-4 w-4" />
-                <span className="text-xs font-semibold uppercase tracking-[0.24em]">登场角色</span>
+                <span className="text-[13px] font-semibold">登场角色</span>
               </div>
               <div className="mt-5 space-y-3">
                 {relationPreview.characters.length === 0 ? (
@@ -365,7 +375,7 @@ export default function EpisodeDetail() {
             <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
               <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
                 <ImageIcon className="h-4 w-4" />
-                <span className="text-xs font-semibold uppercase tracking-[0.24em]">场景参考</span>
+                <span className="text-[13px] font-semibold">场景参考</span>
               </div>
               <div className="mt-5 space-y-3">
                 {relationPreview.scenes.length === 0 ? (
@@ -399,7 +409,7 @@ export default function EpisodeDetail() {
             <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
               <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
                 <Package className="h-4 w-4" />
-                <span className="text-xs font-semibold uppercase tracking-[0.24em]">道具与操作</span>
+                <span className="text-[13px] font-semibold">道具与操作</span>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 {relationPreview.objects.length === 0 ? (

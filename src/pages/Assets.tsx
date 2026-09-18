@@ -125,9 +125,11 @@ export default function Assets() {
             <div className="flex items-center gap-4">
               <h1 className="text-xl font-bold text-[hsl(var(--on-surface))]">资产管理</h1>
               <span className="text-xs text-[hsl(var(--secondary))]">{projectName}</span>
-              <Badge variant="secondary" className="text-xs">
-                {filteredAssets.length} 个资产
-              </Badge>
+              {!isLoading ? (
+                <Badge variant="secondary" className="text-xs">
+                  {filteredAssets.length} 个资产
+                </Badge>
+              ) : null}
             </div>
             
             <div className="flex items-center gap-3">
@@ -188,11 +190,10 @@ export default function Assets() {
         {/* Content */}
         <div className="p-8">
           {isLoading ? (
-            <div className="mb-6 rounded-xl bg-[hsl(var(--surface-container-lowest))] p-4 text-sm text-[hsl(var(--secondary))]">
+            <div className="flex min-h-[240px] items-center justify-center rounded-xl bg-[hsl(var(--surface-container-lowest))] text-sm text-[hsl(var(--secondary))]">
               正在加载项目资产...
             </div>
-          ) : null}
-          {viewMode === "kanban" ? (
+          ) : viewMode === "kanban" ? (
             // Kanban View
             <div className="flex gap-6 overflow-x-auto pb-4">
               {assetsByStatus.map((column) => (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { ArrowRight, CalendarClock, Clapperboard, Plus, Sparkles, Workflow } from "lucide-react"
 
@@ -8,6 +8,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { useCanvasDocumentsStore } from "@/features/infinite-canvas/stores/projectsStore"
 import type { WorkflowSourceType } from "@/types"
+import { QuerySpinner } from "@/components/feedback/ListQueryState"
 
 const sourceTypeMeta: Record<
   WorkflowSourceType,
@@ -56,15 +57,26 @@ export default function WorkflowsTab() {
   const projects = useCanvasDocumentsStore((state) => state.projects)
   const initProjects = useCanvasDocumentsStore((state) => state.initProjects)
   const syncProjectWorkflows = useCanvasDocumentsStore((state) => state.syncProjectWorkflows)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    void initProjects()
-  }, [initProjects])
-
-  useEffect(() => {
-    if (!projectId) return
-    void syncProjectWorkflows(projectId)
-  }, [projectId, syncProjectWorkflows])
+    let cancelled = false
+    const load = async () => {
+      setIsLoading(true)
+      try {
+        await initProjects()
+        if (projectId) {
+          await syncProjectWorkflows(projectId)
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [initProjects, projectId, syncProjectWorkflows])
 
   const workflows = useMemo(
     () =>
@@ -102,7 +114,7 @@ export default function WorkflowsTab() {
               <Badge className="mb-4 rounded-full border-0 bg-[hsl(var(--primary))]/10 px-3 py-1 text-[11px] font-bold text-[hsl(var(--primary))]">
                 工作流空间
               </Badge>
-              <h2 className="text-2xl font-black tracking-tight text-[hsl(var(--on-surface))]">
+              <h2 className="text-2xl font-black cn-keep text-[hsl(var(--on-surface))]">
                 把角色、场景、物品串成可复用的创作流
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[hsl(var(--secondary))]">
@@ -123,9 +135,11 @@ export default function WorkflowsTab() {
               <Plus className="mr-2 h-4 w-4" />
               新建空白工作流
             </Button>
-            <span className="rounded-full bg-[hsl(var(--surface-container-high))] px-4 py-2 text-xs font-semibold text-[hsl(var(--on-surface-variant))]">
-              当前项目共 {workflows.length} 个工作流
-            </span>
+            {!isLoading && workflows.length > 0 ? (
+              <span className="rounded-full bg-[hsl(var(--surface-container-high))] px-4 py-2 text-xs font-semibold text-[hsl(var(--on-surface-variant))]">
+                当前项目共 {workflows.length} 个工作流
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -141,7 +155,8 @@ export default function WorkflowsTab() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {workflows.slice(0, 3).map((workflow) => {
+            {isLoading ? <QuerySpinner label="正在加载工作流..." /> : null}
+            {!isLoading && workflows.slice(0, 3).map((workflow) => {
               const sourceType = (workflow.sourceType as WorkflowSourceType | undefined) ?? "blank"
               const meta = sourceTypeMeta[sourceType] ?? sourceTypeMeta.blank
               const Icon = meta.icon
@@ -169,7 +184,7 @@ export default function WorkflowsTab() {
               )
             })}
 
-            {workflows.length === 0 ? (
+            {!isLoading && workflows.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[hsl(var(--outline-variant))] bg-[hsl(var(--surface-container-low))]/60 px-4 py-6 text-center">
                 <p className="text-sm font-semibold text-[hsl(var(--on-surface))]">还没有工作流</p>
                 <p className="mt-1 text-xs leading-5 text-[hsl(var(--secondary))]">
@@ -181,7 +196,7 @@ export default function WorkflowsTab() {
         </div>
       </div>
 
-      {workflows.length > 0 ? (
+      {!isLoading && workflows.length > 0 ? (
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
           {workflows.map((workflow) => {
             const sourceType = (workflow.sourceType as WorkflowSourceType | undefined) ?? "blank"
