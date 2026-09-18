@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { applyNodeChanges, applyEdgeChanges, addEdge as addReactFlowEdge, NodeChange, EdgeChange, Connection, Node, Edge } from 'reactflow';
 import type { CustomNode, CustomEdge, NodeData, CanvasStore, Project } from '../types';
+import { isGenerateNodeType, nextSlotOrder } from '../utils/generateSlots';
 
 let nodeId = 0;
 const getNodeId = () => `node_${nodeId++}`;
@@ -132,7 +133,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const targetNode = get().nodes.find(n => n.id === connection.target);
 
     let edgeType = undefined;
-    let edgeData = {};
+    let edgeData: NonNullable<CustomEdge['data']> = {};
 
     if (sourceNode?.type === 'image' && targetNode?.type === 'videoConfig') {
       // Use imageRole edge type
@@ -146,6 +147,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const nextOrder = existingTextEdges.length + 1;
       edgeType = 'promptOrder';
       edgeData = { promptOrder: nextOrder };
+    }
+
+    if (connection.target && isGenerateNodeType(targetNode?.type)) {
+      const slotOrder = nextSlotOrder(connection.target, get().edges);
+      edgeData = { ...edgeData, slotOrder };
+      if (edgeType === 'promptOrder' && !('promptOrder' in edgeData)) {
+        edgeData = { ...edgeData, promptOrder: slotOrder };
+      }
     }
 
     set({
@@ -230,7 +239,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const targetNode = get().nodes.find(n => n.id === params.target);
 
     let edgeType = params.type;
-    let edgeData = params.data || {};
+    let edgeData: NonNullable<CustomEdge['data']> = params.data || {};
 
     if (!edgeType) {
       if (sourceNode?.type === 'image' && targetNode?.type === 'videoConfig') {
@@ -244,6 +253,10 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         const nextOrder = existingTextEdges.length + 1;
         edgeData = { promptOrder: nextOrder, ...edgeData };
       }
+    }
+
+    if (params.target && isGenerateNodeType(targetNode?.type) && edgeData.slotOrder == null) {
+      edgeData = { ...edgeData, slotOrder: nextSlotOrder(params.target, get().edges) };
     }
 
     const newEdge: CustomEdge = {

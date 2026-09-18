@@ -53,6 +53,7 @@ import ImageRoleEdge from './components/edges/ImageRoleEdge';
 import ApiSettings from './components/ApiSettings';
 import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
+import NodeGenerateBar from './components/NodeGenerateBar';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -1068,6 +1069,7 @@ const CanvasInner: React.FC = () => {
           {showGrid && <Background gap={20} size={1} />}
           <MiniMap position="bottom-right" pannable zoomable />
         </ReactFlow>
+        <NodeGenerateBar />
 
         <aside className="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-1 rounded-[20px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/90 p-2 shadow-xl shadow-black/5 backdrop-blur-md">
           <Tooltip title="添加节点" placement="right">

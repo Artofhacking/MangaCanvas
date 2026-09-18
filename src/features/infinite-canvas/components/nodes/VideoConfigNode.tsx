@@ -7,6 +7,7 @@ import { useVideoGeneration, useVideoModels } from '../../hooks';
 import { VIDEO_MODELS, remapVideoModel, filterLiveModels } from '../../config/models';
 import { isT2VModel, isKF2VModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
+import { collectGenerateInputs } from '../../utils/generateSlots';
 
 // 尺寸映射表
 const SIZE_MAP: Record<string, Record<string, string>> = {
@@ -164,63 +165,11 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     updateNode(id, { duration: value });
   };
 
-  // Get connected inputs
-  const getConnectedInputs = () => {
-    const incomingEdges = edges.filter((edge) => edge.target === id);
-    let prompt = '';
-    let firstFrameImage = '';
-    let lastFrameImage = '';
-    const effectParams: { style?: string; lighting?: string; camera?: string; effect?: string } = {};
-
-    incomingEdges.forEach((edge) => {
-      const sourceNode = nodes.find((n) => n.id === edge.source);
-      if (!sourceNode) return;
-
-      if (sourceNode.type === 'text') {
-        // 文本节点：通过 prompt handle 或默认连接都可以获取提示词
-        if (edge.targetHandle === 'prompt' || !edge.targetHandle) {
-          prompt = (sourceNode.data.content || sourceNode.data.value || '') as string;
-        }
-      } else if (sourceNode.type === 'image') {
-        const imageUrl = sourceNode.data.url || sourceNode.data.base64;
-        if (imageUrl) {
-          // 关键帧模式: 根据 targetHandle 区分首帧和尾帧
-          if (edge.targetHandle === 'first-frame') {
-            firstFrameImage = imageUrl;
-          } else if (edge.targetHandle === 'last-frame') {
-            lastFrameImage = imageUrl;
-          } else if (!firstFrameImage) {
-            // 其他模式: 默认作为首帧
-            firstFrameImage = imageUrl;
-          }
-        }
-      } else if (sourceNode.type === 'effectConfig') {
-        // 收集效果配置参数（视频包含运镜）
-        if (sourceNode.data.style) effectParams.style = sourceNode.data.style as string;
-        if (sourceNode.data.lighting) effectParams.lighting = sourceNode.data.lighting as string;
-        if (sourceNode.data.camera) effectParams.camera = sourceNode.data.camera as string;
-        if (sourceNode.data.effect) effectParams.effect = sourceNode.data.effect as string;
-      }
+  const getConnectedInputs = () =>
+    collectGenerateInputs(id, nodes, edges, {
+      includeCamera: true,
+      localPrompt: typeof data.prompt === 'string' ? data.prompt : '',
     });
-
-    // 将效果参数转换为提示词后缀
-    const effectSuffix = [
-      effectParams.style,
-      effectParams.lighting,
-      effectParams.camera,
-      effectParams.effect,
-    ].filter(Boolean).join('，');
-
-    // 合并提示词和效果参数
-    let finalPrompt = prompt;
-    if (effectSuffix && finalPrompt) {
-      finalPrompt = `${finalPrompt}，${effectSuffix}`;
-    } else if (effectSuffix) {
-      finalPrompt = effectSuffix;
-    }
-
-    return { prompt: finalPrompt, firstFrameImage, lastFrameImage, effectParams };
-  };
 
   const handleGenerate = async () => {
     const { prompt, firstFrameImage, lastFrameImage } = getConnectedInputs();
@@ -244,7 +193,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
     // 文生视频需要文本输入
     if (isT2V && !prompt) {
-      message.warning('请连接文本节点（描述文案）');
+      message.warning('请先填写提示词，或连入文本节点');
       return;
     }
 

@@ -53,6 +53,7 @@ export interface CustomEdge {
   type?: string;
   data?: {
     promptOrder?: number;
+    slotOrder?: number;
     imageRole?: string;
     [key: string]: unknown;
   };
