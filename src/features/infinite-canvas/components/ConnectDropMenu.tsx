@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { ImageIcon, Video } from 'lucide-react'
 import type { GenerateNodeType } from '../utils/generateSlots'
+import { buildScreenBezier } from '../utils/connectPreview'
 
 export interface ConnectDropMenuState {
   sourceId: string
   screen: { x: number; y: number }
   flow: { x: number; y: number }
+  fromScreen?: { x: number; y: number }
 }
 
 export const CONNECT_DROP_MENU_WIDTH = 220
@@ -31,6 +33,8 @@ const ConnectDropMenu: React.FC<{
   onClose: () => void
 }> = ({ state, onSelect, onClose }) => {
   const position = getConnectDropMenuPosition(state.screen)
+  const toScreen = getConnectDropMenuLineTarget(state.screen)
+  const previewPath = state.fromScreen ? buildScreenBezier(state.fromScreen, toScreen) : null
   const [armed, setArmed] = useState(false)
 
   useEffect(() => {
@@ -48,6 +52,18 @@ const ConnectDropMenu: React.FC<{
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[40]">
+      {previewPath && state.fromScreen ? (
+        <svg className="absolute inset-0 h-full w-full overflow-visible" aria-hidden>
+          <path
+            d={previewPath}
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth={2}
+            className="react-flow__connection-path"
+          />
+          <circle cx={toScreen.x} cy={toScreen.y} r={4} fill="hsl(var(--primary))" />
+        </svg>
+      ) : null}
       <button
         type="button"
         className="pointer-events-auto absolute inset-0 cursor-default bg-transparent"

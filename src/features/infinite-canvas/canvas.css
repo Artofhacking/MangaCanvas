@@ -49,9 +49,9 @@ code {
 }
 
 .react-flow__connection-path {
-  fill: none;
-  stroke: var(--ic-primary, hsl(var(--primary)));
-  stroke-width: 2;
+  fill: none !important;
+  stroke: var(--ic-primary, hsl(var(--primary))) !important;
+  stroke-width: 2 !important;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
