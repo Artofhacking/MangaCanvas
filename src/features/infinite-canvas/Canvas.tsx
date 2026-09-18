@@ -144,6 +144,8 @@ const CanvasInner: React.FC = () => {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [isCanvasMaterialDragOver, setIsCanvasMaterialDragOver] = useState(false);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [episodesLoaded, setEpisodesLoaded] = useState(false);
+  const [workflowsLoaded, setWorkflowsLoaded] = useState(false);
 
   const projectWorkflows = useMemo(
     () =>
@@ -577,13 +579,15 @@ const CanvasInner: React.FC = () => {
   useEffect(() => {
     if (!projectId) return;
     const numericProjectId = Number(projectId);
-    void syncProjectWorkflows(projectId);
+    setWorkflowsLoaded(false);
+    void syncProjectWorkflows(projectId).finally(() => setWorkflowsLoaded(true));
     if (Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
+    setEpisodesLoaded(false);
     void projectApi.episodes.getAll(numericProjectId).then((response) => {
       if (response.success) {
         setEpisodes(response.data || []);
       }
-    });
+    }).finally(() => setEpisodesLoaded(true));
   }, [projectId, syncProjectWorkflows]);
 
   useEffect(() => {
@@ -897,8 +901,8 @@ const CanvasInner: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[hsl(var(--surface))] text-[hsl(var(--on-surface))]">
-      <header className="h-16 flex items-center justify-between px-6 bg-[hsl(var(--surface))]/95 backdrop-blur-md border-b border-[hsl(var(--outline-variant))]/20 z-50">
+    <div className="h-screen w-screen flex flex-col bg-[hsl(var(--surface))] text-[hsl(var(--on-surface))] cn-keep">
+      <header className="h-14 flex items-center justify-between px-6 bg-[hsl(var(--surface))]/95 backdrop-blur-md border-b border-[hsl(var(--outline-variant))]/20 z-50">
         <div className="flex items-center gap-4">
           <button 
             onClick={handleBackNavigation}
@@ -915,8 +919,8 @@ const CanvasInner: React.FC = () => {
                 <PictureOutlined style={{ fontSize: 16 }} />
               </div>
               <div className="text-left leading-tight">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[hsl(var(--secondary))]">{workflowContextLabel}</div>
-                <span className="text-sm font-bold tracking-tight text-[hsl(var(--on-surface))]">{workflowName}</span>
+                <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">{workflowContextLabel}</div>
+                <span className="cn-keep text-sm font-bold text-[hsl(var(--on-surface))]">{workflowName}</span>
               </div>
               <DownOutlined style={{ fontSize: 12, color: 'hsl(var(--secondary))' }} />
             </button>
@@ -927,10 +931,12 @@ const CanvasInner: React.FC = () => {
                   onClick={() => setShowProjectMenu(false)}
                 />
                 <div className="absolute left-0 top-full mt-2 w-[280px] rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1.5 shadow-xl shadow-black/5 backdrop-blur-md z-50">
-                  <div className="px-3 pt-2 pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--secondary))]">
+                  <div className="px-3 pt-2 pb-1 text-[13px] font-bold text-[hsl(var(--secondary))]">
                     片段
                   </div>
-                  {episodes.length === 0 ? (
+                  {!episodesLoaded ? (
+                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载片段中...</div>
+                  ) : episodes.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有片段</div>
                   ) : (
                     episodes.map((item) => {
@@ -954,10 +960,12 @@ const CanvasInner: React.FC = () => {
                   )}
 
                   <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
-                  <div className="px-3 pt-1 pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--secondary))]">
+                  <div className="px-3 pt-1 pb-1 text-[13px] font-bold text-[hsl(var(--secondary))]">
                     工作流
                   </div>
-                  {projectWorkflows.length === 0 ? (
+                  {!workflowsLoaded ? (
+                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载工作流中...</div>
+                  ) : projectWorkflows.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有工作流</div>
                   ) : (
                     projectWorkflows.map((item) => {
@@ -1005,12 +1013,12 @@ const CanvasInner: React.FC = () => {
         
         {/* Center Navigation */}
         <nav className="hidden md:flex items-center gap-3 rounded-2xl bg-[hsl(var(--surface-container-low))] p-1">
-          <button className="rounded-xl bg-[hsl(var(--surface-container-highest))] px-4 py-2 text-xs font-bold tracking-[0.24em] text-[hsl(var(--on-surface))] shadow-sm">
+          <button className="rounded-xl bg-[hsl(var(--surface-container-highest))] px-4 py-2 text-xs font-bold text-[hsl(var(--on-surface))] shadow-sm">
             画布
           </button>
           <button 
             onClick={handleBackNavigation}
-            className="px-3 py-2 text-xs tracking-[0.2em] text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))] transition-colors"
+            className="px-3 py-2 text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))] transition-colors"
           >
             {backTarget.label}
           </button>

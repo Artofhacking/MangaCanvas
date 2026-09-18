@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
-import { Trash2, Check, ArrowRight, Wand2, Workflow, User, Sparkles, Image, Settings, Copy, MoreHorizontal } from "lucide-react"
+import { Trash2, Check, Wand2, Workflow, User, Sparkles, Image, Settings, Copy, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
@@ -145,35 +145,29 @@ export default function CharactersTab({
             <button
               type="button"
               onClick={handleAddNew}
-              className="flex w-full items-center justify-between rounded-xl bg-[hsl(var(--surface-container-high))] px-3 py-3 text-left transition-all hover:bg-[hsl(var(--surface-container-highest))]"
+              className="flex w-full items-center gap-2 rounded-xl bg-[hsl(var(--surface-container-high))] px-2.5 py-2.5 text-left transition-all hover:bg-[hsl(var(--surface-container-highest))]"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-                  <Wand2 className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[hsl(var(--on-surface))]">快捷创作</div>
-                  <div className="text-[10px] text-[hsl(var(--secondary))]">快速建角色</div>
-                </div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
+                <Wand2 className="h-4 w-4" />
               </div>
-              <ArrowRight className="h-4 w-4 text-[hsl(var(--secondary))]" />
+              <div className="min-w-0">
+                <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">快捷创作</div>
+                <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">快速建角色</div>
+              </div>
             </button>
 
             <button
               type="button"
               onClick={() => handleOpenCanvas()}
-              className="flex w-full items-center justify-between rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-3 py-3 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
+              className="flex w-full items-center gap-2 rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-2.5 py-2.5 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))]">
-                  <Workflow className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-[hsl(var(--on-surface))]">无限画布</div>
-                  <div className="text-[10px] text-[hsl(var(--secondary))]">自由编排</div>
-                </div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))]">
+                <Workflow className="h-4 w-4" />
               </div>
-              <ArrowRight className="h-4 w-4 text-[hsl(var(--secondary))]" />
+              <div className="min-w-0">
+                <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">无限画布</div>
+                <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">自由编排</div>
+              </div>
             </button>
           </div>
         </div>
@@ -272,10 +266,10 @@ export default function CharactersTab({
             </div>
           </div>
           <div className="p-2.5">
-            <h3 className="text-xs font-bold text-[hsl(var(--on-surface))] truncate">{character.name}</h3>
+            <h3 className="cn-keep text-xs font-bold text-[hsl(var(--on-surface))] truncate">{character.name}</h3>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-[9px] text-[hsl(var(--secondary))] truncate max-w-[60%]">{character.style}</span>
-              <span className="text-[9px] text-[hsl(var(--secondary))]">{character.scenes}场景</span>
+              <span className="text-[13px] text-[hsl(var(--secondary))] truncate max-w-[60%]">{character.style}</span>
+              <span className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">{character.scenes}场景</span>
             </div>
           </div>
         </div>

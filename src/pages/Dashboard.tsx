@@ -27,6 +27,7 @@ import { useProjectsStore } from "@/store/projectsStore"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { workflowsApi } from "@/features/project/api/workflows"
 import { projectAssetsPath, projectScriptPath } from "@/lib/workspaceRoutes"
+import { QuerySpinner } from "@/components/feedback/ListQueryState"
 
 const activities = [
   {
@@ -108,39 +109,28 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { id: projectId } = useParams<{ id: string }>()
-  const [projects, setProjects] = useState<Array<{ id: number; name: string; image: string; status: string; updated: string }>>([])
+  const [createdProjects, setCreatedProjects] = useState<Array<{ id: number; name: string; image: string; status: string; updated: string }>>([])
   const [projectStats, setProjectStats] = useState({ episodeCount: 0, sceneCount: 0, characterCount: 0, objectCount: 0 })
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
-  // 使用全局缓存的项目列表
-  const { projects: allProjects, isLoaded: projectsLoaded, isLoading: projectsLoading, fetchProjects } = useProjectsStore()
-  const isLoading = !projectsLoaded || projectsLoading
+  const { projects: allProjects, isLoaded: projectsLoaded, fetchProjects } = useProjectsStore()
   const launchWorkflow = useWorkflowLauncher()
-  
-  // 获取当前项目
+
+  const projects = (() => {
+    const mapped = allProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      image: project.coverImage || '/default-project.png',
+      status: project.status as "in-progress" | "completed" | "draft",
+      updated: project.updatedAt || project.createdAt || '',
+    }))
+    const extras = createdProjects.filter((item) => !mapped.some((project) => project.id === item.id))
+    return [...extras, ...mapped]
+  })()
+
   const currentProject = projects.find(p => p.id === Number(projectId)) || projects[0]
-  
-  // 是否有项目
   const hasProjects = projects.length > 0
-  
-  useEffect(() => {
-    // 从全局缓存同步项目（只在加载完成且项目列表变化时更新）
-    if (projectsLoaded && allProjects.length > 0) {
-      setProjects((prev) => {
-        const mapped = allProjects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          image: project.coverImage || '/default-project.png',
-          status: project.status as "in-progress" | "completed" | "draft",
-          updated: project.updatedAt || project.createdAt || '',
-        }))
-        // 只有当数据真正变化时才更新
-        if (JSON.stringify(prev) === JSON.stringify(mapped)) {
-          return prev
-        }
-        return mapped
-      })
-    }
-  }, [allProjects, projectsLoaded])
+  const awaitingProjects = !projectsLoaded && !hasProjects && !projectId
+  const showProjectEmpty = !awaitingProjects && !hasProjects && !projectId
   
   useEffect(() => {
     // 如果全局未加载，触发加载
@@ -173,7 +163,7 @@ export default function Dashboard() {
       isPublic: false,
     })
     const mapped = mapProjectCard(project)
-    setProjects((prev) => [{ id: mapped.id, name: mapped.name, image: mapped.image, status: mapped.status, updated: mapped.modified }, ...prev])
+    setCreatedProjects((prev) => [{ id: mapped.id, name: mapped.name, image: mapped.image, status: mapped.status, updated: mapped.modified }, ...prev])
   }
 
   const handleEnterCanvas = async () => {
@@ -201,11 +191,11 @@ export default function Dashboard() {
       <WorkspaceLayout
         header={
           <WorkspaceHeader
-            title={hasProjects ? '工作台' : '欢迎'}
-            subtitle={hasProjects ? "无限画布创作中心" : "开始你的创作之旅"}
+            title={hasProjects || projectId ? '工作台' : '欢迎'}
+            subtitle={hasProjects || projectId ? "无限画布创作中心" : "开始你的创作之旅"}
             searchPlaceholder="搜索..."
             actions={
-              hasProjects ? (
+              hasProjects || projectId ? (
                 <Button
                   onClick={() => navigate(projectAssetsPath(currentProject?.id || projectId || ""))}
                   className="signature-gradient rounded-xl border-0 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90"
@@ -225,19 +215,16 @@ export default function Dashboard() {
           />
         }
       >
-        {!hasProjects ? (
+        {awaitingProjects ? (
+          <QuerySpinner label="正在同步项目数据..." />
+        ) : showProjectEmpty ? (
           <EmptyState onCreate={() => setIsProjectDialogOpen(true)} />
         ) : (
         <>
-        {isLoading ? (
-          <div className="mb-6 rounded-xl bg-[hsl(var(--surface-container-lowest))] p-4 text-sm text-[hsl(var(--secondary))]">
-            正在同步项目数据...
-          </div>
-        ) : null}
         {/* 无限画布入口 - 核心区域 */}
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold tracking-tight text-[hsl(var(--on-surface))] flex items-center gap-2">
+        <section className="mb-7">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-[hsl(var(--on-surface))] flex items-center gap-2">
               无限画布
               <span className="w-2 h-2 rounded-full bg-[hsl(var(--primary))] animate-pulse"></span>
             </h3>
@@ -254,7 +241,7 @@ export default function Dashboard() {
           
           <Card 
             onClick={handleEnterCanvas}
-            className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(var(--primary))]/10 via-[hsl(var(--surface-container-low))] to-[hsl(var(--surface-container-high))] p-8 cursor-pointer transition-all duration-500 hover:shadow-xl hover:shadow-[hsl(var(--primary))]/10 hover:scale-[1.01]"
+            className="group relative overflow-hidden border-0 bg-gradient-to-br from-[hsl(var(--primary))]/10 via-[hsl(var(--surface-container-low))] to-[hsl(var(--surface-container-high))] p-6 cursor-pointer transition-all duration-500 hover:shadow-xl hover:shadow-[hsl(var(--primary))]/10 hover:scale-[1.01]"
           >
             {/* 背景装饰 */}
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
@@ -269,7 +256,7 @@ export default function Dashboard() {
                   <Sparkles className="w-3 h-3" />
                   AI 驱动创作
                 </div>
-                <h2 className="text-2xl lg:text-3xl font-black text-[hsl(var(--on-surface))] mb-3">
+                <h2 className="text-xl lg:text-2xl font-black text-[hsl(var(--on-surface))] mb-3 cn-keep">
                   开始你的创作之旅
                 </h2>
                 <p className="text-[hsl(var(--secondary))] max-w-lg mb-6">
@@ -327,97 +314,97 @@ export default function Dashboard() {
         </section>
 
         {/* 项目统计 */}
-        <section className="mb-10">
-          <h3 className="text-lg font-bold tracking-tight text-[hsl(var(--on-surface))] mb-5">项目概览</h3>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}>
+        <section className="mb-7">
+          <h3 className="text-base font-bold text-[hsl(var(--on-surface))] mb-4">项目概览</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-4 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">片段</p>
+                <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">片段</p>
                 <Box className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
               </div>
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.episodeCount}</p>
-              <p className="mt-1 text-xs text-[hsl(var(--secondary))]">管理故事章节</p>
+              <p className="mt-1 text-[13px] text-[hsl(var(--secondary))]">管理故事章节</p>
             </Card>
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "scenes"))}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-4 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "scenes"))}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">场景</p>
+                <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">场景</p>
                 <Image className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
               </div>
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.sceneCount}</p>
-              <p className="mt-1 text-xs text-[hsl(var(--secondary))]">已创建的场景</p>
+              <p className="mt-1 text-[13px] text-[hsl(var(--secondary))]">已创建的场景</p>
             </Card>
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "characters"))}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-4 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "characters"))}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">角色</p>
+                <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">角色</p>
                 <Users className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
               </div>
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.characterCount}</p>
-              <p className="mt-1 text-xs text-[hsl(var(--secondary))]">项目角色数</p>
+              <p className="mt-1 text-[13px] text-[hsl(var(--secondary))]">项目角色数</p>
             </Card>
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "objects"))}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-4 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "objects"))}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">物品</p>
+                <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">物品</p>
                 <Sparkles className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
               </div>
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.objectCount}</p>
-              <p className="mt-1 text-xs text-[hsl(var(--secondary))]">道具和素材</p>
+              <p className="mt-1 text-[13px] text-[hsl(var(--secondary))]">道具和素材</p>
             </Card>
           </div>
         </section>
 
         {/* 快捷入口网格 */}
-        <section className="mb-10">
-          <h3 className="text-lg font-bold tracking-tight text-[hsl(var(--on-surface))] mb-5">快速入口</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <section className="mb-7">
+          <h3 className="text-base font-bold text-[hsl(var(--on-surface))] mb-4">快速入口</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card 
               onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}
-              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
+              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-4 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Box className="w-5 h-5 text-[hsl(var(--primary))]" />
               </div>
               <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">片段管理</h4>
-              <p className="text-xs text-[hsl(var(--secondary))]">故事章节管理</p>
+              <p className="text-[13px] text-[hsl(var(--secondary))]">故事章节管理</p>
             </Card>
             <Card 
               onClick={() => navigate(projectAssetsPath(projectId || "", "scenes"))}
-              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
+              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-4 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Image className="w-5 h-5 text-[hsl(var(--primary))]" />
               </div>
               <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">场景管理</h4>
-              <p className="text-xs text-[hsl(var(--secondary))]">背景和场景资源</p>
+              <p className="text-[13px] text-[hsl(var(--secondary))]">背景和场景资源</p>
             </Card>
             <Card 
               onClick={() => navigate(projectAssetsPath(projectId || "", "characters"))}
-              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
+              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-4 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Users className="w-5 h-5 text-[hsl(var(--primary))]" />
               </div>
               <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">角色管理</h4>
-              <p className="text-xs text-[hsl(var(--secondary))]">角色和人物设定</p>
+              <p className="text-[13px] text-[hsl(var(--secondary))]">角色和人物设定</p>
             </Card>
             <Card 
               onClick={handleEnterCanvas}
-              className="group bg-[hsl(var(--primary))]/5 rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--primary))]/10 border-0 shadow-none cursor-pointer hover:shadow-md"
+              className="group bg-[hsl(var(--primary))]/5 rounded-xl p-4 transition-all duration-300 hover:bg-[hsl(var(--primary))]/10 border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <LayoutGrid className="w-5 h-5 text-white" />
               </div>
               <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">工作流编排</h4>
-              <p className="text-xs text-[hsl(var(--secondary))]">无限画布创作</p>
+              <p className="text-[13px] text-[hsl(var(--secondary))]">无限画布创作</p>
             </Card>
           </div>
         </section>
 
         {/* 活动动态 */}
-        <section className="mb-10">
-          <h3 className="text-lg font-bold tracking-tight text-[hsl(var(--on-surface))] mb-5">最近活动</h3>
-          <div className="space-y-3">
+        <section className="mb-7">
+          <h3 className="text-base font-bold text-[hsl(var(--on-surface))] mb-4">最近活动</h3>
+          <div className="space-y-2">
             {activities.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-4 p-4 rounded-xl bg-[hsl(var(--surface-container-low))]/50 hover:bg-[hsl(var(--surface-container-low))] transition-colors">
+              <div key={activity.id} className="flex items-center gap-4 px-3 py-2.5 rounded-xl bg-[hsl(var(--surface-container-low))]/50 hover:bg-[hsl(var(--surface-container-low))] transition-colors">
                 {activity.type === "upload" ? (
                   <div className="flex -space-x-2">
                     {activity.users?.map((user, idx) => (
@@ -448,7 +435,7 @@ export default function Dashboard() {
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div>
               <span className="text-lg font-bold text-[hsl(var(--on-surface))]">MangaCanvas</span>
-              <p className="mt-1 text-xs text-[hsl(var(--on-secondary-fixed-variant))]">© 2024 Kinetic Gallery. 保留所有权利。</p>
+              <p className="mt-1 text-xs text-[hsl(var(--on-secondary-fixed-variant))]">© 2024 MangaCanvas. 保留所有权利。</p>
             </div>
             <div className="flex gap-8">
               <Link to="/privacy" className="text-xs text-[hsl(var(--secondary))] transition-opacity hover:text-[hsl(var(--primary))]">

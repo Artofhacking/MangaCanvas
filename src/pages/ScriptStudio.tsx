@@ -469,7 +469,7 @@ export default function ScriptStudio() {
                 <Sparkles className="w-3 h-3" />
                 全新模块
               </div>
-              <h2 className="text-3xl font-black tracking-tight text-[hsl(var(--on-surface))] mb-3">
+              <h2 className="text-2xl font-black cn-keep text-[hsl(var(--on-surface))] mb-3">
                 把一篇故事变成一套制作清单
               </h2>
               <p className="text-[hsl(var(--secondary))] max-w-lg mb-8 leading-relaxed">
@@ -501,7 +501,7 @@ function StatCard({
   return (
     <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-4 shadow-none rounded-xl">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--secondary))]">{label}</p>
+        <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">{label}</p>
         <Icon className="w-4 h-4 text-[hsl(var(--primary))]" />
       </div>
       <p className="text-2xl font-black text-[hsl(var(--on-surface))]">{value}</p>
@@ -533,13 +533,13 @@ function PlotPanel({ document }: { document: ScriptDocument }) {
     <div className="space-y-5">
       {plot.logline ? (
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[hsl(var(--secondary))] mb-2">一句话</p>
+          <p className="text-[13px] font-bold text-[hsl(var(--secondary))] mb-2">一句话</p>
           <p className="text-lg font-bold leading-relaxed text-[hsl(var(--on-surface))]">{plot.logline}</p>
         </div>
       ) : null}
       {plot.summary ? (
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[hsl(var(--secondary))] mb-2">剧情梗概</p>
+          <p className="text-[13px] font-bold text-[hsl(var(--secondary))] mb-2">剧情梗概</p>
           <p className="text-sm leading-8 text-[hsl(var(--on-surface-variant))] whitespace-pre-wrap">
             {plot.summary}
           </p>

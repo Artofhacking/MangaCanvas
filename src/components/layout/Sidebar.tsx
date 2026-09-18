@@ -142,7 +142,7 @@ export default function Sidebar() {
   const isSettingsPath = /\/project\/\d+\/(settings|permissions)(?:\/|$)/.test(location.pathname)
 
   const navClass = (active: boolean) =>
-    `flex items-center gap-4 px-4 py-3 rounded-lg transition-colors ${
+    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
       active
         ? "text-[hsl(var(--primary))] font-semibold bg-[hsl(var(--surface-container-high))]"
         : "text-[hsl(var(--on-secondary-fixed-variant))] hover:bg-[hsl(var(--surface-container-high))]"
@@ -158,7 +158,7 @@ export default function Sidebar() {
           </div>
         </div>
       )}
-      <aside className="h-screen w-64 fixed left-0 top-0 bg-[hsl(var(--surface-container-low))] flex flex-col p-6 gap-y-4 z-50">
+      <aside className="h-screen w-64 fixed left-0 top-0 bg-[hsl(var(--surface-container-low))] flex flex-col p-5 gap-y-3 z-50">
         {inProjectShell ? (
           <div className="mb-2">
             <Link
@@ -173,10 +173,10 @@ export default function Sidebar() {
                 <button className="w-full text-left p-3 rounded-xl hover:bg-[hsl(var(--surface-container-high))] transition-colors group">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h1 className="text-lg font-bold text-[hsl(var(--on-surface))] truncate max-w-[160px]">
+                      <h1 className="cn-keep text-base font-bold text-[hsl(var(--on-surface))] truncate max-w-[160px]">
                         {currentProject?.name || "未选择项目"}
                       </h1>
-                      <p className="text-xs text-[hsl(var(--secondary))]">当前项目</p>
+                      <p className="text-[13px] text-[hsl(var(--secondary))]">当前项目</p>
                     </div>
                     <ChevronDown className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--on-surface))]" />
                   </div>
@@ -214,8 +214,8 @@ export default function Sidebar() {
           </div>
         ) : (
           <div className="mb-6 px-2">
-            <h1 className="text-lg font-black text-[hsl(var(--on-surface))] tracking-tight">MangaCanvas</h1>
-            <p className="text-xs text-[hsl(var(--secondary))]">工作区</p>
+            <h1 className="text-base font-black text-[hsl(var(--on-surface))]">MangaCanvas</h1>
+            <p className="text-[13px] text-[hsl(var(--secondary))]">工作区</p>
           </div>
         )}
 

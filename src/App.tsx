@@ -377,7 +377,7 @@ function Home() {
             </Link>
           </div>
           <p className="text-xs text-[hsl(var(--on-secondary-fixed-variant))]">
-            © 2024 Kinetic Gallery. 保留所有权利。
+            © 2024 MangaCanvas. 保留所有权利。
           </p>
         </div>
       </footer>

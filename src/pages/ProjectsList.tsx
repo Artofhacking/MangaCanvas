@@ -23,6 +23,7 @@ import { useEffect, useState } from "react"
 import ProjectCreator from "./ProjectCreator"
 import ProjectEditor, { type EditableProject } from "./ProjectEditor"
 import Sidebar from "@/components/layout/Sidebar"
+import { QuerySpinner } from "@/components/feedback/ListQueryState"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { projectsApi } from "@/api"
 import {
@@ -105,13 +106,16 @@ export default function ProjectsList() {
     }
   }
 
-  // 当分页或筛选条件变化时重新加载
   useEffect(() => {
     if (currentIdentityMeta.hasProjects) {
       void loadProjects()
+      return
     }
+    setIsLoading(false)
+    setProjects([])
+    setTotal(0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter])
+  }, [page, statusFilter, currentIdentity])
 
   const handleProjectClick = (projectId: number) => {
     setActiveProjectId(projectId)
@@ -300,8 +304,11 @@ export default function ProjectsList() {
             </div>
           </div>
 
+          {isLoading ? (
+            <QuerySpinner label="正在加载项目列表..." />
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Add New Project Card */}
+            {currentIdentityMeta.hasProjects ? (
             <div
               onClick={() => setIsProjectDialogOpen(true)}
               className="aspect-[4/3] bg-[hsl(var(--surface-container))] border-2 border-dashed border-[hsl(var(--outline-variant))] flex flex-col items-center justify-center rounded-xl hover:bg-[hsl(var(--surface-container-low))] transition-all cursor-pointer group"
@@ -310,16 +317,10 @@ export default function ProjectsList() {
                 <Plus className="w-6 h-6 text-[hsl(var(--primary))]" />
               </div>
               <span className="text-sm font-bold text-[hsl(var(--on-surface-variant))]">新建项目</span>
-              <span className="text-[10px] text-[hsl(var(--secondary))] mt-1 uppercase tracking-tighter">
+              <span className="text-[13px] text-[hsl(var(--secondary))] mt-1">
                 开始新的创作
               </span>
             </div>
-
-            {/* Project Cards */}
-            {isLoading ? (
-              <div className="col-span-full rounded-xl bg-[hsl(var(--surface-container-lowest))] p-6 text-sm text-[hsl(var(--secondary))]">
-                正在加载项目列表...
-              </div>
             ) : null}
             {visibleProjects.map((project) => (
               <div
@@ -405,7 +406,7 @@ export default function ProjectsList() {
 
             {!currentIdentityMeta.hasProjects ? (
               <div className="col-span-full flex min-h-[320px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))] px-8 text-center">
-                <div className="rounded-full bg-[hsl(var(--surface-container-high))] px-4 py-1.5 text-[11px] font-bold tracking-[0.18em] text-[hsl(var(--secondary))]">
+                <div className="rounded-full bg-[hsl(var(--surface-container-high))] px-4 py-1.5 text-[13px] font-bold text-[hsl(var(--secondary))]">
                   {currentIdentityMeta.label}
                 </div>
                 <h3 className="mt-5 text-2xl font-black text-[hsl(var(--on-surface))]">当前身份下还没有项目</h3>
@@ -415,9 +416,10 @@ export default function ProjectsList() {
               </div>
             ) : null}
           </div>
+          )}
 
           {/* 分页 */}
-          {currentIdentityMeta.hasProjects && total > 0 && (
+          {!isLoading && currentIdentityMeta.hasProjects && total > 0 && (
             <Pagination
               page={page}
               size={size}
@@ -432,7 +434,7 @@ export default function ProjectsList() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <span className="text-sm font-bold text-[hsl(var(--on-surface))]">MangaCanvas</span>
-              <p className="text-xs text-[hsl(var(--on-secondary-fixed-variant))] mt-1">© 2024 Kinetic Gallery. 保留所有权利。</p>
+              <p className="text-xs text-[hsl(var(--on-secondary-fixed-variant))] mt-1">© 2024 MangaCanvas. 保留所有权利。</p>
             </div>
             <div className="flex gap-6">
               <Link to="/privacy" className="text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--primary))] transition-colors">

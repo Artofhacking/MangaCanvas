@@ -81,20 +81,31 @@ export default function GenerationTaskPanel({ tasks, highlight = false, panelRef
 export function GenerationTaskListButton({
   label,
   count,
+  running = false,
+  expanded = false,
   onClick,
 }: {
   label: string
   count: number
+  running?: boolean
+  expanded?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-expanded={expanded}
       className="inline-flex items-center gap-2 rounded-full signature-gradient px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
     >
       <LayoutList className="h-4 w-4" />
       {label}
+      {running ? (
+        <span className="relative flex h-2 w-2" aria-hidden>
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+        </span>
+      ) : null}
       {count ? <span className="rounded-full bg-white/20 px-1.5 text-[11px] leading-5">{count}</span> : null}
     </button>
   )
