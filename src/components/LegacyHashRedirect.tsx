@@ -1,25 +1,21 @@
-import { useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useLayoutEffect } from "react"
+
+import { redirectLegacyHashLocation } from "@/lib/legacyHash"
 
 /**
- * Keep bookmarked HashRouter URLs working after the switch to history mode.
- * `#/project/6/scenes` (and `#/project/6/assets/scenes`) rewrite to the same path.
+ * Safety net for leftover HashRouter URLs after the app has already mounted.
+ * The real handoff happens in `index.html` / `main.tsx` before the router
+ * matches the marketing homepage.
  */
 export default function LegacyHashRedirect() {
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const { hash, search } = window.location
-    if (!hash.startsWith("#/")) {
-      return
+  useLayoutEffect(() => {
+    redirectLegacyHashLocation()
+    const onHashChange = () => {
+      redirectLegacyHashLocation()
     }
-
-    const hashed = hash.slice(1)
-    const queryIndex = hashed.indexOf("?")
-    const pathname = queryIndex === -1 ? hashed : hashed.slice(0, queryIndex)
-    const hashSearch = queryIndex === -1 ? "" : hashed.slice(queryIndex)
-    navigate(`${pathname}${hashSearch || search}`, { replace: true })
-  }, [navigate])
+    window.addEventListener("hashchange", onHashChange)
+    return () => window.removeEventListener("hashchange", onHashChange)
+  }, [])
 
   return null
 }

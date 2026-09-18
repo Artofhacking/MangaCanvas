@@ -11,6 +11,7 @@ if [[ ! -f dist/index.html ]]; then
 fi
 
 node "$ROOT/scripts/check-spa-assets.mjs"
+node "$ROOT/scripts/check-legacy-hash.mjs"
 
 PORT="${SPA_VERIFY_PORT:-4179}"
 npx vite preview --host 127.0.0.1 --port "$PORT" --strictPort >/tmp/mangacanvas-preview.log 2>&1 &

@@ -40,7 +40,7 @@ npm run verify:spa
 
 否则打开 `/project/6/scenes` 时，浏览器会把脚本解析成 `/project/6/assets/index-….js`。nginx 把该路径回退成 HTML，页面白屏。Hash 路由 `#/project/6/scenes` 之所以能用，是因为浏览器实际请求的是 `/`。
 
-应用已从 `HashRouter` 切到 `BrowserRouter`。旧书签 `#/project/:id/...` 会由 `LegacyHashRedirect` 改写成同路径 history URL。
+应用已从 `HashRouter` 切到 `BrowserRouter`。旧书签 `#/project/:id/...` 会在 `index.html` / `main.tsx` 里立刻 `location.replace` 成同路径 history URL，然后再进 SPA 路由和鉴权。`LegacyHashRedirect` 只作为挂载后的兜底。
 
 服务端必须同时满足：
 
