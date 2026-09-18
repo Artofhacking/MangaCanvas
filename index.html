@@ -2,6 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      /* Legacy HashRouter bookmarks: /#/project/6/script -> /project/6/script
+         Must run before module JS so the marketing homepage cannot win. */
+      (function () {
+        var hash = location.hash;
+        if (hash.indexOf("#/") !== 0) return;
+        var hashed = hash.slice(1);
+        var queryIndex = hashed.indexOf("?");
+        var pathname = queryIndex === -1 ? hashed : hashed.slice(0, queryIndex);
+        var hashSearch = queryIndex === -1 ? "" : hashed.slice(queryIndex);
+        if (pathname.charAt(0) !== "/" || pathname.indexOf("//") === 0) return;
+        location.replace(pathname + (hashSearch || location.search));
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MangaCanvas - AI 漫画创作平台</title>
