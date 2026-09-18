@@ -42,6 +42,18 @@ code {
   stroke-width: 2;
 }
 
+.react-flow__connectionline,
+.react-flow__connection {
+  pointer-events: none;
+  overflow: visible;
+}
+
+.react-flow__connection-path {
+  fill: none;
+  stroke: var(--ic-primary, hsl(var(--primary)));
+  stroke-width: 2;
+}
+
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--ic-primary);
 }

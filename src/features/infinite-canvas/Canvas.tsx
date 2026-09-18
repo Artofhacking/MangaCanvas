@@ -62,6 +62,7 @@ import EffectConfigNode from './components/nodes/EffectConfigNode';
 import TemplateEffectNode from './components/nodes/TemplateEffectNode';
 import PromptOrderEdge from './components/edges/PromptOrderEdge';
 import ImageRoleEdge from './components/edges/ImageRoleEdge';
+import ConnectPreviewLine from './components/edges/ConnectPreviewLine';
 import ApiSettings from './components/ApiSettings';
 import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
@@ -69,6 +70,7 @@ import NodeGenerateBar from './components/NodeGenerateBar';
 import ConnectDropMenu, { type ConnectDropMenuState } from './components/ConnectDropMenu';
 import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
 import { spawnGenerateFromSource } from './utils/spawnGenerateFromSource';
+import { getSourceHandleScreenPoint } from './utils/connectPreview';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -805,6 +807,7 @@ const CanvasInner: React.FC = () => {
       sourceId: start.nodeId,
       screen: point,
       flow: screenToFlowPosition(point),
+      fromScreen: getSourceHandleScreenPoint(start.nodeId) || undefined,
     })
   }, [isLocked, screenToFlowPosition]);
 
@@ -1138,6 +1141,8 @@ const CanvasInner: React.FC = () => {
           onConnect={isLocked ? undefined : handleConnect}
           onConnectStart={isLocked ? undefined : handleConnectStart}
           onConnectEnd={isLocked ? undefined : handleConnectEnd}
+          connectionLineComponent={ConnectPreviewLine}
+          connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultViewport={viewport}
