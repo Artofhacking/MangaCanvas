@@ -7,6 +7,7 @@ import { useImageGeneration, useImageModels } from '../../hooks';
 import { IMAGE_MODELS, filterLiveModels } from '../../config/models';
 import { isI2IModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
+import { collectGenerateInputs } from '../../utils/generateSlots';
 
 // 画面比例选项
 const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
@@ -147,48 +148,11 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     }
   };
 
-  // Get connected inputs
-  const getConnectedInputs = () => {
-    const incomingEdges = edges.filter((edge) => edge.target === id);
-    const prompts: string[] = [];
-    const refImages: string[] = [];
-    const effectParams: { style?: string; lighting?: string; effect?: string } = {};
-
-    incomingEdges.forEach((edge) => {
-      const sourceNode = nodes.find((n) => n.id === edge.source);
-      if (!sourceNode) return;
-
-      if (sourceNode.type === 'text') {
-        const content = (sourceNode.data.content || sourceNode.data.value || '') as string;
-        if (content) prompts.push(content);
-      } else if (sourceNode.type === 'image') {
-        const imageUrl = sourceNode.data.url || sourceNode.data.base64;
-        if (imageUrl) refImages.push(imageUrl);
-      } else if (sourceNode.type === 'effectConfig') {
-        // 收集效果配置参数（图片不包含运镜）
-        if (sourceNode.data.style) effectParams.style = sourceNode.data.style as string;
-        if (sourceNode.data.lighting) effectParams.lighting = sourceNode.data.lighting as string;
-        if (sourceNode.data.effect) effectParams.effect = sourceNode.data.effect as string;
-      }
+  const getConnectedInputs = () =>
+    collectGenerateInputs(id, nodes, edges, {
+      includeCamera: false,
+      localPrompt: typeof data.prompt === 'string' ? data.prompt : '',
     });
-
-    // 将效果参数转换为提示词后缀
-    const effectSuffix = [
-      effectParams.style,
-      effectParams.lighting,
-      effectParams.effect,
-    ].filter(Boolean).join('，');
-
-    // 合并提示词和效果参数
-    let finalPrompt = prompts.join('\n\n');
-    if (effectSuffix && finalPrompt) {
-      finalPrompt = `${finalPrompt}，${effectSuffix}`;
-    } else if (effectSuffix) {
-      finalPrompt = effectSuffix;
-    }
-
-    return { prompt: finalPrompt, prompts, refImages, effectParams };
-  };
 
   const handleGenerate = async () => {
     const { prompt, refImages } = getConnectedInputs();
@@ -201,7 +165,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
     // 文生图模式需要提示词
     if (!isI2I && !prompt) {
-      message.warning('请连接文本节点（提示词）');
+      message.warning('请先填写提示词，或连入文本节点');
       return;
     }
 
