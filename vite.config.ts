@@ -5,7 +5,9 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  // Absolute base so history deep links (e.g. /project/6/scenes) load
+  // /assets/*.js instead of the relative /project/6/assets/*.js white screen.
+  base: '/',
   server: {
     host: '0.0.0.0',
     port: 5174,
@@ -19,6 +21,10 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 4173,
   },
   resolve: {
     alias: {

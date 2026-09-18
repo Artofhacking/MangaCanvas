@@ -23,3 +23,5 @@ jobs:
           CI: "true"
           VITE_MOCK_MODE: "false"
           VITE_APP_API_BASE_URL: /api/v1
+      - name: Assert absolute /assets URLs
+        run: npm run check:spa

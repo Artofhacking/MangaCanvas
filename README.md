@@ -29,6 +29,75 @@ npm run dev
 npm run build
 npm run preview
 npm run lint
+npm run check:spa
+npm run verify:spa
+```
+
+## SPA 深链（history）
+
+生产根路径是站点根（`http://47.104.138.144:18999/`），前端必须用绝对资源路径。`vite.config.ts` 的 `base` 是 `/`，构建后的 `dist/index.html` 只能引用 `/assets/...`，不能引用 `./assets/...`。
+
+否则打开 `/project/6/scenes` 时，浏览器会把脚本解析成 `/project/6/assets/index-….js`。nginx 把该路径回退成 HTML，页面白屏。Hash 路由 `#/project/6/scenes` 之所以能用，是因为浏览器实际请求的是 `/`。
+
+应用已从 `HashRouter` 切到 `BrowserRouter`。旧书签 `#/project/:id/...` 会由 `LegacyHashRedirect` 改写成同路径 history URL。
+
+服务端必须同时满足：
+
+1. 未知前端路径回退到 `index.html`（`try_files $uri /index.html`，不要带 `$uri/`）
+2. `/assets/*` 只返回真实 JS/CSS，绝不回退成 HTML
+3. React 路由 `/assets` 不能被物理目录 `assets/` 301/403
+
+参考配置：本地 Docker 用仓库根目录 `nginx.conf`；生产模板是 `deploy/nginx/mangacanvas.conf`。`npm run deploy` 会在服务器上幂等补丁 `/etc/nginx/conf.d/mangacanvas.conf`。GitHub Actions 只跑 `npm run build` + `npm run check:spa`，不负责发版。
+
+### 本地验证
+
+**方式 A — Vite preview（最快）**
+
+```bash
+npm run build
+npm run verify:spa
+# 或手动：
+npm run preview
+# 浏览器打开：
+#   http://localhost:4173/project/6/scenes
+#   http://localhost:4173/#/project/6/scenes
+# curl：
+curl -sS http://localhost:4173/project/6/scenes | grep 'src="/assets/'
+```
+
+未登录时深链应进入登录页或应用壳，而不是白屏。DevTools 里 JS 必须是 `/assets/index-….js`（200, JavaScript），不能是 `/project/6/assets/index-….js`（HTML）。
+
+**方式 B — nginx Docker（更接近生产）**
+
+```bash
+npm run build
+docker run --rm -p 8080:80 \
+  -v "$PWD/dist:/usr/share/nginx/html:ro" \
+  -v "$PWD/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+  nginx:1.27-alpine
+curl -sS http://localhost:8080/project/6/scenes | grep 'src="/assets/'
+curl -sI http://localhost:8080/assets/   # 目录本身不应 301/403 成死链；hashed 文件必须是 JS
+```
+
+### 生产验证（CI/CD 发版后）
+
+```bash
+# 1) 构建产物必须是绝对路径
+curl -sS http://47.104.138.144:18999/project/6/scenes | grep 'src="/assets/'
+
+# 2) 入口 JS 必须是 JavaScript，不能是 HTML
+js=$(curl -sS http://47.104.138.144:18999/project/6/scenes \
+  | sed -n 's/.*src="\(\/assets\/[^"]*index-[^"]*\.js\)".*/\1/p' | head -n 1)
+curl -sI "http://47.104.138.144:18999$js" | grep -i content-type
+
+# 3) 错误的相对路径必须不再被当成入口
+curl -sI "http://47.104.138.144:18999/project/6$js" | grep -i content-type
+# 期望：不是 application/javascript
+
+# 4) 浏览器
+#   http://47.104.138.144:18999/project/6/scenes
+#   http://47.104.138.144:18999/#/project/6/scenes
+#   http://47.104.138.144:18999/#/project/6/assets/scenes
 ```
 
 ## 当前技术栈
