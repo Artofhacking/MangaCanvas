@@ -50,9 +50,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-const BAR_WIDTH = 520
+const BAR_WIDTH = 560
 const BAR_GAP = 12
-const BAR_ESTIMATED_HEIGHT = 236
+const BAR_ESTIMATED_HEIGHT = 268
 const CAPABILITY_CHIPS = [
   { id: 'mark', label: '标记', icon: Tag },
   { id: 'fx', label: '特效', icon: Sparkles },
@@ -461,6 +461,12 @@ const NodeGenerateBar: React.FC = () => {
   }, [node?.data.prompt, selectedId])
 
   useEffect(() => {
+    if (!selectedId) return
+    const timer = window.setTimeout(() => mentionRef.current?.focus(), 40)
+    return () => window.clearTimeout(timer)
+  }, [selectedId])
+
+  useEffect(() => {
     if (!selectedId) {
       prevSlotsRef.current = { nodeId: null, slots: [] }
       return
@@ -537,6 +543,7 @@ const NodeGenerateBar: React.FC = () => {
       <div
         ref={barRef}
         className="pointer-events-auto absolute nodrag nowheel nopan"
+        data-generate-bar="true"
         style={{ left, top, width: BAR_WIDTH }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}

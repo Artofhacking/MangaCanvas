@@ -193,7 +193,7 @@ const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInp
             onKeyUp={(event) => syncCaret(event.currentTarget)}
             onSelect={(event) => syncCaret(event.currentTarget)}
             spellCheck={false}
-            className="min-h-[88px] w-full resize-none rounded-2xl bg-[hsl(var(--surface-container-low))] px-3 py-2.5 text-sm leading-5 text-transparent caret-[hsl(var(--on-surface))] placeholder:text-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+            className="min-h-[120px] w-full resize-none rounded-2xl bg-[hsl(var(--surface-container-low))] px-3 py-2.5 text-sm leading-5 text-transparent caret-[hsl(var(--on-surface))] placeholder:text-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
           />
         </div>
       </div>
