@@ -2,9 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore, type Node as RFNode } from 'reactflow'
 import {
   ArrowUp,
+  Check,
+  ChevronDown,
   Clapperboard,
   FileText,
   ImagePlus,
+  Loader2,
   Music2,
   Sparkles,
   Tag,
@@ -13,13 +16,22 @@ import {
 } from 'lucide-react'
 import { message } from 'antd'
 import { useCanvasStore } from '../stores/canvasStore'
-import { IMAGE_MODELS, VIDEO_MODELS } from '../config/models'
+import { IMAGE_MODELS, VIDEO_MODELS, filterLiveModels, remapVideoModel } from '../config/models'
+import { useImageModels, useVideoModels } from '../hooks/useModels'
 import { useNodeGenerateAction } from '../hooks/useNodeGenerateAction'
 import {
   getIncomingReferenceSlots,
   isGenerateNodeType,
   type ReferenceSlot,
 } from '../utils/generateSlots'
+import type { CustomNode, ModelConfig } from '../types'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 const BAR_WIDTH = 520
@@ -68,6 +80,115 @@ function useGenerateBarAnchor(nodeId: string | null): GenerateBarAnchor | null {
       height: height * zoom,
     }
   })
+}
+
+function applyModelDefaults(nodeType: string, modelKey: string): Partial<CustomNode['data']> {
+  if (nodeType === 'videoConfig') {
+    const nextKey = remapVideoModel(modelKey)
+    const model = VIDEO_MODELS.find((item) => item.key === nextKey)
+    return {
+      model: nextKey,
+      size: model?.defaultParams?.size,
+      resolution: model?.defaultParams?.resolution,
+      duration: model?.defaultParams?.duration,
+    }
+  }
+
+  const model = IMAGE_MODELS.find((item) => item.key === modelKey)
+  return {
+    model: modelKey,
+    quality: model?.defaultParams?.quality,
+    size: model?.defaultParams?.size,
+  }
+}
+
+function GenerateBarModelPicker({
+  node,
+  onChange,
+}: {
+  node: CustomNode
+  onChange: (data: Partial<CustomNode['data']>) => void
+}) {
+  const isVideo = node.type === 'videoConfig'
+  const { models: liveImageModels, loading: imageLoading } = useImageModels()
+  const { models: liveVideoModels, loading: videoLoading } = useVideoModels()
+  const catalog = isVideo ? VIDEO_MODELS : IMAGE_MODELS
+  const liveIds = (isVideo ? liveVideoModels : liveImageModels).map((item) => item.id)
+  const loading = isVideo ? videoLoading : imageLoading
+  const pickerModels = useMemo(() => {
+    const live = filterLiveModels(catalog, liveIds)
+    return live.length > 0 ? live : catalog
+  }, [catalog, liveIds])
+
+  const currentKey = isVideo
+    ? remapVideoModel(typeof node.data.model === 'string' ? node.data.model : undefined)
+    : typeof node.data.model === 'string'
+      ? node.data.model
+      : pickerModels[0]?.key || ''
+  const selected = pickerModels.find((item) => item.key === currentKey) || catalog.find((item) => item.key === currentKey)
+  const paramStub = [node.data.size, node.data.ratio, node.data.resolution, node.data.duration ? `${node.data.duration}s` : '']
+    .filter((item) => typeof item === 'string' && item)
+    .slice(0, 2)
+    .join(' · ')
+
+  useEffect(() => {
+    if (loading || pickerModels.length === 0) return
+    if (!pickerModels.some((item) => item.key === currentKey)) {
+      onChange(applyModelDefaults(node.type, pickerModels[0].key))
+    }
+  }, [currentKey, loading, node.type, onChange, pickerModels])
+
+  const handleSelect = (model: ModelConfig) => {
+    onChange(applyModelDefaults(node.type, model.key))
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={loading && pickerModels.length === 0}
+          className="h-auto max-w-[168px] shrink-0 justify-end rounded-xl bg-[hsl(var(--surface-container-low))] px-2.5 py-1.5 text-right hover:bg-[hsl(var(--surface-container-high))]"
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-[11px] font-semibold text-[hsl(var(--on-surface))]">
+              {loading && !selected ? '加载模型…' : selected?.label || currentKey || '选择模型'}
+            </span>
+            {paramStub ? (
+              <span className="block truncate text-[10px] text-[hsl(var(--secondary))]">{paramStub}</span>
+            ) : null}
+          </span>
+          {loading ? (
+            <Loader2 className="ml-1 h-3.5 w-3.5 shrink-0 animate-spin text-[hsl(var(--secondary))]" />
+          ) : (
+            <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-[hsl(var(--secondary))]" />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="z-[80] max-h-72 w-64 overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl"
+      >
+        {pickerModels.map((model) => (
+          <DropdownMenuItem
+            key={model.key}
+            onClick={() => handleSelect(model)}
+            className={cn(
+              'rounded-lg px-2.5 py-2 text-sm',
+              currentKey === model.key
+                ? 'bg-[hsl(var(--primary))] text-white focus:bg-[hsl(var(--primary))] focus:text-white'
+                : 'text-[hsl(var(--on-surface))]'
+            )}
+          >
+            <Check className={cn('mr-2 h-3.5 w-3.5', currentKey === model.key ? 'opacity-100' : 'opacity-0')} />
+            <span className="truncate">{model.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 }
 
 function SlotThumb({ slot }: { slot: ReferenceSlot }) {
@@ -193,6 +314,11 @@ const NodeGenerateBar: React.FC = () => {
     return () => observer.disconnect()
   }, [selectedId])
 
+  const handleModelChange = useCallback((data: Partial<CustomNode['data']>) => {
+    if (!selectedId) return
+    updateNode(selectedId, data)
+  }, [selectedId, updateNode])
+
   if (!selectedId || !anchor || !node) {
     return <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20" />
   }
@@ -208,14 +334,6 @@ const NodeGenerateBar: React.FC = () => {
     ? Math.max(16, anchor.top - barSize.height - BAR_GAP)
     : Math.min(anchor.top + anchor.height + BAR_GAP, containerHeight - 24)
 
-  const models = node.type === 'videoConfig' ? VIDEO_MODELS : IMAGE_MODELS
-  const modelKey = typeof node.data.model === 'string' ? node.data.model : ''
-  const modelLabel = models.find((item) => item.key === modelKey)?.label || modelKey || '未接模型'
-  const paramStub = [node.data.size, node.data.ratio, node.data.resolution, node.data.duration ? `${node.data.duration}s` : '']
-    .filter((item) => typeof item === 'string' && item)
-    .slice(0, 2)
-    .join(' · ')
-
   const handlePromptChange = (value: string) => {
     setDraftPrompt(value)
     updateNode(selectedId, { prompt: value })
@@ -227,7 +345,7 @@ const NodeGenerateBar: React.FC = () => {
 
   const handleSend = (event: React.MouseEvent) => {
     event.stopPropagation()
-    void send()
+    void send(draftPrompt)
   }
 
   return (
@@ -291,10 +409,7 @@ const NodeGenerateBar: React.FC = () => {
                 )
               })}
             </div>
-            <div className="hidden min-w-0 max-w-[148px] truncate text-right text-[11px] text-[hsl(var(--secondary))] sm:block">
-              <div className="truncate font-semibold text-[hsl(var(--on-surface))]">{modelLabel}</div>
-              {paramStub ? <div className="truncate">{paramStub}</div> : null}
-            </div>
+            <GenerateBarModelPicker node={node} onChange={handleModelChange} />
             <button
               type="button"
               onClick={handleSend}

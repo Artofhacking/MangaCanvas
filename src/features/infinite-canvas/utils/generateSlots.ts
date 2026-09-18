@@ -159,7 +159,7 @@ export function collectGenerateInputs(
   nodeId: string,
   nodes: CustomNode[],
   edges: CustomEdge[],
-  options: { includeCamera?: boolean; localPrompt?: string } = {}
+  options: { includeCamera?: boolean; localPrompt?: string; promptSource?: 'bar' | 'merge' } = {}
 ): GenerateConnectedInputs {
   const slots = getIncomingReferenceSlots(nodeId, nodes, edges)
   const textSnippets: string[] = []
@@ -210,7 +210,10 @@ export function collectGenerateInputs(
   const effectSuffix = effectSuffixFromParams(effectParams, options.includeCamera === true)
   const connectedPrompt = textSnippets.join('\n\n')
   const localPrompt = (options.localPrompt || '').trim()
-  const mergedBase = [localPrompt, connectedPrompt].filter(Boolean).join('\n\n')
+  const mergedBase =
+    options.promptSource === 'bar'
+      ? localPrompt || connectedPrompt
+      : [localPrompt, connectedPrompt].filter(Boolean).join('\n\n')
   const prompt = effectSuffix
     ? mergedBase
       ? `${mergedBase}，${effectSuffix}`

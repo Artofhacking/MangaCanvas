@@ -1,38 +1,43 @@
 import { useCallback, useState } from 'react'
 import { message } from 'antd'
-import { isI2IModel, isKF2VModel, isT2VModel } from '@/api/aigc'
-import { getDashScopeApiKey } from '@/api/core/runtime'
-import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel } from '../config/models'
+import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel, remapVideoModel } from '../config/models'
 import { useCanvasStore } from '../stores/canvasStore'
 import { collectGenerateInputs, isGenerateNodeType } from '../utils/generateSlots'
 import { useImageGeneration } from './useImageGeneration'
 import { useVideoGeneration } from './useVideoGeneration'
 
-const MISSING_MODEL_HINT = '未接模型'
+const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
+const DEFAULT_VIDEO_MODEL = 'happyhorse-1.1-t2v'
+
+function toErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message && err.message !== 'API_RATE_LIMIT') {
+    return err.message
+  }
+  return fallback
+}
 
 export function useNodeGenerateAction(nodeId: string | null) {
   const { generate: generateImage } = useImageGeneration()
   const { generate: generateVideo } = useVideoGeneration()
   const [sending, setSending] = useState(false)
 
-  const send = useCallback(async () => {
+  const send = useCallback(async (barPrompt?: string) => {
     if (!nodeId) return
 
     const { nodes, edges, addNode, addEdgeManually, updateNode, removeNode } = useCanvasStore.getState()
     const node = nodes.find((item) => item.id === nodeId)
     if (!node || !isGenerateNodeType(node.type)) return
 
-    const model = typeof node.data.model === 'string' ? node.data.model : ''
-    const apiKey = getDashScopeApiKey()
-    if (!model || !apiKey) {
-      message.warning(MISSING_MODEL_HINT)
-      return
+    const storedPrompt = typeof node.data.prompt === 'string' ? node.data.prompt : ''
+    const localPrompt = (barPrompt ?? storedPrompt).trim()
+    if (barPrompt !== undefined && barPrompt !== storedPrompt) {
+      updateNode(nodeId, { prompt: barPrompt })
     }
 
-    const localPrompt = typeof node.data.prompt === 'string' ? node.data.prompt : ''
     const inputs = collectGenerateInputs(nodeId, nodes, edges, {
       includeCamera: node.type === 'videoConfig',
       localPrompt,
+      promptSource: 'bar',
     })
 
     const outgoing = edges.filter((edge) => edge.source === nodeId)
@@ -41,16 +46,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
     setSending(true)
     try {
       if (node.type === 'imageConfig') {
-        const isI2I = isI2IModel(model)
-        if (isI2I && inputs.refImages.length === 0) {
-          message.warning('图生图模式需要连接图片节点（参考图）')
-          return
-        }
-        if (!isI2I && !inputs.prompt) {
-          message.warning('请先填写提示词，或连入文本节点')
-          return
-        }
-
+        const model = (typeof node.data.model === 'string' && node.data.model) || DEFAULT_IMAGE_MODEL
         const modelLabel = getImageModel(model)?.label || IMAGE_MODELS.find((item) => item.key === model)?.label || model
         const imageNodeId = addNode(
           'image',
@@ -84,38 +80,23 @@ export function useNodeGenerateAction(nodeId: string | null) {
             message.success('图片生成成功！')
           } else {
             updateNode(imageNodeId, { loading: false, error: '生成失败' })
+            message.error('生成失败')
           }
         } catch (err: unknown) {
           if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
             removeNode(imageNodeId)
             message.warning('请求过于频繁，请稍后重试')
           } else {
-            updateNode(imageNodeId, { loading: false, error: '生成失败' })
+            const errorMessage = toErrorMessage(err, '生成失败')
+            updateNode(imageNodeId, { loading: false, error: errorMessage })
           }
         }
         return
       }
 
-      const isT2V = isT2VModel(model)
-      const isKF2V = isKF2VModel(model)
-      if (isKF2V) {
-        if (!inputs.firstFrameImage) {
-          message.warning('请连接首帧图片节点')
-          return
-        }
-        if (!inputs.lastFrameImage) {
-          message.warning('请连接尾帧图片节点')
-          return
-        }
-      } else if (!isT2V && !inputs.firstFrameImage) {
-        message.warning('请连接图片节点（首帧图片）')
-        return
-      }
-      if (isT2V && !inputs.prompt) {
-        message.warning('请先填写提示词，或连入文本节点')
-        return
-      }
-
+      const model = remapVideoModel(
+        (typeof node.data.model === 'string' && node.data.model) || DEFAULT_VIDEO_MODEL
+      )
       const modelLabel = getVideoModel(model)?.label || VIDEO_MODELS.find((item) => item.key === model)?.label || model
       const videoNodeId = addNode(
         'video',
@@ -148,13 +129,15 @@ export function useNodeGenerateAction(nodeId: string | null) {
           updateNode(videoNodeId, { url: videoUrl, loading: false, updatedAt: Date.now() })
         } else {
           updateNode(videoNodeId, { loading: false, error: '生成失败' })
+          message.error('生成失败')
         }
       } catch (err: unknown) {
         if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
           removeNode(videoNodeId)
           message.warning('请求过于频繁，请稍后重试')
         } else {
-          updateNode(videoNodeId, { loading: false, error: '生成失败' })
+          const errorMessage = toErrorMessage(err, '生成失败')
+          updateNode(videoNodeId, { loading: false, error: errorMessage })
         }
       }
     } finally {
