@@ -39,6 +39,7 @@ if [[ ! -f "$ROOT/dist/index.html" ]]; then
   echo "frontend build missing dist/index.html" >&2
   exit 1
 fi
+node "$ROOT/scripts/check-spa-assets.mjs"
 
 echo "==> upload frontend -> $WEB_ROOT"
 COPYFILE_DISABLE=1 tar czf - -C "$ROOT/dist" . | ssh_cmd \
@@ -48,8 +49,13 @@ echo "==> upload backend -> $APP_ROOT/app"
 COPYFILE_DISABLE=1 tar czf - -C "$ROOT/backend" app requirements.txt | ssh_cmd \
   "mkdir -p /tmp/mangacanvas-release && rm -rf /tmp/mangacanvas-release/* && tar xzf - -C /tmp/mangacanvas-release && test -f /tmp/mangacanvas-release/app/main.py && test -f /tmp/mangacanvas-release/requirements.txt && cp -a /tmp/mangacanvas-release/app/. '$APP_ROOT/app/' && cp /tmp/mangacanvas-release/requirements.txt '$APP_ROOT/requirements.txt'"
 
+echo "==> upload nginx SPA template + patcher"
+scp -i "$KEY" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes \
+  "$ROOT/deploy/nginx/mangacanvas.conf" "$ROOT/scripts/ensure-nginx-spa.py" \
+  "$TARGET:/tmp/"
+
 echo "==> install deps and restart"
-ssh_cmd "cd '$APP_ROOT' && .venv/bin/pip install -r requirements.txt -q && sudo systemctl restart mangacanvas && sudo sed -i 's/proxy_read_timeout [0-9]\\+s;/proxy_read_timeout 600s;/' /etc/nginx/conf.d/mangacanvas.conf && sudo nginx -t && sudo systemctl reload nginx"
+ssh_cmd "cd '$APP_ROOT' && .venv/bin/pip install -r requirements.txt -q && sudo systemctl restart mangacanvas && sudo sed -i 's/proxy_read_timeout [0-9]\\+s;/proxy_read_timeout 600s;/' /etc/nginx/conf.d/mangacanvas.conf && sudo python3 /tmp/ensure-nginx-spa.py && sudo nginx -t && sudo systemctl reload nginx"
 
 echo "==> health check"
 ok=0
@@ -69,4 +75,18 @@ if [[ "$ok" -ne 1 ]]; then
   exit 1
 fi
 
-echo "release ok  http://$HOST/"
+echo "==> spa deep-link check"
+spa_ok=0
+for url in "http://$HOST:18999/project/6/scenes" "http://$HOST/project/6/scenes"; do
+  if html="$(curl -fsS --max-time 8 "$url" 2>/dev/null)" && grep -q 'src="/assets/' <<<"$html"; then
+    echo "deep link OK  $url"
+    spa_ok=1
+    break
+  fi
+done
+if [[ "$spa_ok" -ne 1 ]]; then
+  echo "deep-link check failed (index.html must reference /assets/..., not ./assets/...)" >&2
+  exit 1
+fi
+
+echo "release ok  http://$HOST:18999/"

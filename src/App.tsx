@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, Suspense, lazy } from "react"
-import { HashRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } from "react-router-dom"
+import LegacyHashRedirect from "@/components/LegacyHashRedirect"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -390,7 +391,8 @@ function RouteLoading() {
 
 function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
+      <LegacyHashRedirect />
       <IdentityRouteGuard />
       <Suspense fallback={<RouteLoading />}>
         <Routes>
@@ -416,7 +418,7 @@ function App() {
           <Route path="/assets" element={<RequireAuth><Assets /></RequireAuth>} />
         </Routes>
       </Suspense>
-    </HashRouter>
+    </BrowserRouter>
   )
 }
 
