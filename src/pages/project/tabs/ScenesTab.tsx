@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, Trash2, Copy, Check, ArrowRight, Wand2, Workflow, Pencil } from "lucide-react"
+import { MoreHorizontal, Trash2, Copy, Check, ArrowRight, Wand2, Workflow } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
+import { useAssetGenerationStore } from "@/store/assetGenerationStore"
 import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
 import SceneCreator from "../SceneCreator"
@@ -34,6 +35,7 @@ export default function ScenesTab({
 }: ScenesTabProps) {
   const scenes = useProjectStore((state) => scenesProp ?? state.assets.scenes)
   const { deleteScene, duplicateScene, updateScene } = useProjectStore()
+  const generationTasks = useAssetGenerationStore((state) => state.tasks)
   const { confirm, notify } = useFeedback()
   
   const [editScene, setEditScene] = useState<Scene | null>(null)
@@ -73,11 +75,29 @@ export default function ScenesTab({
     setCreatorOpen(true)
   }
 
-  const handleUpdate = async (data: { id: number; name: string; genMethod: string; model: string; description: string; distance: number; zoom: number; status: "draft" | "in-use" }) => {
+  const isDraftScene = (scene: Scene) => !scene.hasImage && scene.status !== "in-use"
+
+  const sceneTask = (sceneId: number) =>
+    generationTasks.find((task) => task.kind === "scene" && task.assetId === sceneId)
+
+  const handleUpdate = async (data: {
+    id: number
+    name: string
+    genMethod: string
+    model: string
+    description: string
+    distance: number
+    zoom: number
+    status: "draft" | "in-use"
+    referenceImage?: string
+  }) => {
     if (!projectId) return
-    await updateScene(projectId, data.id, data)
-    setCreatorOpen(false)
-    setEditScene(null)
+    await updateScene(projectId, data.id, {
+      name: data.name,
+      description: data.description,
+      image: data.referenceImage,
+      status: data.status,
+    })
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -155,12 +175,16 @@ export default function ScenesTab({
             <div className="absolute top-3 left-3 flex gap-2">
               <Badge 
                 className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase border-0 ${
-                  scene.status === "in-use" 
+                  sceneTask(scene.id)?.status === "running" || scene.hasImage || scene.status === "in-use"
                     ? "bg-[hsl(var(--primary))] text-white" 
                     : "bg-[hsl(var(--surface-container-highest))] text-[hsl(var(--on-secondary-fixed-variant))]"
                 }`}
               >
-                {scene.status === "in-use" ? "使用中" : "草稿"}
+                {sceneTask(scene.id)?.status === "running"
+                  ? "生成中"
+                  : scene.hasImage || scene.status === "in-use"
+                    ? "使用中"
+                    : "草稿"}
               </Badge>
             </div>
             {batchMode && (
@@ -196,10 +220,17 @@ export default function ScenesTab({
                 <Button 
                   variant="secondary" 
                   size="sm"
-                  onClick={() => handleEdit(scene)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleEdit(scene)
+                  }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
-                  编辑
+                  {sceneTask(scene.id)?.status === "running"
+                    ? "查看进度"
+                    : isDraftScene(scene)
+                      ? "生成"
+                      : "编辑"}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -212,10 +243,6 @@ export default function ScenesTab({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => handleEdit(scene)}>
-                      <Pencil className="w-4 h-4 mr-2" />
-                      编辑
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleDuplicate(scene)}>
                       <Copy className="w-4 h-4 mr-2" />
                       复制
@@ -250,7 +277,8 @@ export default function ScenesTab({
         onOpenChange={setCreatorOpen}
         onUpdate={handleUpdate}
         initialData={editScene}
-        mode={editScene ? 'edit' : 'create'}
+        projectId={projectId}
+        mode={editScene ? (isDraftScene(editScene) ? "generate" : "edit") : "create"}
       />
     </div>
   )

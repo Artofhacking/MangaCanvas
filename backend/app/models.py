@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -58,6 +59,20 @@ class RefreshToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class OauthIdentity(Base):
+    __tablename__ = "oauth_identities"
+    __table_args__ = (UniqueConstraint("provider", "provider_user_id", name="uq_oauth_provider_user"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    provider: Mapped[str] = mapped_column(String(32))
+    provider_user_id: Mapped[str] = mapped_column(String(128))
+    open_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    union_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
 
 class Project(Base):
@@ -159,6 +174,7 @@ class Episode(Base):
     name: Mapped[str] = mapped_column(String(128))
     code: Mapped[str] = mapped_column(String(64))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cover_image: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="draft")
     progress: Mapped[int] = mapped_column(Integer, default=0)
     duration: Mapped[int] = mapped_column(Integer, default=0)
@@ -211,6 +227,24 @@ class CanvasWorkflowMember(Base):
     role: Mapped[str] = mapped_column(String(16), default="viewer")
     assigned_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ScriptDocument(Base):
+    __tablename__ = "script_documents"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    organization_id: Mapped[int] = mapped_column(Integer)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"))
+    title: Mapped[str] = mapped_column(String(128), default="未命名剧本")
+    source_filename: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    source_text: Mapped[str] = mapped_column(Text().with_variant(LONGTEXT(), "mysql"))
+    plot_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parsed_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(16), default="parsed")
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
 
 class ProjectAsset(Base):

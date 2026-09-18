@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Button, Select, message, Input } from 'antd';
+import { Button, message, Input } from 'antd';
 import { ThunderboltOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useImageGeneration, useImageModels } from '../../hooks';
-import { IMAGE_MODELS, filterLiveModels } from '../../config/models';
+import { IMAGE_MODELS, resolvePickerModels } from '../../config/models';
 import { isI2IModel } from '@/api/aigc';
 import type { CustomNode } from '../../types';
 import { collectGenerateInputs } from '../../utils/generateSlots';
+import NodeSelect from '../NodeSelect';
 
 // 画面比例选项
 const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
@@ -32,12 +34,24 @@ const getShortLabelFromModel = (modelLabel: string): string => {
 };
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { nodes, edges, updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore();
+  const { updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore(
+    useShallow((state) => ({
+      updateNode: state.updateNode,
+      addNode: state.addNode,
+      addEdgeManually: state.addEdgeManually,
+      duplicateNode: state.duplicateNode,
+      removeNode: state.removeNode,
+    }))
+  );
   const { generate } = useImageGeneration();
   const { models: liveImageModels, loading: liveModelsLoading } = useImageModels();
   const pickerModels = useMemo(
-    () => filterLiveModels(IMAGE_MODELS, liveImageModels.map((item) => item.id)),
-    [liveImageModels]
+    () => resolvePickerModels(IMAGE_MODELS, liveImageModels.map((item) => item.id), liveModelsLoading),
+    [liveImageModels, liveModelsLoading]
+  );
+  const modelOptions = useMemo(
+    () => pickerModels.map((item) => ({ label: item.label, value: item.key })),
+    [pickerModels]
   );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '文生图');
@@ -87,11 +101,11 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
   useEffect(() => {
     if (liveModelsLoading || pickerModels.length === 0) return
-    if (!pickerModels.some((model) => model.key === localModel)) {
-      const next = pickerModels[0]
-      setLocalModel(next.key)
-      updateNode(id, { model: next.key })
-    }
+    if (pickerModels.some((model) => model.key === localModel)) return
+    const next = pickerModels[0]
+    if (!next || next.key === localModel) return
+    setLocalModel(next.key)
+    updateNode(id, { model: next.key })
   }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
 
   const currentModel = useMemo(() => IMAGE_MODELS.find((m) => m.key === localModel), [localModel]);
@@ -103,13 +117,13 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     return currentModel.getSizesByQuality(localQuality);
   }, [currentModel, localQuality]);
 
-  // Sync size when options change and current size is not in options
   useEffect(() => {
-    if (sizeOptions.length > 0 && !sizeOptions.find(s => s.key === localSize)) {
-      setLocalSize(sizeOptions[0].key);
-      updateNode(id, { size: sizeOptions[0].key });
-    }
-  }, [sizeOptions, localSize, id, updateNode]);
+    if (sizeOptions.length === 0 || sizeOptions.some((item) => item.key === localSize)) return
+    const nextSize = sizeOptions[0].key
+    if (nextSize === localSize) return
+    setLocalSize(nextSize)
+    updateNode(id, { size: nextSize })
+  }, [sizeOptions, localSize, id, updateNode])
 
   const handleModelChange = (value: string) => {
     setLocalModel(value);
@@ -148,11 +162,13 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     }
   };
 
-  const getConnectedInputs = () =>
-    collectGenerateInputs(id, nodes, edges, {
+  const getConnectedInputs = () => {
+    const { nodes, edges } = useCanvasStore.getState();
+    return collectGenerateInputs(id, nodes, edges, {
       includeCamera: false,
       localPrompt: typeof data.prompt === 'string' ? data.prompt : '',
     });
+  };
 
   const handleGenerate = async () => {
     const { prompt, refImages } = getConnectedInputs();
@@ -169,7 +185,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       return;
     }
 
-    // 始终创建新节点，支持并发生成
+    const { nodes, edges } = useCanvasStore.getState();
     const node = nodes.find((n) => n.id === id);
     if (!node) return;
 
@@ -318,14 +334,12 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
           <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}>
             模型
           </label>
-          <Select
-            value={localModel}
-            onChange={handleModelChange}
-            style={{ width: '100%' }}
-            options={pickerModels.map((m) => ({ label: m.label, value: m.key }))}
+          <NodeSelect
+            value={modelOptions.some((item) => item.value === localModel) ? localModel : modelOptions[0]?.value}
+            onChange={(next) => handleModelChange(String(next))}
+            options={modelOptions}
             placeholder={liveModelsLoading ? '检测可用模型...' : '暂无可用模型'}
             loading={liveModelsLoading}
-            popupClassName="nodrag nowheel"
           />
         </div>
 

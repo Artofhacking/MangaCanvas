@@ -7,9 +7,12 @@ import { useEffect, useMemo, useState } from "react"
 import { projectApi } from "@/api/projectApi"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import type { Character, Episode, EpisodeRelationItem, ObjectItem, Scene } from "@/types"
+import PlotMentionText from "@/components/PlotMentionText"
+import type { PlotAsset } from "@/lib/plotMentions"
 import {
   ChevronLeft,
   Clapperboard,
+  FileText,
   Image as ImageIcon,
   MoveRight,
   Package,
@@ -45,7 +48,7 @@ export default function EpisodeDetail() {
     ])
     if (!episodeResponse.success || !episodeResponse.data) {
       notify.error(episodeResponse.message || "片段不存在")
-      navigate(`/project/${projectId}/episodes`, { replace: true })
+      navigate(`/project/${projectId}/assets/episodes`, { replace: true })
       return
     }
     setEpisode(episodeResponse.data)
@@ -69,6 +72,14 @@ export default function EpisodeDetail() {
   const relatedCharacters = episode?.characters || []
   const relatedScenes = episode?.scenes || []
   const relatedObjects = episode?.objects || []
+  const plotAssets = useMemo<PlotAsset[]>(
+    () => [
+      ...relatedCharacters.map((item) => ({ id: item.id, name: item.name, category: "character" as const, image: item.image })),
+      ...relatedScenes.map((item) => ({ id: item.id, name: item.name, category: "scene" as const, image: item.image })),
+      ...relatedObjects.map((item) => ({ id: item.id, name: item.name, category: "object" as const, image: item.image })),
+    ],
+    [relatedCharacters, relatedObjects, relatedScenes]
+  )
 
   const openCanvas = async () => {
     if (!projectId || !episodeId || !episode) return
@@ -142,7 +153,7 @@ export default function EpisodeDetail() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(`/project/${projectId}/episodes`)}
+              onClick={() => navigate(`/project/${projectId}/assets/episodes`)}
               className="mb-5 gap-2 text-[hsl(var(--secondary))]"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -182,7 +193,9 @@ export default function EpisodeDetail() {
                   用本集资产进入无限画布
                 </h2>
                 <p className="mt-5 max-w-2xl text-base leading-7 text-white/85">
-                  {episode.description || "先把角色、场景和道具挂到这一集，再进入画布生成和回写素材。"}
+                  {episode.description
+                    ? "带着本集剧情、角色、场景和道具进入画布生成。"
+                    : "先把角色、场景和道具挂到这一集，再进入画布生成和回写素材。"}
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-3">
@@ -227,6 +240,29 @@ export default function EpisodeDetail() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="mt-6 rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-lowest))] p-6">
+            <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
+              <FileText className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-[0.24em]">本集剧情</span>
+            </div>
+            {episode.description ? (
+              <div className="mt-4 max-h-[420px] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-[hsl(var(--on-surface))]">
+                <PlotMentionText
+                  text={episode.description}
+                  assets={plotAssets}
+                  onMentionClick={(asset) => {
+                    const tab = asset.category === "character" ? "characters" : asset.category === "scene" ? "scenes" : "objects"
+                    navigate(`/project/${projectId}/assets/${tab}`)
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[hsl(var(--secondary))]">
+                还没有剧情。从剧本创作写入，或在编辑片段时补上本集场次和对白。
+              </p>
+            )}
           </section>
 
           {editing ? (

@@ -81,6 +81,7 @@ export interface ModelConfig {
   key: string;
   label: string;
   type: 'image' | 'video' | 'chat';
+  enabled?: boolean;
   endpoint?: string;
   async?: boolean;
   qualities?: { label: string; key: string }[];
@@ -184,6 +185,8 @@ export interface VideoGenerationParams {
   prompt: string;
   first_frame_image?: string;
   last_frame_image?: string;
+  images?: string[];
+  imageNames?: string[];
   size?: string;
   seconds?: number;
   resolution?: string;
@@ -245,6 +248,7 @@ export interface CanvasStore {
   updateNode: (id: string, data: Partial<NodeData>) => void;
   removeNode: (id: string) => void;
   duplicateNode: (id: string) => string | null;
+  selectNode: (id: string) => void;
   addEdgeManually: (params: Partial<CustomEdge>) => void;
   updateEdge: (id: string, data: Partial<CustomEdge['data']>) => void;
   clearCanvas: () => void;

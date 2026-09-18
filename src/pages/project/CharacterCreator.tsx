@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -5,8 +6,19 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { X } from "lucide-react"
-import type { CharacterCreateData, CharacterEditData, Character } from "@/types"
-import CharacterForm from "./CharacterForm"
+import { useFeedback } from "@/components/feedback/FeedbackProvider"
+import GenerationTaskPanel, {
+  AssetEditorActions,
+  GenerationTaskListButton,
+} from "@/components/generation/GenerationTaskPanel"
+import {
+  assetTaskKey,
+  tasksForAsset,
+  useAssetGenerationStore,
+  withExistingAssetResult,
+} from "@/store/assetGenerationStore"
+import type { Character, CharacterCreateData, CharacterEditData } from "@/types"
+import CharacterForm, { type CharacterFormValues } from "./CharacterForm"
 
 interface CharacterCreatorProps {
   open: boolean
@@ -14,48 +26,158 @@ interface CharacterCreatorProps {
   onCreate?: (data: CharacterCreateData) => void
   onUpdate?: (data: CharacterEditData) => void
   initialData?: Character | null
-  mode?: 'create' | 'edit'
+  mode?: "create" | "edit"
+  projectId?: number | null
 }
 
 export default function CharacterCreator({
   open,
   onOpenChange,
-  onCreate,
   onUpdate,
   initialData,
-  mode = 'create'
+  mode = "create",
+  projectId,
 }: CharacterCreatorProps) {
-  const isEditMode = mode === 'edit' && initialData != null
+  const { notify } = useFeedback()
+  const isEditMode = Boolean(initialData)
+  const valuesRef = useRef<CharacterFormValues | null>(null)
+  const taskPanelRef = useRef<HTMLDivElement>(null)
+  const [highlightTasks, setHighlightTasks] = useState(false)
+  const allTasks = useAssetGenerationStore((state) => state.tasks)
+  const storeTasks = tasksForAsset(allTasks, "character", projectId, initialData?.id)
+  const tasks = withExistingAssetResult(storeTasks, {
+    kind: "character",
+    projectId: Number(projectId) || 0,
+    assetId: initialData?.id,
+    name: initialData?.name || "",
+    prompt: initialData?.description,
+    model: initialData?.model,
+    imageUrl: initialData?.hasImage ? initialData.image : "",
+  })
+  const runningKey = projectId ? assetTaskKey("character", Number(projectId), initialData?.id) : ""
+  const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
+  const startGeneration = useAssetGenerationStore((state) => state.start)
 
-  const handleSubmit = (data: CharacterCreateData | CharacterEditData) => {
-    if ('id' in data) {
-      onUpdate?.(data as CharacterEditData)
-    } else {
-      onCreate?.(data as CharacterCreateData)
+  const handleValuesChange = useCallback((values: CharacterFormValues) => {
+    valuesRef.current = values
+  }, [])
+
+  const handleOpenTaskList = () => {
+    taskPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+    setHighlightTasks(true)
+    window.setTimeout(() => setHighlightTasks(false), 1600)
+  }
+
+  const currentValues = () => valuesRef.current
+
+  const handleSave = () => {
+    const values = currentValues()
+    if (!values?.name.trim()) {
+      notify.warning("请输入角色名称")
+      return
     }
-    onOpenChange(false)
+    if (!values.gender) {
+      notify.warning("请选择性别")
+      return
+    }
+    if (!values.ageGroup) {
+      notify.warning("请选择年龄段")
+      return
+    }
+    if (!initialData) return
+    onUpdate?.({
+      id: initialData.id,
+      name: values.name.trim(),
+      gender: values.gender,
+      ageGroup: values.ageGroup,
+      genMethod: "model",
+      model: values.model,
+      style: values.style,
+      description: values.prompt,
+    })
+    notify.success("角色已保存")
+  }
+
+  const handleGenerate = () => {
+    const values = currentValues()
+    if (!values?.name.trim()) {
+      notify.warning("请输入角色名称")
+      return
+    }
+    if (!values.gender) {
+      notify.warning("请选择性别")
+      return
+    }
+    if (!values.ageGroup) {
+      notify.warning("请选择年龄段")
+      return
+    }
+    if (!values.prompt.trim()) {
+      notify.warning("请输入角色描述")
+      return
+    }
+    if (!values.model) {
+      notify.warning("暂无可用生图模型")
+      return
+    }
+    if (!projectId) {
+      notify.warning("缺少项目信息，无法生成")
+      return
+    }
+    handleOpenTaskList()
+    void startGeneration({
+      kind: "character",
+      projectId: Number(projectId),
+      assetId: initialData?.id,
+      name: values.name.trim(),
+      prompt: values.prompt.trim(),
+      model: values.model,
+      aspectRatio: values.aspectRatio,
+      referenceImages: values.referenceImages,
+      extras: {
+        gender: values.gender,
+        ageGroup: values.ageGroup,
+        style: values.style,
+      },
+    }).then((result) => {
+      if (result === "ok") notify.success("角色已生成")
+    }).catch((error) => {
+      notify.error(error instanceof Error ? error.message : "生成失败")
+    })
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[900px] sm:max-w-[900px] p-0 overflow-hidden bg-[hsl(var(--surface))]" style={{ maxWidth: '900px' }} hideCloseButton>
-        <SheetTitle className="sr-only">{isEditMode ? "编辑角色" : "新建角色"}</SheetTitle>
-        {/* Header */}
+      <SheetContent side="right" className="w-[900px] sm:max-w-[900px] p-0 overflow-hidden bg-[hsl(var(--surface))]" style={{ maxWidth: "900px" }} hideCloseButton>
+        <SheetTitle className="sr-only">{isEditMode ? "编辑角色" : "创建角色"}</SheetTitle>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface))]">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
               <X className="w-5 h-5" />
             </Button>
-            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{isEditMode ? "编辑角色" : "新建角色"}</h2>
+            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{isEditMode ? "编辑角色" : "创建角色"}</h2>
           </div>
+          <GenerationTaskListButton label="角色生成任务列表" count={tasks.length} onClick={handleOpenTaskList} />
         </div>
 
-        {/* Content */}
-        <div className="h-[calc(100vh-70px)] overflow-y-auto p-6 pb-28">
-          <CharacterForm
-            mode={mode}
-            initialData={initialData}
-            onSubmit={handleSubmit}
+        <div className="flex h-[calc(100vh-70px)]">
+          <div className="flex h-full w-[52%] flex-col overflow-y-auto border-r border-[hsl(var(--outline-variant))]/15 p-6 pb-24">
+            <CharacterForm
+              mode={mode}
+              initialData={initialData}
+              hideActions
+              onValuesChange={handleValuesChange}
+            />
+          </div>
+          <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+        </div>
+
+        <div className="absolute bottom-0 left-0 w-[52%] p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
+          <AssetEditorActions
+            hasExisting={Boolean(initialData)}
+            submitting={submitting}
+            onSave={handleSave}
+            onGenerate={handleGenerate}
           />
         </div>
       </SheetContent>

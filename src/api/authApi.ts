@@ -11,6 +11,29 @@ export const authApi = {
     })
   },
 
+  oauthProviders() {
+    return requestData<{ providers: Array<{ id: string; name: string; enabled: boolean }> }>(appClient, {
+      url: '/auth/oauth/providers',
+      method: 'GET',
+    })
+  },
+
+  oauthUrl(provider: string, redirectUri?: string) {
+    return requestData<{ url: string }>(appClient, {
+      url: `/auth/oauth/${provider}/url`,
+      method: 'GET',
+      params: redirectUri ? { redirect_uri: redirectUri } : undefined,
+    })
+  },
+
+  oauthTicket(ticket: string) {
+    return requestData<AuthPayload>(appClient, {
+      url: '/auth/oauth/ticket',
+      method: 'POST',
+      data: { ticket },
+    })
+  },
+
   register(payload: { username: string; email: string; password: string; avatar?: string }) {
     return requestData<AuthPayload>(appClient, {
       url: '/auth/register',

@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Input, Select, message } from 'antd';
+import { Input, message } from 'antd';
 import { DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
 import type { CustomNode } from '../../types';
+import NodeSelect from '../NodeSelect';
 
 // 风格选项
 const STYLE_OPTIONS = [
@@ -206,12 +207,10 @@ const EffectConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, s
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
               🎨 风格
             </label>
-            <Select
-              value={localStyle}
-              onChange={setLocalStyle}
-              style={{ width: '100%' }}
+            <NodeSelect
+              value={String(localStyle || '')}
+              onChange={(next) => setLocalStyle(String(next))}
               options={STYLE_OPTIONS}
-              popupClassName="nodrag nowheel"
               placeholder="选择风格"
             />
           </div>
@@ -220,12 +219,10 @@ const EffectConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, s
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
               ☀️ 光影
             </label>
-            <Select
-              value={localLighting}
-              onChange={setLocalLighting}
-              style={{ width: '100%' }}
+            <NodeSelect
+              value={String(localLighting || '')}
+              onChange={(next) => setLocalLighting(String(next))}
               options={LIGHTING_OPTIONS}
-              popupClassName="nodrag nowheel"
               placeholder="选择光影"
             />
           </div>
@@ -234,12 +231,10 @@ const EffectConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, s
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
               🎬 运镜
             </label>
-            <Select
-              value={localCamera}
-              onChange={setLocalCamera}
-              style={{ width: '100%' }}
+            <NodeSelect
+              value={String(localCamera || '')}
+              onChange={(next) => setLocalCamera(String(next))}
               options={CAMERA_OPTIONS}
-              popupClassName="nodrag nowheel"
               placeholder="选择运镜"
             />
           </div>
@@ -248,12 +243,10 @@ const EffectConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, s
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
               ✨ 特效
             </label>
-            <Select
-              value={localEffect}
-              onChange={setLocalEffect}
-              style={{ width: '100%' }}
+            <NodeSelect
+              value={String(localEffect || '')}
+              onChange={(next) => setLocalEffect(String(next))}
               options={EFFECT_OPTIONS}
-              popupClassName="nodrag nowheel"
               placeholder="选择特效"
             />
           </div>

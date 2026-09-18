@@ -1,13 +1,19 @@
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { MouseEvent } from "react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useState } from "react"
-import { Trash2, Check, ArrowRight, Wand2, Workflow, User, Sparkles, Image, Settings, Pencil } from "lucide-react"
+import { Trash2, Check, ArrowRight, Wand2, Workflow, User, Sparkles, Image, Settings, Copy, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
@@ -34,7 +40,7 @@ export default function CharactersTab({
   onToggleSelect,
 }: CharactersTabProps) {
   const characters = useProjectStore((state) => charactersProp ?? state.assets.characters)
-  const { deleteCharacter, updateCharacter, createCharacter } = useProjectStore()
+  const { deleteCharacter, updateCharacter, createCharacter, duplicateCharacter } = useProjectStore()
   const { confirm, notify } = useFeedback()
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -43,8 +49,8 @@ export default function CharactersTab({
   const [editCharacter, setEditCharacter] = useState<Character | null>(null)
   const [creatorOpen, setCreatorOpen] = useState(false)
 
-  const handleDelete = async (e: MouseEvent<HTMLButtonElement>, id: number) => {
-    e.stopPropagation()
+  const handleDelete = async (id: number, event?: { stopPropagation: () => void }) => {
+    event?.stopPropagation()
     const confirmed = await confirm({
       title: "删除角色",
       description: "删除后将无法恢复这个角色资料。",
@@ -75,6 +81,12 @@ export default function CharactersTab({
     setDetailOpen(false)
   }
 
+  const handleDuplicate = (character: Character, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (!projectId) return
+    void duplicateCharacter(projectId, character.id)
+  }
+
   const handleCreate = async (data: CharacterCreateData) => {
     if (!projectId) return
     await createCharacter(projectId, data)
@@ -84,14 +96,17 @@ export default function CharactersTab({
   const handleUpdate = async (data: CharacterEditData) => {
     if (!projectId) return
     const roleMap: Record<string, '主角' | '配角'> = { main: '主角', support: '配角' }
-    const updateData: Partial<Character> = {
-      ...data,
+    await updateCharacter(projectId, data.id, {
+      name: data.name,
+      gender: data.gender,
+      ageGroup: data.ageGroup,
+      style: data.style,
+      description: data.description,
+      model: data.model,
       role: data.role ? roleMap[data.role] : undefined,
-    }
-    await updateCharacter(projectId, data.id, updateData)
-    setCreatorOpen(false)
-    setEditCharacter(null)
-    notify.success("角色已更新")
+      ...(data.referenceImage ? { image: data.referenceImage, hasImage: true } : {}),
+    })
+    notify.success(data.referenceImage ? "角色已生成" : "角色已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -199,21 +214,61 @@ export default function CharactersTab({
                 <Check className="h-4 w-4" />
               </button>
             )}
-            <div className={`absolute top-2 right-2 flex flex-col gap-2 transition-all ${batchMode ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"}`}>
-              <button
-                type="button"
-                onClick={(e) => handleEdit(character, e)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-[hsl(var(--primary))]"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleDelete(e, character.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-red-500"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+            <div className={`absolute inset-0 bg-gradient-to-t from-[hsl(var(--on-surface))]/60 to-transparent transition-opacity flex items-end p-3 ${batchMode ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"}`}>
+              <div className="flex gap-1.5 w-full">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleOpenCanvas({
+                      id: character.id,
+                      name: character.name,
+                      image: character.image,
+                      description: character.description,
+                    })
+                  }}
+                  className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                >
+                  打开画布
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(event) => handleEdit(character, event)}
+                  className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                >
+                  {character.hasImage ? "编辑" : "生成"}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={(event) => event.stopPropagation()}
+                      className="w-10 bg-white/20 backdrop-blur-md text-white py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={(event) => handleDuplicate(character, event)}>
+                      <Copy className="w-4 h-4 mr-2" />
+                      复制
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleDelete(character.id)
+                      }}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      删除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
           <div className="p-2.5">
@@ -342,6 +397,7 @@ export default function CharactersTab({
         onUpdate={handleUpdate}
         initialData={editCharacter}
         mode={editCharacter ? 'edit' : 'create'}
+        projectId={projectId}
       />
     </div>
   )

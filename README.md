@@ -21,7 +21,7 @@ npm run dev
 MANGACANVAS_SSH_KEY=/path/to/your.pem npm run deploy
 ```
 
-两条路径都调用服务器上的 `scripts/deploy-on-server.sh`：同步前端到 `/var/www/mangacanvas`、同步后端代码、重启 `mangacanvas` 并做健康检查。不会覆盖服务器上的 `backend/.env`（数据库和模型 Key 留在机器上）。可选 SSH 环境变量见 `scripts/deploy.env.example`。
+两条路径都调用服务器上的 `scripts/deploy-on-server.sh`：同步前端到 `/var/www/mangacanvas`、同步后端代码、重启 `mangacanvas` 并做健康检查。不会覆盖服务器上的 `backend/.env`（数据库和模型 Key 留在机器上）。生产访问地址：`http://47.104.138.144:18999/`。可选 SSH 环境变量见 `scripts/deploy.env.example`。
 
 常用命令：
 

@@ -62,6 +62,7 @@ class EpisodeIn(BaseModel):
     name: str | None = None
     code: str | None = None
     description: str | None = None
+    coverImage: str | None = None
     status: str | None = None
     progress: int | None = None
     duration: int | None = None
@@ -442,6 +443,7 @@ def create_episode(
         name=body.name,
         code=body.code or f"EP_{int(now().timestamp() * 1000)}",
         description=body.description,
+        cover_image=body.coverImage,
         duration=body.duration or 0,
         creation_mode=mode,
         source_workflow_id=wf,
@@ -484,6 +486,7 @@ def update_episode(
         "name": "name",
         "code": "code",
         "description": "description",
+        "coverImage": "cover_image",
         "status": "status",
         "progress": "progress",
         "duration": "duration",

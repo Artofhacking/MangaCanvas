@@ -33,6 +33,8 @@ export interface Episode {
   status: 'completed' | 'in-progress' | 'draft'
   modified: string
   code: string
+  image?: string
+  hasImage?: boolean
   description?: string
   progress?: number
   characters?: EpisodeRelationItem[]
@@ -54,6 +56,7 @@ export interface EpisodeCreateData {
   folderName: string
   episodeCount: string
   description: string
+  coverImage?: string
 }
 
 // ==================== 场景 (Scene) ====================
@@ -62,6 +65,7 @@ export interface Scene {
   id: number
   name: string
   image: string
+  hasImage?: boolean
   status: 'in-use' | 'draft'
   modified: string
   code: string
@@ -91,6 +95,7 @@ export interface Character {
   id: number
   name: string
   image: string
+  hasImage?: boolean
   role: CharacterRole
   style: string
   scenes: number
@@ -131,12 +136,14 @@ export interface ObjectItem {
   id: number
   name: string
   image: string
+  hasImage?: boolean
   type: ObjectType
   status: 'in-use' | 'draft'
   scene: string
   modified: string
   description?: string
   genMethod?: string
+  model?: string
 }
 
 export interface ObjectCreateData {

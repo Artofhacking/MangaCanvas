@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Button, Select, message, Input } from 'antd';
+import { Button, message, Input } from 'antd';
 import { PlayCircleOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useVideoGeneration, useVideoModels } from '../../hooks';
-import { VIDEO_MODELS, remapVideoModel, filterLiveModels } from '../../config/models';
-import { isT2VModel, isKF2VModel } from '@/api/aigc';
+import { VIDEO_MODELS, remapVideoModel, resolvePickerModels } from '../../config/models';
+import { isT2VModel, isI2VModel, isKF2VModel, isSeedanceModel, isMiniMaxModel } from '@/api/aigc';
+import { persistOpenCanvas } from '@/lib/persistCanvas';
 import type { CustomNode } from '../../types';
 import { collectGenerateInputs } from '../../utils/generateSlots';
+import NodeSelect from '../NodeSelect';
 
 // 尺寸映射表
 const SIZE_MAP: Record<string, Record<string, string>> = {
@@ -31,12 +34,35 @@ const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
 const RESOLUTIONS = ['1080P', '720P'];
 
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { nodes, edges, updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore();
+  const { updateNode, addNode, addEdgeManually, duplicateNode, removeNode } = useCanvasStore(
+    useShallow((state) => ({
+      updateNode: state.updateNode,
+      addNode: state.addNode,
+      addEdgeManually: state.addEdgeManually,
+      duplicateNode: state.duplicateNode,
+      removeNode: state.removeNode,
+    }))
+  );
   const { generate } = useVideoGeneration();
   const { models: liveVideoModels, loading: liveModelsLoading } = useVideoModels();
   const pickerModels = useMemo(
-    () => filterLiveModels(VIDEO_MODELS, liveVideoModels.map((item) => item.id)),
-    [liveVideoModels]
+    () => resolvePickerModels(VIDEO_MODELS, liveVideoModels.map((item) => item.id), liveModelsLoading),
+    [liveVideoModels, liveModelsLoading]
+  );
+  const incomingImageCount = useCanvasStore(
+    (state) => state.edges.filter((edge) => edge.target === id && state.nodes.some((node) => node.id === edge.source && node.type === 'image')).length
+  )
+  const modelOptions = useMemo(
+    () => {
+      const options = pickerModels.map((item) => ({ label: item.label, value: item.key }))
+      if (incomingImageCount > 0) {
+        return options
+          .filter((item) => !item.value.includes('t2v'))
+          .map((item) => (item.value.includes('i2v') ? { ...item, label: '视频' } : item))
+      }
+      return options
+    },
+    [pickerModels, incomingImageCount]
   );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '视频生成');
@@ -106,27 +132,76 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (liveModelsLoading || pickerModels.length === 0) return
-    if (!pickerModels.some((model) => model.key === localModel)) {
-      const next = pickerModels[0]
-      setLocalModel(next.key)
-      updateNode(id, { model: next.key })
-    }
-  }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
-
   const currentModel = useMemo(() => VIDEO_MODELS.find((m) => m.key === localModel), [localModel]);
   const isT2V = useMemo(() => isT2VModel(localModel), [localModel]);
   const isKF2V = useMemo(() => isKF2VModel(localModel), [localModel]);
+  const availableResolutions = useMemo(() => {
+    if (isSeedanceModel(localModel) && (localModel.includes('fast') || localModel.includes('mini'))) {
+      return ['720P'];
+    }
+    if (isMiniMaxModel(localModel) && /h3-max/i.test(localModel)) {
+      return ['720P'];
+    }
+    return RESOLUTIONS;
+  }, [localModel]);
+
+  useEffect(() => {
+    if (liveModelsLoading || pickerModels.length === 0) return
+    if (pickerModels.some((model) => model.key === localModel)) return
+    const next = pickerModels[0]
+    if (!next || next.key === localModel) return
+    setLocalModel(next.key)
+    updateNode(id, { model: next.key })
+  }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
+
+  useEffect(() => {
+    if (availableResolutions.includes(t2vResolution)) return
+    const next = availableResolutions[0] || '720P'
+    if (next === t2vResolution) return
+    const newSize = SIZE_MAP[next]?.[t2vAspectRatio] || SIZE_MAP[next]?.['16:9'] || '1280*720'
+    setT2vResolution(next)
+    setLocalSize(newSize)
+    setLocalResolution(next)
+    updateNode(id, { size: newSize, resolution: next })
+  }, [availableResolutions, t2vResolution, t2vAspectRatio, id, updateNode])
+
+  useEffect(() => {
+    const durs = currentModel?.durs?.map((item) => item.key) || []
+    if (!durs.length || durs.includes(localDuration)) return
+    const next = durs[0]
+    if (next === localDuration) return
+    setLocalDuration(next)
+    updateNode(id, { duration: next })
+  }, [currentModel, localDuration, id, updateNode])
 
   // Handle model change
   const handleModelChange = (value: string) => {
     setLocalModel(value);
     const model = VIDEO_MODELS.find((m) => m.key === value);
     if (model?.defaultParams) {
-      const newSize = model.defaultParams.size || '1280*720';
-      const newResolution = model.defaultParams.resolution || '720P';
-      const newDuration = model.defaultParams.duration || 5;
+      let newSize = (model.defaultParams.size || '1280*720') as string;
+      let newResolution = (model.defaultParams.resolution || '720P') as string;
+      const newDuration = (model.defaultParams.duration || 5) as number;
+      let res = '720P';
+      let ratio = '16:9';
+      for (const candidate of RESOLUTIONS) {
+        for (const aspect of ASPECT_RATIOS) {
+          if (SIZE_MAP[candidate][aspect] === newSize) {
+            res = candidate;
+            ratio = aspect;
+          }
+        }
+      }
+      const seedanceLimited =
+        (isSeedanceModel(value) && (value.includes('fast') || value.includes('mini'))) ||
+        (isMiniMaxModel(value) && /h3-max/i.test(value));
+      if (seedanceLimited) {
+        res = '720P';
+        newResolution = '720P';
+        newSize = SIZE_MAP[res][ratio] || '1280*720';
+      }
+      setT2vResolution(res);
+      setT2vAspectRatio(ratio);
       setLocalSize(newSize);
       setLocalResolution(newResolution);
       setLocalDuration(newDuration);
@@ -165,14 +240,19 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     updateNode(id, { duration: value });
   };
 
-  const getConnectedInputs = () =>
-    collectGenerateInputs(id, nodes, edges, {
+  const getConnectedInputs = () => {
+    const { nodes, edges } = useCanvasStore.getState();
+    return collectGenerateInputs(id, nodes, edges, {
       includeCamera: true,
       localPrompt: typeof data.prompt === 'string' ? data.prompt : '',
     });
+  };
 
   const handleGenerate = async () => {
-    const { prompt, firstFrameImage, lastFrameImage } = getConnectedInputs();
+    const { prompt, firstFrameImage, lastFrameImage, refImages, slots } = getConnectedInputs();
+    const referenceImages = refImages.length ? refImages : [firstFrameImage, lastFrameImage].filter(Boolean);
+    const hasImages = referenceImages.length > 0;
+    const imageNames = slots.filter((slot) => slot.kind === 'image').map((slot) => slot.label);
 
     // 关键帧生视频需要首帧和尾帧
     if (isKF2V) {
@@ -184,10 +264,8 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         message.warning('请连接尾帧图片节点');
         return;
       }
-    }
-    // 图生视频需要图片输入
-    else if (!isT2V && !firstFrameImage) {
-      message.warning('请连接图片节点（首帧图片）');
+    } else if (!prompt && !hasImages) {
+      message.warning('请连接剧情文本或参考图');
       return;
     }
 
@@ -197,7 +275,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       return;
     }
 
-    // 始终创建新节点，支持并发生成
+    const { nodes, edges } = useCanvasStore.getState();
     const node = nodes.find((n) => n.id === id);
     if (!node) return;
 
@@ -227,10 +305,18 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
     try {
       const videoUrl = await generate({
-        model: localModel,
+        model: hasImages
+          ? referenceImages.length >= 2
+            ? 'happyhorse-1.1-r2v'
+            : isI2VModel(localModel)
+              ? localModel
+              : 'happyhorse-1.1-i2v'
+          : localModel,
         prompt: prompt || '',
-        first_frame_image: firstFrameImage,
+        first_frame_image: referenceImages[0] || firstFrameImage,
         last_frame_image: lastFrameImage,
+        images: hasImages ? referenceImages.slice(0, 3) : undefined,
+        imageNames: hasImages ? imageNames.slice(0, 3) : undefined,
         seconds: localDuration,
         size: localSize,
         resolution: localResolution,
@@ -241,6 +327,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       } else {
         updateNode(videoNodeId, { loading: false, error: '生成失败' });
       }
+      persistOpenCanvas();
     } catch (err: unknown) {
       // 处理 429 错误 - 删除节点并显示友好提示
       if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
@@ -249,6 +336,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       } else {
         updateNode(videoNodeId, { loading: false, error: '生成失败' });
       }
+      persistOpenCanvas();
     }
   };
 
@@ -357,21 +445,24 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         </div>
 
         <div className="p-4 space-y-3 nodrag">
-          {/* Model Selection */}
-          <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}>
-              模型
-            </label>
-            <Select
-              value={localModel}
-              onChange={handleModelChange}
-              style={{ width: '100%' }}
-              options={pickerModels.map((m) => ({ label: m.label, value: m.key }))}
-              placeholder={liveModelsLoading ? '检测可用模型...' : '暂无可用模型'}
-              loading={liveModelsLoading}
-              popupClassName="nodrag nowheel"
-            />
-          </div>
+          {incomingImageCount > 0 ? (
+            <div className="text-xs leading-5" style={{ color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))' }}>
+              已连接 {incomingImageCount} 张参考图，将用图片+文字直接生成视频
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}>
+                模型
+              </label>
+              <NodeSelect
+                value={modelOptions.some((item) => item.value === localModel) ? localModel : modelOptions[0]?.value}
+                onChange={(next) => handleModelChange(String(next))}
+                options={modelOptions}
+                placeholder={liveModelsLoading ? '检测可用模型...' : '暂无可用模型'}
+                loading={liveModelsLoading}
+              />
+            </div>
+          )}
 
           {/* 关键帧模式标签 */}
           {isKF2V && (
@@ -394,7 +485,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
                   分辨率
                 </label>
                 <div className="flex gap-2">
-                  {RESOLUTIONS.map((res) => (
+                  {availableResolutions.map((res) => (
                     <button
                       key={res}
                       onClick={() => handleT2vResolutionChange(res)}
@@ -494,12 +585,15 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}>
               时长
             </label>
-            <Select
-              value={localDuration}
-              onChange={handleDurationChange}
-              style={{ width: '100%' }}
-              options={currentModel?.durs?.map((d) => ({ label: d.label, value: d.key })) || []}
-              popupClassName="nodrag nowheel"
+            <NodeSelect
+              value={
+                currentModel?.durs?.some((item) => item.key === localDuration)
+                  ? localDuration
+                  : currentModel?.durs?.[0]?.key
+              }
+              onChange={(next) => handleDurationChange(Number(next))}
+              options={currentModel?.durs?.map((item) => ({ label: item.label, value: item.key })) || []}
+              placeholder="选择时长"
             />
           </div>
 

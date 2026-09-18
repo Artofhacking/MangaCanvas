@@ -214,9 +214,8 @@ export const getIdentityMeta = (identity: IdentityOption) => {
   return identityOptions.find((option) => option.id === identity) ?? identityOptions[0]
 }
 
-export const getIdentityHomePath = (identity: IdentityOption): string => {
-  const meta = getIdentityMeta(identity)
-  return meta.hasProjects ? '/dashboard' : '/projects'
+export const getIdentityHomePath = (): string => {
+  return '/projects'
 }
 
 export const canAccessProjectRoutes = (identity: IdentityOption): boolean => {

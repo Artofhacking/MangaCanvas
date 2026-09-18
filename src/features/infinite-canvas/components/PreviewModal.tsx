@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from 'antd';
 import { CloseOutlined, DownloadOutlined } from '@ant-design/icons';
+import { mediaUrl } from '@/lib/mediaUrl';
 
 interface PreviewParams {
   prompt?: string;
@@ -93,13 +94,13 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
           <div className={`flex items-center justify-center ${hasParams ? 'flex-1' : 'w-full'}`}>
             {type === 'image' ? (
               <img
-                src={url}
+                src={mediaUrl(url)}
                 alt={title}
                 className="max-w-full max-h-[75vh] object-contain rounded-lg"
               />
             ) : (
               <video
-                src={url}
+                src={mediaUrl(url)}
                 controls
                 autoPlay
                 className="max-w-full max-h-[75vh] rounded-lg"

@@ -18,5 +18,5 @@
 export * from './types'
 export * from './taskRunner'
 export { imageService, isDashScopeDirectModel, isI2IModel } from './imageService'
-export { videoService, isT2VModel, isI2VModel, isKF2VModel, isVideoModel } from './videoService'
+export { videoService, isT2VModel, isI2VModel, isKF2VModel, isVideoModel, isSeedanceModel, isMiniMaxModel, isViduModel } from './videoService'
 export { chatService } from './chatService'

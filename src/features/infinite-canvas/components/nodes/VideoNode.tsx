@@ -1,10 +1,11 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { message, Input } from 'antd';
-import { DownloadOutlined, CopyOutlined, DeleteOutlined, VideoCameraOutlined, PictureOutlined } from '@ant-design/icons';
+import { DownloadOutlined, CopyOutlined, DeleteOutlined, VideoCameraOutlined, PictureOutlined, SoundOutlined, MutedOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import type { CustomNode } from '../../types';
+import { mediaUrl } from '@/lib/mediaUrl';
 
 // 自定义视频 Loading 动画组件
 const VideoLoadingAnimation: React.FC = () => (
@@ -33,6 +34,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '');
   const [extracting, setExtracting] = useState(false);
+  const [muted, setMuted] = useState(true);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -199,6 +201,25 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           <div className="flex items-center gap-1">
             {data.url && (
               <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMuted((prev) => {
+                    const next = !prev;
+                    if (videoRef.current) {
+                      videoRef.current.muted = next;
+                      if (!next) videoRef.current.play().catch(() => {});
+                    }
+                    return next;
+                  });
+                }}
+                className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
+                title={muted ? '打开声音' : '静音'}
+              >
+                {muted ? <MutedOutlined style={{ fontSize: 14 }} /> : <SoundOutlined style={{ fontSize: 14 }} />}
+              </button>
+            )}
+            {data.url && (
+              <button
                 onClick={handleExtractLastFrame}
                 className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
                 title="提取尾帧"
@@ -245,13 +266,13 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             <div className="relative group">
               <video
                 ref={videoRef}
-                src={data.url}
+                src={mediaUrl(data.url)}
                 autoPlay
                 loop
-                muted
+                muted={muted}
                 playsInline
                 className="w-full max-h-64 rounded object-contain bg-black"
-                poster={data.thumbnail}
+                poster={mediaUrl(data.thumbnail)}
                 onCanPlay={() => {
                   // 确保视频能够自动播放
                   videoRef.current?.play().catch(() => {});

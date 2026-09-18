@@ -5,9 +5,14 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..ai_media import (
+    baidu_video_generate,
     dashscope_async,
     dashscope_chat,
     extract_media_url,
+    is_minimax_model,
+    is_seedance_model,
+    is_vidu_model,
+    minimax_video_generate,
     openai_image_generate,
     openai_quality,
     openai_size,
@@ -16,7 +21,9 @@ from ..ai_media import (
     persist_openai_images,
     persist_placeholder,
     persist_remote_url,
+    _is_local_url,
     video_template_prompt,
+    vidu_video_generate,
 )
 from ..config import settings
 from ..db import get_db
@@ -104,7 +111,7 @@ async def images(request: Request, user: models.User = Depends(current_user), db
             else:
                 persisted = []
                 for url in urls:
-                    persisted.append(url if url.startswith(settings.public_base_url) else await _persist_or_placeholder(url))
+                    persisted.append(url if _is_local_url(url) else await _persist_or_placeholder(url))
                 urls = persisted
             return ok({"created": int(time.time()), "data": [{"url": url} for url in urls]})
 
@@ -127,30 +134,98 @@ async def videos(request: Request, user: models.User = Depends(current_user), db
     duration = int(body.get("duration") or body.get("seconds") or 5)
     first_frame = body.get("firstFrameImage") or body.get("image")
     last_frame = body.get("lastFrameImage")
+    raw_images = body.get("images") or []
+    if isinstance(raw_images, str):
+        raw_images = [raw_images]
+    images = [item for item in raw_images if item]
+    if first_frame and first_frame not in images:
+        images = [first_frame, *images]
+    if images:
+        first_frame = images[0]
+    raw_names = body.get("imageNames") or body.get("image_names") or []
+    if isinstance(raw_names, str):
+        raw_names = [raw_names]
+    image_names = [str(item) for item in raw_names if item]
     template = body.get("template")
     _record_usage(db, user, prompt, "ai_video")
 
-    if settings.openai_api_key:
-        try:
-            if template:
-                if not first_frame:
-                    fail(3001, "特效视频需要首帧图片", 400)
-                prompt = video_template_prompt(template, prompt)
-                model = "happyhorse-1.1-i2v"
+    try:
+        if template:
+            if not first_frame:
+                fail(3001, "特效视频需要首帧图片", 400)
+            prompt = video_template_prompt(template, prompt)
+            model = "happyhorse-1.1-i2v"
+
+        if is_seedance_model(model):
+            if not settings.baidu_enabled:
+                fail(3001, "百度云视频渠道已禁用", 503)
+            if not settings.baidu_api_key:
+                fail(3001, "未配置百度网关 API Key", 503)
+            url = await baidu_video_generate(
+                prompt=prompt,
+                model=model,
+                size=size,
+                resolution=str(resolution or ""),
+                duration=duration,
+                first_frame=first_frame,
+                last_frame=last_frame,
+            )
+            persisted = await persist_remote_url(url)
+            return ok({"url": persisted})
+
+        if is_minimax_model(model):
+            if not settings.minimax_enabled:
+                fail(3001, "MiniMax 视频渠道已禁用", 503)
+            if not settings.minimax_api_key:
+                fail(3001, "未配置 MiniMax API Key", 503)
+            url = await minimax_video_generate(
+                prompt=prompt,
+                model=model,
+                size=size,
+                resolution=str(resolution or ""),
+                duration=duration,
+                first_frame=first_frame,
+                last_frame=last_frame,
+            )
+            persisted = await persist_remote_url(url)
+            return ok({"url": persisted})
+
+        if is_vidu_model(model):
+            if not settings.vidu_enabled:
+                fail(3001, "Vidu 视频渠道已禁用", 503)
+            if not settings.vidu_api_key:
+                fail(3001, "未配置 Vidu API Key", 503)
+            url = await vidu_video_generate(
+                prompt=prompt,
+                model=model,
+                size=size,
+                resolution=str(resolution or ""),
+                duration=duration,
+                first_frame=first_frame,
+                last_frame=last_frame,
+                images=images,
+                names=image_names,
+            )
+            persisted = await persist_remote_url(url)
+            return ok({"url": persisted})
+
+        if settings.openai_api_key:
             url = await openai_video_generate(
                 prompt=prompt,
                 model=model,
                 size=openai_video_size(size, resolution),
                 duration=duration,
                 first_frame=first_frame,
+                images=images,
+                names=image_names,
             )
             persisted = await persist_remote_url(url)
             return ok({"url": persisted})
-        except ApiError:
-            raise
-        except Exception as exc:
-            note_upstream_result(str(model), 0, str(exc))
-            fail(3001, f"视频生成失败: {exc}", 502)
+    except ApiError:
+        raise
+    except Exception as exc:
+        note_upstream_result(str(model), 0, str(exc))
+        fail(3001, f"视频生成失败: {exc}", 502)
 
     if not settings.dashscope_api_key:
         fail(3001, "未配置视频模型 API Key", 503)

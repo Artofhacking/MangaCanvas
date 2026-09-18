@@ -26,6 +26,7 @@ import { mapProjectCard, mapProjectStats } from "@/lib/projectMappers"
 import { useProjectsStore } from "@/store/projectsStore"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { workflowsApi } from "@/features/project/api/workflows"
+import { projectAssetsPath, projectScriptPath } from "@/lib/workspaceRoutes"
 
 const activities = [
   {
@@ -206,7 +207,7 @@ export default function Dashboard() {
             actions={
               hasProjects ? (
                 <Button
-                  onClick={() => navigate(`/project/${currentProject?.id || projectId}`)}
+                  onClick={() => navigate(projectAssetsPath(currentProject?.id || projectId || ""))}
                   className="signature-gradient rounded-xl border-0 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90"
                 >
                   进入资产管理
@@ -289,11 +290,11 @@ export default function Dashboard() {
                     variant="outline"
                     onClick={(e) => {
                       e.stopPropagation()
-                      navigate(`/project/${currentProject?.id || projectId}`)
+                      navigate(projectScriptPath(currentProject?.id || projectId || ""))
                     }}
                     className="rounded-xl border-[hsl(var(--outline-variant))] px-6 py-3 text-sm font-bold hover:bg-[hsl(var(--surface-container-high))]"
                   >
-                    管理资产
+                    剧本创作
                   </Button>
                 </div>
               </div>
@@ -329,7 +330,7 @@ export default function Dashboard() {
         <section className="mb-10">
           <h3 className="text-lg font-bold tracking-tight text-[hsl(var(--on-surface))] mb-5">项目概览</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(`/project/${projectId}`)}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">片段</p>
                 <Box className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
@@ -337,7 +338,7 @@ export default function Dashboard() {
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.episodeCount}</p>
               <p className="mt-1 text-xs text-[hsl(var(--secondary))]">管理故事章节</p>
             </Card>
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(`/project/${projectId}/scenes`)}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "scenes"))}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">场景</p>
                 <Image className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
@@ -345,7 +346,7 @@ export default function Dashboard() {
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.sceneCount}</p>
               <p className="mt-1 text-xs text-[hsl(var(--secondary))]">已创建的场景</p>
             </Card>
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(`/project/${projectId}/characters`)}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "characters"))}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">角色</p>
                 <Users className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
@@ -353,7 +354,7 @@ export default function Dashboard() {
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.characterCount}</p>
               <p className="mt-1 text-xs text-[hsl(var(--secondary))]">项目角色数</p>
             </Card>
-            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(`/project/${projectId}/objects`)}>
+            <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-5 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "objects"))}>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[hsl(var(--secondary))]">物品</p>
                 <Sparkles className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
@@ -369,7 +370,7 @@ export default function Dashboard() {
           <h3 className="text-lg font-bold tracking-tight text-[hsl(var(--on-surface))] mb-5">快速入口</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card 
-              onClick={() => navigate(`/project/${projectId}`)}
+              onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}
               className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
@@ -379,7 +380,7 @@ export default function Dashboard() {
               <p className="text-xs text-[hsl(var(--secondary))]">故事章节管理</p>
             </Card>
             <Card 
-              onClick={() => navigate(`/project/${projectId}/scenes`)}
+              onClick={() => navigate(projectAssetsPath(projectId || "", "scenes"))}
               className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
@@ -389,7 +390,7 @@ export default function Dashboard() {
               <p className="text-xs text-[hsl(var(--secondary))]">背景和场景资源</p>
             </Card>
             <Card 
-              onClick={() => navigate(`/project/${projectId}/characters`)}
+              onClick={() => navigate(projectAssetsPath(projectId || "", "characters"))}
               className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-5 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
             >
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">

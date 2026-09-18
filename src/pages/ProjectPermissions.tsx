@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { 
-  ArrowLeft, 
   Plus, 
   MoreHorizontal, 
   Shield, 
@@ -29,6 +28,7 @@ import {
   Crown,
   Mail
 } from "lucide-react"
+import Sidebar from "@/components/layout/Sidebar"
 import { projectMembersApi, projectsApi } from "@/api"
 import { mapMember } from "@/lib/projectMappers"
 
@@ -49,10 +49,9 @@ const roleLabels: Record<string, { label: string; description: string; icon: typ
 }
 
 export default function ProjectPermissions() {
-  const navigate = useNavigate()
-  const { projectId } = useParams()
+  const { projectId, id } = useParams()
   const { notify, confirm } = useFeedback()
-  const numericProjectId = projectId ? Number(projectId) : null
+  const numericProjectId = Number(projectId ?? id) || null
   const [members, setMembers] = useState<Member[]>([])
   const [projectName, setProjectName] = useState("当前项目")
   const [inviteEmail, setInviteEmail] = useState("")
@@ -129,29 +128,16 @@ export default function ProjectPermissions() {
   const pendingMembers = members.filter((m) => m.status === "pending")
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--surface))]">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[hsl(var(--surface-container-lowest))]/85 backdrop-blur-md border-b border-[hsl(var(--outline-variant))]/15">
-        <div className="flex items-center justify-between h-16 px-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/projects")}
-              className="text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-lg font-black text-[hsl(var(--on-surface))]">权限控制</h1>
-              <p className="text-xs text-[hsl(var(--secondary))]">管理项目成员和访问权限</p>
-            </div>
-          </div>
+    <div className="workspace-shell min-h-screen bg-[hsl(var(--surface))]">
+      <Sidebar />
+      <header className="workspace-fixed-header fixed top-0 z-40 flex h-16 items-center border-b border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-lowest))]/85 px-8 backdrop-blur-md">
+        <div>
+          <h1 className="text-lg font-black text-[hsl(var(--on-surface))]">项目设置</h1>
+          <p className="text-xs text-[hsl(var(--secondary))]">管理项目成员和访问权限</p>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="pt-24 pb-12 px-8 max-w-5xl mx-auto">
+      <main className="ml-64 pt-24 pb-12 px-8 max-w-5xl">
         {/* Project Info */}
         <div className="mb-8 p-6 rounded-2xl bg-[hsl(var(--surface-container-low))]">
           <div className="flex items-center gap-4">
@@ -160,7 +146,7 @@ export default function ProjectPermissions() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{projectName}</h2>
-              <p className="text-sm text-[hsl(var(--secondary))]">项目 ID: {projectId}</p>
+              <p className="text-sm text-[hsl(var(--secondary))]">项目 ID: {numericProjectId}</p>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Badge variant="secondary" className="bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))] border-0">

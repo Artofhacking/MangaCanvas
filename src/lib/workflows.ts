@@ -1,5 +1,8 @@
 import { workflowsApi } from '@/features/project/api/workflows'
 import type { WorkflowSourceType } from '@/types'
+import { buildEpisodePlotCanvas, isLegacyEpisodeCanvas, shouldRebuildEpisodeCanvas } from './plotActs'
+
+export { isLegacyEpisodeCanvas, shouldRebuildEpisodeCanvas }
 
 const sourceLabelMap: Record<string, string> = {
   blank: '空白',
@@ -67,6 +70,10 @@ export const normalizeCanvasData = (canvasData?: {
     if (node.type === 'text' && !data.content) {
       data.content = data.value || ''
     }
+    if (data.loading && !data.url) {
+      data.loading = false
+      if (!data.error) data.error = '生成中断，请重新生成'
+    }
     return { ...node, data }
   })
   return {
@@ -77,6 +84,10 @@ export const normalizeCanvasData = (canvasData?: {
 }
 
 export const buildSeedCanvas = (options: OpenWorkflowOptions): CanvasGraph => {
+  if (options.sourceType === 'episode') {
+    return buildEpisodePlotCanvas(options)
+  }
+
   const nodes: CanvasGraph['nodes'] = []
   const edges: CanvasGraph['edges'] = []
   let x = 80
@@ -152,11 +163,22 @@ export const openOrCreateWorkflow = async (
           Number(workflow.sourceAssetId) === Number(options.sourceAssetId)
       )
       if (hit) {
+        const current = normalizeCanvasData(hit.canvasData)
+        if (options.sourceType === 'episode' && shouldRebuildEpisodeCanvas(current)) {
+          const canvasData = buildSeedCanvas(options)
+          const updated = await workflowsApi.update(numericProjectId, hit.id, { canvasData })
+          return {
+            id: hit.id,
+            name: hit.name,
+            created: false,
+            canvasData: normalizeCanvasData(updated.data?.canvasData || canvasData),
+          }
+        }
         return {
           id: hit.id,
           name: hit.name,
           created: false,
-          canvasData: normalizeCanvasData(hit.canvasData),
+          canvasData: current,
         }
       }
     }

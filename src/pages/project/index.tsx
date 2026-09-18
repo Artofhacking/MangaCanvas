@@ -61,7 +61,14 @@ const sortOptions = [
   { id: "name-desc", label: "名称 Z-A" },
 ] as const
 
+const genderFilterOptions = [
+  { id: "all", label: "全部" },
+  { id: "male", label: "男" },
+  { id: "female", label: "女" },
+] as const
+
 type SortOption = (typeof sortOptions)[number]["id"]
+type GenderFilter = (typeof genderFilterOptions)[number]["id"]
 
 const isProjectTab = (value?: string): value is ProjectTab =>
   Boolean(value && projectTabs.includes(value as ProjectTab))
@@ -94,6 +101,7 @@ export default function ProjectDetail() {
   const [batchMode, setBatchMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [sortBy, setSortBy] = useState<SortOption>("recent")
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>("all")
   const [batchUploadOpen, setBatchUploadOpen] = useState(false)
 
   const routeTab = isProjectTab(tabParam) ? tabParam : undefined
@@ -119,6 +127,7 @@ export default function ProjectDetail() {
   useEffect(() => {
     setBatchMode(false)
     setSelectedIds([])
+    setGenderFilter("all")
   }, [activeTab])
 
   useEffect(() => {
@@ -126,12 +135,12 @@ export default function ProjectDetail() {
 
     const stateTab = location.state?.activeTab
     if (isProjectTab(stateTab) && stateTab !== routeTab) {
-      navigate(`/project/${projectId}/${stateTab}`, { replace: true })
+      navigate(`/project/${projectId}/assets/${stateTab}`, { replace: true })
       return
     }
 
     if (!routeTab) {
-      navigate(`/project/${projectId}/${defaultProjectTab}`, { replace: true })
+      navigate(`/project/${projectId}/assets/${defaultProjectTab}`, { replace: true })
     }
   }, [location.state, navigate, projectId, routeTab])
 
@@ -149,7 +158,7 @@ export default function ProjectDetail() {
 
   const handleTabChange = (tab: ProjectTab) => {
     if (!projectId || tab === activeTab) return
-    navigate(`/project/${projectId}/${tab}`)
+    navigate(`/project/${projectId}/assets/${tab}`)
   }
 
   const sortItemsByName = <T extends { name: string }>(items: T[], direction: "asc" | "desc") => {
@@ -158,31 +167,38 @@ export default function ProjectDetail() {
   }
 
   const sortedAssets = useMemo(() => {
-    switch (sortBy) {
-      case "name-asc":
-        return {
-          episodes: sortItemsByName(assets.episodes, "asc"),
-          scenes: sortItemsByName(assets.scenes, "asc"),
-          characters: sortItemsByName(assets.characters, "asc"),
-          objects: sortItemsByName(assets.objects, "asc"),
-        }
-      case "name-desc":
-        return {
-          episodes: sortItemsByName(assets.episodes, "desc"),
-          scenes: sortItemsByName(assets.scenes, "desc"),
-          characters: sortItemsByName(assets.characters, "desc"),
-          objects: sortItemsByName(assets.objects, "desc"),
-        }
-      case "recent":
-      default:
-        return {
-          episodes: assets.episodes,
-          scenes: assets.scenes,
-          characters: assets.characters,
-          objects: assets.objects,
-        }
+    const sorted = (() => {
+      switch (sortBy) {
+        case "name-asc":
+          return {
+            episodes: sortItemsByName(assets.episodes, "asc"),
+            scenes: sortItemsByName(assets.scenes, "asc"),
+            characters: sortItemsByName(assets.characters, "asc"),
+            objects: sortItemsByName(assets.objects, "asc"),
+          }
+        case "name-desc":
+          return {
+            episodes: sortItemsByName(assets.episodes, "desc"),
+            scenes: sortItemsByName(assets.scenes, "desc"),
+            characters: sortItemsByName(assets.characters, "desc"),
+            objects: sortItemsByName(assets.objects, "desc"),
+          }
+        case "recent":
+        default:
+          return {
+            episodes: assets.episodes,
+            scenes: assets.scenes,
+            characters: assets.characters,
+            objects: assets.objects,
+          }
+      }
+    })()
+    if (genderFilter === "all") return sorted
+    return {
+      ...sorted,
+      characters: sorted.characters.filter((character) => character.gender === genderFilter),
     }
-  }, [assets.characters, assets.episodes, assets.objects, assets.scenes, sortBy])
+  }, [assets.characters, assets.episodes, assets.objects, assets.scenes, genderFilter, sortBy])
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((current) =>
@@ -229,13 +245,40 @@ export default function ProjectDetail() {
   ) => {
     if (!projectId) return
 
+    const episode =
+      sourceType === "episode" && source?.id
+        ? assets.episodes.find((item) => item.id === source.id)
+        : undefined
+
     launchWorkflow({
       projectId,
       sourceType,
       sourceName: source?.name,
       sourceAssetId: source?.id,
       seedImage: source?.image,
-      seedPrompt: source?.description,
+      seedPrompt: source?.description || episode?.description,
+      relatedAssets: episode
+        ? [
+            ...(episode.characters || []).map((item) => ({
+              id: item.id,
+              name: item.name,
+              image: item.image,
+              category: "character" as const,
+            })),
+            ...(episode.scenes || []).map((item) => ({
+              id: item.id,
+              name: item.name,
+              image: item.image,
+              category: "scene" as const,
+            })),
+            ...(episode.objects || []).map((item) => ({
+              id: item.id,
+              name: item.name,
+              image: item.image,
+              category: "object" as const,
+            })),
+          ]
+        : undefined,
       forceNew: !source?.id,
     })
   }
@@ -248,6 +291,7 @@ export default function ProjectDetail() {
           <EpisodesTab
             episodes={sortedAssets.episodes}
             onAddNew={() => openDrawer('episode')}
+            onOpenCanvas={(source) => handleOpenInfiniteCanvas("episode", source)}
             projectId={numericProjectId}
             batchMode={batchMode}
             selectedIds={selectedIds}
@@ -284,6 +328,7 @@ export default function ProjectDetail() {
             objects={sortedAssets.objects}
             onAddNew={() => openDrawer('object')}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("object", source)}
+            projectId={numericProjectId}
             batchMode={batchMode}
             selectedIds={selectedIds}
             onToggleSelect={handleToggleSelect}
@@ -302,6 +347,7 @@ export default function ProjectDetail() {
       <EpisodeCreator 
         open={ui.isEpisodeDrawerOpen} 
         onOpenChange={(open) => open ? openDrawer('episode') : closeDrawer('episode')} 
+        projectId={numericProjectId}
         onCreate={(data) => {
           if (!numericProjectId) return
           void createEpisode(numericProjectId, data)
@@ -312,6 +358,7 @@ export default function ProjectDetail() {
       <CharacterCreator 
         open={ui.isCharacterDrawerOpen} 
         onOpenChange={(open) => open ? openDrawer('character') : closeDrawer('character')} 
+        projectId={numericProjectId}
         onCreate={(data) => {
           if (!numericProjectId) return
           void createCharacter(numericProjectId, data)
@@ -322,6 +369,7 @@ export default function ProjectDetail() {
       <SceneCreator 
         open={ui.isSceneDrawerOpen} 
         onOpenChange={(open) => open ? openDrawer('scene') : closeDrawer('scene')} 
+        projectId={numericProjectId}
         onCreate={(data) => {
           if (!numericProjectId) return
           void createScene(numericProjectId, data)
@@ -343,6 +391,7 @@ export default function ProjectDetail() {
       <ObjectCreator 
         open={ui.isObjectDrawerOpen} 
         onOpenChange={(open) => open ? openDrawer('object') : closeDrawer('object')} 
+        projectId={numericProjectId}
         onCreate={(data) => {
           if (!numericProjectId) return
           void createObject(numericProjectId, data)
@@ -385,6 +434,27 @@ export default function ProjectDetail() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+                {activeTab === "characters" && (
+                  <>
+                    <span className="ml-2 text-sm text-[hsl(var(--secondary))]">性别:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {genderFilterOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => setGenderFilter(option.id)}
+                          className={`rounded-full px-3.5 py-2 text-xs font-medium transition-all ${
+                            genderFilter === option.id
+                              ? "signature-gradient text-white"
+                              : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
                 {batchMode && (
                   <span className="rounded-full bg-[hsl(var(--surface-container-low))] px-3 py-2 text-xs font-medium text-[hsl(var(--primary))]">
                     已选 {selectedIds.length} 项

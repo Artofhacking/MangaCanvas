@@ -24,6 +24,50 @@ export const IMAGE_MODELS: ModelConfig[] = [
     },
   },
   {
+    key: 'gpt-image-2.5-flare',
+    label: 'GPT Image 2.5 Flare 文生图',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '低', key: 'low' },
+      { label: '中', key: 'medium' },
+      { label: '高', key: 'high' },
+    ],
+    defaultParams: {
+      size: '1024x1024',
+      quality: 'medium',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1024x1024)', key: '1024x1024' },
+        { label: '3:4 (1024x1536)', key: '1024x1536' },
+        { label: '4:3 (1536x1024)', key: '1536x1024' },
+      ];
+    },
+  },
+  {
+    key: 'gpt-image-2.5-sunburst',
+    label: 'GPT Image 2.5 Sunburst 文生图',
+    type: 'image',
+    async: true,
+    qualities: [
+      { label: '低', key: 'low' },
+      { label: '中', key: 'medium' },
+      { label: '高', key: 'high' },
+    ],
+    defaultParams: {
+      size: '1024x1024',
+      quality: 'medium',
+    },
+    getSizesByQuality: (): SizeOption[] => {
+      return [
+        { label: '1:1 (1024x1024)', key: '1024x1024' },
+        { label: '3:4 (1024x1536)', key: '1024x1536' },
+        { label: '4:3 (1536x1024)', key: '1536x1024' },
+      ];
+    },
+  },
+  {
     key: 'wan2.7-image',
     label: '万相 2.7 文生图',
     type: 'image',
@@ -197,16 +241,198 @@ export const VIDEO_MODELS: ModelConfig[] = [
       duration: 5,
     },
   },
+  {
+    key: 'doubao-seedance-2-0-260128',
+    label: 'Seedance 2.0',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '720P 16:9 (1280*720)', key: '1280*720' },
+      { label: '720P 9:16 (720*1280)', key: '720*1280' },
+      { label: '1080P 16:9 (1920*1080)', key: '1920*1080' },
+      { label: '1080P 9:16 (1080*1920)', key: '1080*1920' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'doubao-seedance-2-0-fast-260128',
+    label: 'Seedance 2.0 Fast',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '720P 16:9 (1280*720)', key: '1280*720' },
+      { label: '720P 9:16 (720*1280)', key: '720*1280' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'doubao-seedance-2-0-mini-260615',
+    label: 'Seedance 2.0 Mini',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '720P 16:9 (1280*720)', key: '1280*720' },
+      { label: '720P 9:16 (720*1280)', key: '720*1280' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'doubao-seedance-2-5-260628',
+    label: 'Seedance 2.5',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '720P 16:9 (1280*720)', key: '1280*720' },
+      { label: '720P 9:16 (720*1280)', key: '720*1280' },
+      { label: '1080P 16:9 (1920*1080)', key: '1920*1080' },
+      { label: '1080P 9:16 (1080*1920)', key: '1080*1920' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'MiniMax-H3',
+    label: 'MiniMax H3',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '768P 16:9 (1280*720)', key: '1280*720' },
+      { label: '768P 9:16 (720*1280)', key: '720*1280' },
+      { label: '2K 16:9 (1920*1080)', key: '1920*1080' },
+      { label: '2K 9:16 (1080*1920)', key: '1080*1920' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'MiniMax-H3-Max',
+    label: 'MiniMax H3 Max',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '768P 16:9 (1280*720)', key: '1280*720' },
+      { label: '768P 9:16 (720*1280)', key: '720*1280' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'viduq3-pro',
+    label: 'Vidu Q3 Pro',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '720P 16:9 (1280*720)', key: '1280*720' },
+      { label: '720P 9:16 (720*1280)', key: '720*1280' },
+      { label: '1080P 16:9 (1920*1080)', key: '1920*1080' },
+      { label: '1080P 9:16 (1080*1920)', key: '1080*1920' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
+  {
+    key: 'viduq3-turbo',
+    label: 'Vidu Q3 Turbo',
+    type: 'video',
+    enabled: false,
+    async: true,
+    sizes: [
+      { label: '720P 16:9 (1280*720)', key: '1280*720' },
+      { label: '720P 9:16 (720*1280)', key: '720*1280' },
+      { label: '1080P 16:9 (1920*1080)', key: '1920*1080' },
+      { label: '1080P 9:16 (1080*1920)', key: '1080*1920' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
+    ],
+    defaultParams: {
+      size: '1280*720',
+      duration: 5,
+    },
+  },
 ];
 
-export function filterLiveModels<T extends { key: string }>(all: T[], liveIds: string[]): T[] {
+export function enabledModels<T extends { enabled?: boolean }>(all: T[]): T[] {
+  return all.filter((item) => item.enabled !== false)
+}
+
+export function filterLiveModels<T extends { key: string; enabled?: boolean }>(all: T[], liveIds: string[]): T[] {
   const set = new Set(liveIds)
-  return all.filter((item) => set.has(item.key))
+  return enabledModels(all).filter((item) => set.has(item.key))
+}
+
+export function resolvePickerModels<T extends { key: string; enabled?: boolean }>(
+  all: T[],
+  liveIds: string[],
+  loading: boolean
+): T[] {
+  const catalog = enabledModels(all)
+  const live = filterLiveModels(catalog, liveIds)
+  if (loading || live.length === 0) return catalog
+  return live
 }
 
 export function remapVideoModel(key: string | undefined): string {
   const name = key || 'happyhorse-1.1-t2v'
-  if (VIDEO_MODELS.some((m) => m.key === name)) {
+  if (enabledModels(VIDEO_MODELS).some((m) => m.key === name)) {
     return name
   }
   if (name.includes('i2v') || name.includes('kf2v')) {

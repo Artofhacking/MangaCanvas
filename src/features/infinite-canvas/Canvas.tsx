@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactFlow, { Background, MiniMap, useReactFlow, ReactFlowProvider, SelectionMode, Node as RFNode } from 'reactflow';
 import {
@@ -38,7 +38,10 @@ import { useThemeStore } from './stores/themeStore';
 import { getAllProjects } from './utils/indexedDB';
 import { workflowsApi } from '@/features/project/api/workflows';
 import { projectApi } from '@/api/projectApi';
-import { openOrCreateWorkflow, type WorkflowSeedAsset } from '@/lib/workflows';
+import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, type WorkflowSeedAsset } from '@/lib/workflows';
+import { rewriteCanvasMedia } from '@/lib/mediaUrl';
+import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { useTwoFingerPan } from './hooks/useTwoFingerPan';
 import type { Episode } from '@/types';
 
 import TextNode from './components/nodes/TextNode';
@@ -79,6 +82,8 @@ const CanvasInner: React.FC = () => {
   }>();
   const navigate = useNavigate();
   const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
+  const canvasPaneRef = useRef<HTMLDivElement>(null);
+  useTwoFingerPan(canvasPaneRef);
   const canvasDocumentId = workflowId;
 
   const toEpisodeSeedAssets = (episode?: Episode | null): WorkflowSeedAsset[] => [
@@ -111,7 +116,6 @@ const CanvasInner: React.FC = () => {
     onConnect,
     addNode,
     loadProject,
-    saveProject,
     updateViewport,
     undo,
     redo,
@@ -128,7 +132,7 @@ const CanvasInner: React.FC = () => {
     createWorkflowDocument,
     syncProjectWorkflows,
   } = useCanvasDocumentsStore();
-  const canvasHydratedRef = React.useRef<string | null>(null);
+  const [hydratedWorkflowId, setHydratedWorkflowId] = useState<string | null>(null);
   const { isDark } = useThemeStore();
 
   const [showApiSettings, setShowApiSettings] = useState(false);
@@ -179,27 +183,27 @@ const CanvasInner: React.FC = () => {
     if (currentWorkflow?.sourceType === 'scene') {
       return {
         label: '返回场景',
-        action: () => navigate(`/project/${projectId}/scenes`),
+        action: () => navigate(`/project/${projectId}/assets/scenes`),
       };
     }
 
     if (currentWorkflow?.sourceType === 'character') {
       return {
         label: '返回角色',
-        action: () => navigate(`/project/${projectId}/characters`),
+        action: () => navigate(`/project/${projectId}/assets/characters`),
       };
     }
 
     if (currentWorkflow?.sourceType === 'object') {
       return {
         label: '返回物品',
-        action: () => navigate(`/project/${projectId}/objects`),
+        action: () => navigate(`/project/${projectId}/assets/objects`),
       };
     }
 
     return {
       label: '返回项目',
-      action: () => navigate(`/project/${projectId}/scenes`),
+      action: () => navigate(`/project/${projectId}/assets/scenes`),
     };
   }, [currentWorkflow?.sourceAssetId, currentWorkflow?.sourceType, navigate, projectId]);
 
@@ -235,19 +239,8 @@ const CanvasInner: React.FC = () => {
   }, [backTarget, cleanupCanvasTransientUi]);
 
   const persistCurrentCanvas = useCallback(() => {
-    if (!canvasDocumentId) return;
-    saveProject(updateProjectCanvas);
-    const numericProjectId = Number(projectId);
-    if (Number.isNaN(numericProjectId) || !workflowId) return;
-    const snapshot = useCanvasStore.getState();
-    void workflowsApi.update(numericProjectId, workflowId, {
-      canvasData: {
-        nodes: snapshot.nodes,
-        edges: snapshot.edges,
-        viewport: snapshot.viewport,
-      },
-    });
-  }, [canvasDocumentId, projectId, saveProject, updateProjectCanvas, workflowId]);
+    persistOpenCanvas({ projectId, workflowId: canvasDocumentId || workflowId });
+  }, [canvasDocumentId, projectId, workflowId]);
 
   const handleSwitchWorkflow = useCallback(
     (nextWorkflowId: string) => {
@@ -619,7 +612,7 @@ const CanvasInner: React.FC = () => {
     if (!projectId || !canvasDocumentId) return;
 
     let cancelled = false;
-    canvasHydratedRef.current = null;
+    setHydratedWorkflowId(null);
 
     const hydrate = async () => {
       const numericProjectId = Number(projectId);
@@ -627,17 +620,43 @@ const CanvasInner: React.FC = () => {
         const response = await workflowsApi.getById(numericProjectId, workflowId);
         if (cancelled) return;
         if (response.success && response.data) {
+          let canvasData = response.data.canvasData
+          if (
+            response.data.sourceType === 'episode' &&
+            shouldRebuildEpisodeCanvas({
+              nodes: (canvasData?.nodes || []) as Array<{ id?: string; type?: string; data?: { content?: string; value?: string } }>,
+            }) &&
+            response.data.sourceAssetId
+          ) {
+            const episodeResponse = await projectApi.episodes.getById(
+              numericProjectId,
+              Number(response.data.sourceAssetId)
+            )
+            if (!cancelled && episodeResponse.success && episodeResponse.data) {
+              const rebuilt = buildSeedCanvas({
+                projectId: String(projectId),
+                sourceType: 'episode',
+                sourceName: episodeResponse.data.name,
+                sourceAssetId: episodeResponse.data.id,
+                seedPrompt: episodeResponse.data.description,
+                relatedAssets: toEpisodeSeedAssets(episodeResponse.data),
+              })
+              await workflowsApi.update(numericProjectId, workflowId, { canvasData: rebuilt })
+              canvasData = rebuilt
+            }
+          }
+          if (cancelled) return
           createWorkflowDocument({
             id: response.data.id,
             name: response.data.name,
             projectId: String(projectId),
             sourceType: response.data.sourceType,
             sourceAssetId: response.data.sourceAssetId,
-            canvasData: {
-              nodes: (response.data.canvasData?.nodes || []) as import('./types').CustomNode[],
-              edges: (response.data.canvasData?.edges || []) as import('./types').CustomEdge[],
-              viewport: response.data.canvasData?.viewport || { x: 100, y: 50, zoom: 0.8 },
-            },
+            canvasData: rewriteCanvasMedia({
+              nodes: (canvasData?.nodes || []) as import('./types').CustomNode[],
+              edges: (canvasData?.edges || []) as import('./types').CustomEdge[],
+              viewport: canvasData?.viewport || { x: 100, y: 50, zoom: 0.8 },
+            }),
           });
         } else {
           createWorkflowDocument({
@@ -660,7 +679,7 @@ const CanvasInner: React.FC = () => {
 
       if (cancelled) return;
       loadProject(canvasDocumentId, getProjectCanvas);
-      canvasHydratedRef.current = canvasDocumentId;
+      setHydratedWorkflowId(canvasDocumentId);
     };
 
     void hydrate();
@@ -679,24 +698,23 @@ const CanvasInner: React.FC = () => {
 
   useEffect(() => {
     if (!canvasDocumentId || !projectId) return;
-    if (canvasHydratedRef.current !== canvasDocumentId) return;
-
-    const timer = setInterval(() => {
-      saveProject(updateProjectCanvas);
-      const numericProjectId = Number(projectId);
-      if (Number.isNaN(numericProjectId) || !workflowId) return;
-      const { nodes: currentNodes, edges: currentEdges, viewport: currentViewport } = useCanvasStore.getState();
-      void workflowsApi.update(numericProjectId, workflowId, {
-        canvasData: {
-          nodes: currentNodes,
-          edges: currentEdges,
-          viewport: currentViewport,
-        },
-      });
-    }, 2500);
-
+    if (hydratedWorkflowId !== canvasDocumentId) return;
+    persistCurrentCanvas();
+    const timer = setInterval(() => persistCurrentCanvas(), 2500);
     return () => clearInterval(timer);
-  }, [canvasDocumentId, projectId, saveProject, updateProjectCanvas, workflowId]);
+  }, [canvasDocumentId, hydratedWorkflowId, persistCurrentCanvas, projectId]);
+
+  useEffect(() => {
+    if (!canvasDocumentId || hydratedWorkflowId !== canvasDocumentId) return;
+    const onHide = () => persistCurrentCanvas();
+    window.addEventListener('pagehide', onHide);
+    window.addEventListener('beforeunload', onHide);
+    return () => {
+      onHide();
+      window.removeEventListener('pagehide', onHide);
+      window.removeEventListener('beforeunload', onHide);
+    };
+  }, [canvasDocumentId, hydratedWorkflowId, persistCurrentCanvas]);
 
   const handleAddNode = (type: string) => {
     const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
@@ -1022,7 +1040,8 @@ const CanvasInner: React.FC = () => {
       </header>
 
       <div 
-        className="flex-1 relative overflow-hidden h-full cursor-grab"
+        ref={canvasPaneRef}
+        className="flex-1 relative overflow-hidden h-full cursor-grab touch-none"
         onDragOver={handleCanvasDragOver}
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
@@ -1049,7 +1068,7 @@ const CanvasInner: React.FC = () => {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultViewport={viewport}
-          onMove={(_, newViewport) => updateViewport(newViewport)}
+          onMoveEnd={(_, newViewport) => updateViewport(newViewport)}
           onPaneClick={handlePaneClick}
           fitView
           snapToGrid

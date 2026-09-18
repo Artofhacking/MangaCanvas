@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import NotificationDrawer, { demoNotifications } from "@/components/layout/NotificationDrawer"
 import UserProfileMenu from "@/components/layout/UserProfileMenu"
-import { Plus, ChevronLeft, Bell, Filter, MoreVertical, Pencil, Trash2 } from "lucide-react"
+import { Plus, Bell, Filter, MoreVertical, Pencil, Trash2 } from "lucide-react"
 import { useNavigate, Link } from "react-router-dom"
 import { useEffect, useState } from "react"
 import ProjectCreator from "./ProjectCreator"
@@ -115,7 +115,7 @@ export default function ProjectsList() {
 
   const handleProjectClick = (projectId: number) => {
     setActiveProjectId(projectId)
-    navigate(`/project/${projectId}`)
+    navigate(`/project/${projectId}/dashboard`)
   }
 
   const handleCreateProject = async (data: {
@@ -252,15 +252,7 @@ export default function ProjectsList() {
         {/* Header */}
         <header className="workspace-fixed-header fixed top-0 z-40 flex h-16 items-center justify-between border-b border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-lowest))]/80 px-8 backdrop-blur-md">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-              className="text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-            <span className="text-lg font-black text-[hsl(var(--on-surface))]">项目列表</span>
+            <span className="text-lg font-black text-[hsl(var(--on-surface))]">项目</span>
           </div>
 
           <div className="flex items-center gap-4">

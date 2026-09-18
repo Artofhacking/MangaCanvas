@@ -183,6 +183,7 @@ export interface EpisodeDTO {
   name: string
   code: string
   description?: string | null
+  coverImage?: string | null
   status: 'draft' | 'in-progress' | 'completed'
   progress?: number
   duration?: number

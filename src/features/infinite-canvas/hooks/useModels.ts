@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useModelsStore } from '@/store/modelsStore'
 import type { ModelModality } from '@/api/types'
 
@@ -24,35 +24,34 @@ interface UseModelsReturn {
 
 function useModelsByModality(modality: ModelModality, options: UseModelsOptions = {}): UseModelsReturn {
   const { autoFetch = true } = options
-  const store = useModelsStore()
-  // 安全访问：如果状态不存在，提供默认值
-  const state = store[modality] || { models: [], status: 'idle', error: null, lastFetchedAt: null }
+  const state = useModelsStore((store) => store[modality])
+  const fetchModelsByModality = useModelsStore((store) => store.fetchModelsByModality)
+  const getModelById = useModelsStore((store) => store.getModelById)
+  const rawModels = state?.models
+  const status = state?.status ?? 'idle'
+  const error = state?.error ?? null
 
-  // 自动获取数据（只触发一次，或缓存为空时重新获取）
   useEffect(() => {
-    // 如果状态是 idle，触发请求
-    const isIdle = state.status === 'idle'
-    // 如果状态是成功但数据为空或缺少 id，也重新请求（可能是之前缓存的坏数据）
-    const hasInvalidData = state.status === 'success' && state.models?.some(m => !m.id)
-    const isEmptySuccess = state.status === 'success' && (!state.models || state.models.length === 0)
-    
-    if (autoFetch && (isIdle || isEmptySuccess || hasInvalidData)) {
-      store.fetchModelsByModality(modality)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFetch, modality, state.status, state.models])
+    const isIdle = status === 'idle'
+    const hasInvalidData = status === 'success' && rawModels?.some((item) => !item.id)
 
-  // 安全获取模型列表
-  const models = state.models || []
+    if (autoFetch && (isIdle || hasInvalidData)) {
+      void fetchModelsByModality(modality)
+    }
+  }, [autoFetch, modality, status, rawModels, fetchModelsByModality])
+
+  const models = useMemo(
+    () => (rawModels || []).filter((item) => item.modality === modality && item.isEnabled !== false),
+    [rawModels, modality]
+  )
 
   return {
-    // 过滤：只返回匹配的 modality 且启用的模型
-    models: models.filter(m => m.modality === modality && m.isEnabled !== false),
-    loading: state.status === 'loading',
-    isLoaded: state.status === 'success' || state.status === 'error',
-    error: state.error,
-    refetch: () => store.fetchModelsByModality(modality, true),
-    getModelById: store.getModelById,
+    models,
+    loading: status === 'loading',
+    isLoaded: status === 'success' || status === 'error',
+    error,
+    refetch: () => fetchModelsByModality(modality, true),
+    getModelById,
   }
 }
 

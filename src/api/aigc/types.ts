@@ -32,6 +32,9 @@ export interface VideoGenerateOptions {
   prompt: string
   firstFrameImage?: string
   lastFrameImage?: string
+  /** 参考图，最多 3 张。有图时走参考图+文字生视频，不再区分文生/图生。 */
+  images?: string[]
+  imageNames?: string[]
   size?: string
   resolution?: string
   duration?: number

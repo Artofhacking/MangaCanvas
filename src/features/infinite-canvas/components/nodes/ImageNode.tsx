@@ -8,6 +8,7 @@ import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CanvasMaterialItem, CustomNode } from '../../types';
 import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
+import { mediaUrl } from '@/lib/mediaUrl';
 
 // 视频特效图标
 const EffectIcon: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
@@ -93,7 +94,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     if (!data?.url) return;
 
     const link = document.createElement('a');
-    link.href = data.url;
+    link.href = mediaUrl(data.url);
     link.download = `image_${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
@@ -105,7 +106,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     if (!data?.url) return;
 
     const link = document.createElement('a');
-    link.href = data.url;
+    link.href = mediaUrl(data.url);
     link.download = `image_${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
@@ -253,7 +254,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   const fetchImageBlob = useCallback(async () => {
     if (!data?.url) return null;
-    const response = await fetch(data.url);
+    const response = await fetch(mediaUrl(data.url));
     if (!response.ok) {
       throw new Error('图片读取失败');
     }
@@ -481,7 +482,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           ) : data?.url ? (
             <div className="aspect-square rounded-lg overflow-hidden bg-[var(--bg-tertiary)]">
               <img
-                src={data.url}
+                src={mediaUrl(data.url)}
                 alt={data.label}
                 className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => setShowPreview(true)}
@@ -555,7 +556,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         visible={showPreview}
         onClose={() => setShowPreview(false)}
         type="image"
-        url={data?.url || ''}
+        url={mediaUrl(data?.url)}
         title={data.label || '图片预览'}
         params={{
           prompt: data?.prompt,
@@ -568,7 +569,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       <SaveToMaterialsModal
         open={showSaveToMaterialsModal}
         onClose={() => setShowSaveToMaterialsModal(false)}
-        imageUrl={data?.url}
+        imageUrl={mediaUrl(data?.url) || undefined}
         initialName={data?.label || '图片素材'}
         initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
         nodeId={id}

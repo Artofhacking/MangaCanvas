@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Input, Select, Button, message } from 'antd';
+import { Input, Button, message } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useVideoGeneration } from '../../hooks';
+import { persistOpenCanvas } from '@/lib/persistCanvas';
 import type { CustomNode } from '../../types';
+import NodeSelect from '../NodeSelect';
 
 // 分辨率选项
 const RESOLUTION_OPTIONS = [
@@ -171,6 +173,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       } else {
         updateNode(videoNodeId, { loading: false, error: '生成失败' });
       }
+      persistOpenCanvas();
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
         removeNode(videoNodeId);
@@ -178,6 +181,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       } else {
         updateNode(videoNodeId, { loading: false, error: '生成失败' });
       }
+      persistOpenCanvas();
     }
   };
 
@@ -257,12 +261,11 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
               分辨率
             </label>
-            <Select
+            <NodeSelect
               value={localResolution}
-              onChange={setLocalResolution}
-              style={{ width: '100%' }}
+              onChange={(next) => setLocalResolution(String(next))}
               options={RESOLUTION_OPTIONS}
-              popupClassName="nodrag nowheel"
+              placeholder="选择分辨率"
             />
           </div>
 
@@ -270,15 +273,11 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
               特效模板
             </label>
-            <Select
+            <NodeSelect
               value={localTemplate}
-              onChange={setLocalTemplate}
-              style={{ width: '100%' }}
+              onChange={(next) => setLocalTemplate(String(next))}
               options={TEMPLATE_GROUPS}
-              popupClassName="nodrag nowheel"
               placeholder="选择特效模板"
-              showSearch
-              optionFilterProp="label"
             />
           </div>
 

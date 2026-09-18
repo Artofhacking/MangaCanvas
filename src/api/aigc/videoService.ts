@@ -2,7 +2,11 @@ import { appClient } from '@/api/clients/appClient'
 import { requestData } from '@/api/core/response'
 import type { VideoGenerateOptions } from './types'
 
-export const isT2VModel = (model: string) => model.includes('t2v')
+export const isSeedanceModel = (model: string) => /seedance/i.test(model)
+export const isMiniMaxModel = (model: string) => /minimax|hailuo/i.test(model)
+export const isViduModel = (model: string) => /vidu/i.test(model)
+export const isT2VModel = (model: string) =>
+  model.includes('t2v') || isSeedanceModel(model) || isMiniMaxModel(model) || isViduModel(model)
 export const isI2VModel = (model: string) => model.includes('i2v')
 export const isKF2VModel = (model: string) => model.includes('kf2v')
 export const isVideoModel = (model: string) => isT2VModel(model) || isI2VModel(model) || isKF2VModel(model)
@@ -17,8 +21,10 @@ export const videoService = {
       data: {
         model: options.model,
         prompt: options.prompt,
-        firstFrameImage: options.firstFrameImage,
+        firstFrameImage: options.firstFrameImage || options.images?.[0],
         lastFrameImage: options.lastFrameImage,
+        images: options.images,
+        imageNames: options.imageNames,
         size: options.size,
         resolution: options.resolution,
         duration: options.duration,

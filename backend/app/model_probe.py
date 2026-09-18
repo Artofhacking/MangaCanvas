@@ -11,6 +11,8 @@ DOWN_TTL = 180.0
 
 IMAGE_CATALOG = [
     {"id": "gpt-image-2", "name": "GPT Image 2 文生图", "owned_by": "nexcor", "modality": "image"},
+    {"id": "gpt-image-2.5-flare", "name": "GPT Image 2.5 Flare 文生图", "owned_by": "nexcor", "modality": "image"},
+    {"id": "gpt-image-2.5-sunburst", "name": "GPT Image 2.5 Sunburst 文生图", "owned_by": "nexcor", "modality": "image"},
     {"id": "wan2.7-image", "name": "万相 2.7 文生图", "owned_by": "nexcor", "modality": "image"},
     {"id": "wan2.7-image-pro", "name": "万相 2.7 文生图 Pro", "owned_by": "nexcor", "modality": "image"},
     {"id": "qwen-image-2.0", "name": "通义千问生图", "owned_by": "nexcor", "modality": "image"},
@@ -22,6 +24,15 @@ IMAGE_CATALOG = [
 VIDEO_CATALOG = [
     {"id": "happyhorse-1.1-t2v", "name": "HappyHorse 文生视频", "owned_by": "nexcor", "modality": "video"},
     {"id": "happyhorse-1.1-i2v", "name": "HappyHorse 图生视频", "owned_by": "nexcor", "modality": "video"},
+    {"id": "happyhorse-1.1-r2v", "name": "HappyHorse 参考图生视频", "owned_by": "nexcor", "modality": "video"},
+    {"id": "doubao-seedance-2-0-260128", "name": "Seedance 2.0", "owned_by": "baidu", "modality": "video"},
+    {"id": "doubao-seedance-2-0-fast-260128", "name": "Seedance 2.0 Fast", "owned_by": "baidu", "modality": "video"},
+    {"id": "doubao-seedance-2-0-mini-260615", "name": "Seedance 2.0 Mini", "owned_by": "baidu", "modality": "video"},
+    {"id": "doubao-seedance-2-5-260628", "name": "Seedance 2.5", "owned_by": "baidu", "modality": "video"},
+    {"id": "MiniMax-H3", "name": "MiniMax H3", "owned_by": "minimax", "modality": "video"},
+    {"id": "MiniMax-H3-Max", "name": "MiniMax H3 Max", "owned_by": "minimax", "modality": "video"},
+    {"id": "viduq3-pro", "name": "Vidu Q3 Pro", "owned_by": "vidu", "modality": "video"},
+    {"id": "viduq3-turbo", "name": "Vidu Q3 Turbo", "owned_by": "vidu", "modality": "video"},
 ]
 
 TEXT_CATALOG = [
@@ -102,6 +113,96 @@ async def _probe_video(client: httpx.AsyncClient, model_id: str) -> bool:
     return _is_validation_ok(status, text)
 
 
+async def _listed_model_ids(url: str, headers: dict[str, str]) -> set[str]:
+    timeout = httpx.Timeout(PROBE_TIMEOUT, connect=1.5)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(url, headers=headers)
+    except (httpx.TimeoutException, httpx.TransportError):
+        return set()
+    if resp.status_code >= 400:
+        return set()
+    try:
+        payload = resp.json()
+    except ValueError:
+        return set()
+    rows = payload.get("data") or payload.get("list") or payload.get("models") or []
+    ids: set[str] = set()
+    if isinstance(rows, list):
+        for item in rows:
+            if isinstance(item, str) and item:
+                ids.add(item)
+            elif isinstance(item, dict):
+                mid = item.get("id") or item.get("model")
+                if isinstance(mid, str) and mid:
+                    ids.add(mid)
+    return ids
+
+
+async def _nexcor_listed_ids() -> set[str]:
+    """Membership check only. Never POST — image generate is billed and can hang."""
+    if not settings.openai_api_key:
+        return set()
+    return await _listed_model_ids(
+        f"{settings.openai_base_url.rstrip('/')}/models",
+        {
+            "Authorization": f"Bearer {settings.openai_api_key}",
+            "User-Agent": "MangaCanvas/1.0",
+        },
+    )
+
+
+async def _baidu_listed_ids() -> set[str]:
+    """Membership check only. Never POST — Seedance create is a billed task."""
+    if not settings.baidu_enabled or not settings.baidu_api_key:
+        return set()
+    return await _listed_model_ids(
+        f"{settings.baidu_root()}/v1/models",
+        {
+            "Authorization": f"Bearer {settings.baidu_api_key}",
+            "User-Agent": "MangaCanvas/1.0",
+        },
+    )
+
+
+async def _minimax_key_live() -> bool:
+    """Auth check only. Never POST — MiniMax create is a billed task."""
+    if not settings.minimax_enabled or not settings.minimax_api_key:
+        return False
+    timeout = httpx.Timeout(PROBE_TIMEOUT, connect=1.5)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(
+                f"{settings.minimax_root()}/v1/models",
+                headers={
+                    "Authorization": f"Bearer {settings.minimax_api_key}",
+                    "User-Agent": "MangaCanvas/1.0",
+                },
+            )
+    except (httpx.TimeoutException, httpx.TransportError):
+        return False
+    return 200 <= resp.status_code < 300
+
+
+async def _vidu_key_live() -> bool:
+    """Credits check only. Never POST — Vidu create is a billed task."""
+    if not settings.vidu_enabled or not settings.vidu_api_key:
+        return False
+    timeout = httpx.Timeout(PROBE_TIMEOUT, connect=1.5)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(
+                f"{settings.vidu_root()}/ent/v2/credits",
+                headers={
+                    "Authorization": f"Token {settings.vidu_api_key}",
+                    "User-Agent": "MangaCanvas/1.0",
+                },
+            )
+    except (httpx.TimeoutException, httpx.TransportError):
+        return False
+    return 200 <= resp.status_code < 300
+
+
 async def _probe_text(client: httpx.AsyncClient, model_id: str) -> bool:
     status, text = await _post(
         client,
@@ -124,9 +225,50 @@ async def _live_ids(kind: str) -> set[str]:
         catalog = list(TEXT_CATALOG)
         probe = _probe_text
 
+    if kind == "image":
+        live: set[str] = {item["id"] for item in catalog if item["owned_by"] == "dashscope"}
+        nexcor_ids = [item["id"] for item in catalog if item["owned_by"] == "nexcor"]
+        if settings.openai_api_key and nexcor_ids:
+            listed = await _nexcor_listed_ids()
+            live.update(model_id for model_id in nexcor_ids if model_id in listed)
+        return live - down
+
+    if kind == "text":
+        live = set()
+        nexcor_ids = [item["id"] for item in catalog if item["owned_by"] == "nexcor"]
+        if settings.openai_api_key and nexcor_ids:
+            listed = await _nexcor_listed_ids()
+            live.update(model_id for model_id in nexcor_ids if model_id in listed)
+        return live - down
+
+    if kind == "video":
+        live: set[str] = set()
+        nexcor_ids = [item["id"] for item in catalog if item["owned_by"] == "nexcor"]
+        baidu_ids = [item["id"] for item in catalog if item["owned_by"] == "baidu"]
+        minimax_ids = [item["id"] for item in catalog if item["owned_by"] == "minimax"]
+        vidu_ids = [item["id"] for item in catalog if item["owned_by"] == "vidu"]
+        timeout = httpx.Timeout(PROBE_TIMEOUT, connect=1.5)
+        if settings.openai_api_key and nexcor_ids:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                results = await asyncio.gather(
+                    *(_probe_video(client, model_id) for model_id in nexcor_ids),
+                    return_exceptions=True,
+                )
+            for model_id, result in zip(nexcor_ids, results):
+                if result is True:
+                    live.add(model_id)
+        if settings.baidu_enabled and settings.baidu_api_key and baidu_ids:
+            listed = await _baidu_listed_ids()
+            live.update(model_id for model_id in baidu_ids if model_id in listed)
+        if settings.minimax_enabled and settings.minimax_api_key and minimax_ids and await _minimax_key_live():
+            live.update(minimax_ids)
+        if settings.vidu_enabled and settings.vidu_api_key and vidu_ids and await _vidu_key_live():
+            live.update(vidu_ids)
+        return live - down
+
     nexcor_ids = [item["id"] for item in catalog if item["owned_by"] != "dashscope"]
     dashscope_ids = {item["id"] for item in catalog if item["owned_by"] == "dashscope"}
-    live: set[str] = set(dashscope_ids)
+    live = set(dashscope_ids)
     if not settings.openai_api_key:
         return live - down
 
@@ -155,6 +297,12 @@ async def available_models(modality: str | None = None) -> list[dict]:
             rows = []
             for item in catalog:
                 if item["owned_by"] == "dashscope" and not settings.dashscope_api_key:
+                    continue
+                if item["owned_by"] == "baidu" and not (settings.baidu_enabled and settings.baidu_api_key):
+                    continue
+                if item["owned_by"] == "minimax" and not (settings.minimax_enabled and settings.minimax_api_key):
+                    continue
+                if item["owned_by"] == "vidu" and not (settings.vidu_enabled and settings.vidu_api_key):
                     continue
                 if item["id"] not in live:
                     continue

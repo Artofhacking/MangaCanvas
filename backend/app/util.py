@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 
 def iso(dt: datetime | None) -> str | None:
@@ -26,6 +27,37 @@ def camelize(value: Any) -> Any:
         return [camelize(v) for v in value]
     if isinstance(value, datetime):
         return iso(value)
+    return value
+
+
+def media_path(url: str | None) -> str | None:
+    if not url or not isinstance(url, str):
+        return None
+    if url.startswith(("data:", "blob:")):
+        return None
+    if url.startswith("/static/") or url.startswith("/api/"):
+        return url
+    parsed = urlparse(url)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    if path.startswith("/static/") or path.startswith("/api/"):
+        return path
+    return None
+
+
+def rewrite_stored_media_url(url: str | None) -> str | None:
+    path = media_path(url)
+    return path if path else url
+
+
+def rewrite_media_tree(value: Any) -> Any:
+    if isinstance(value, str):
+        return rewrite_stored_media_url(value)
+    if isinstance(value, list):
+        return [rewrite_media_tree(item) for item in value]
+    if isinstance(value, dict):
+        return {key: rewrite_media_tree(item) for key, item in value.items()}
     return value
 
 

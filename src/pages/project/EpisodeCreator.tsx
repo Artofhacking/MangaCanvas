@@ -1,14 +1,12 @@
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { HelpCircle } from "lucide-react"
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { X } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import type { Episode } from "@/types"
 
@@ -28,133 +26,161 @@ interface EpisodeCreatorProps {
     description: string
   }) => void
   onUpdate?: (data: EpisodeEditData) => void
+  onOpenCanvas?: () => void
   initialData?: Episode | null
-  mode?: 'create' | 'edit'
+  mode?: "create" | "edit"
+  projectId?: number | null
 }
 
-export default function EpisodeCreator({ 
-  open, 
-  onOpenChange, 
-  onCreate, 
+export default function EpisodeCreator({
+  open,
+  onOpenChange,
+  onCreate,
   onUpdate,
+  onOpenCanvas,
   initialData,
-  mode = 'create'
 }: EpisodeCreatorProps) {
   const { notify } = useFeedback()
-  const isEditMode = mode === 'edit' && initialData != null
-  
   const [folderName, setFolderName] = useState("")
   const [episodeCount, setEpisodeCount] = useState("")
   const [description, setDescription] = useState("")
 
-  // 编辑模式下回填数据
   useEffect(() => {
-    if (isEditMode && initialData) {
+    if (!open) return
+    if (initialData) {
       setFolderName(initialData.name)
-      setEpisodeCount(String(initialData.count))
+      setEpisodeCount(String(initialData.count ?? ""))
       setDescription(initialData.description || "")
-    } else if (!open) {
-      resetForm()
+    } else {
+      setFolderName("")
+      setEpisodeCount("")
+      setDescription("")
     }
-  }, [isEditMode, initialData, open])
+  }, [initialData, open])
 
-  const resetForm = () => {
-    setFolderName("")
-    setEpisodeCount("")
-    setDescription("")
-  }
-
-  const handleSubmit = () => {
-    // 表单校验
+  const handleSave = () => {
     if (!folderName.trim()) {
-      notify.warning("请输入片段文件夹名称")
+      notify.warning("请输入片段名称")
       return
     }
-    
-    if (isEditMode && initialData) {
-      onUpdate?.({ 
-        id: initialData.id, 
-        folderName: folderName.trim(), 
-        episodeCount, 
-        description 
+    if (initialData) {
+      onUpdate?.({
+        id: initialData.id,
+        folderName: folderName.trim(),
+        episodeCount,
+        description,
       })
-      notify.success("片段已更新")
-    } else {
-      onCreate?.({ folderName: folderName.trim(), episodeCount, description })
-      notify.success("片段创建成功")
+      notify.success("片段已保存")
+      return
     }
-    
+    onCreate?.({
+      folderName: folderName.trim(),
+      episodeCount,
+      description,
+    })
+    notify.success("片段已创建")
     onOpenChange(false)
-    resetForm()
+  }
+
+  const handleOpenCanvas = () => {
+    if (initialData) {
+      onUpdate?.({
+        id: initialData.id,
+        folderName: folderName.trim() || initialData.name,
+        episodeCount,
+        description,
+      })
+    }
+    onOpenChange(false)
+    onOpenCanvas?.()
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[480px] p-0 overflow-hidden border-0 rounded-2xl bg-[hsl(var(--surface))]">
-        {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-2 text-left">
-          <DialogTitle className="text-xl font-bold text-[hsl(var(--on-surface))]">
-            {isEditMode ? "编辑片段" : "创建片段"}
-          </DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-[480px] sm:max-w-[480px] p-0 overflow-hidden bg-[hsl(var(--surface))]"
+        style={{ maxWidth: "480px" }}
+        hideCloseButton
+      >
+        <SheetTitle className="sr-only">{initialData ? "编辑片段" : "创建片段"}</SheetTitle>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--outline-variant))]/20">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+              <X className="w-5 h-5" />
+            </Button>
+            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{initialData ? "编辑片段" : "创建片段"}</h2>
+          </div>
+        </div>
 
-        {/* Form */}
-        <div className="px-6 py-4 space-y-5">
-          {/* 片段文件夹名称 */}
+        <div className="h-[calc(100vh-150px)] space-y-5 overflow-y-auto px-6 py-5">
+          <div className="rounded-2xl bg-[hsl(var(--primary))]/8 p-4">
+            <p className="text-sm font-bold text-[hsl(var(--on-surface))]">片段成片走无限画布</p>
+            <p className="mt-1 text-xs leading-5 text-[hsl(var(--secondary))]">
+              这里只保存名称和剧情。要把已生成的角色、场景、物品串进这一集并出视频，请进入无限画布编排。
+            </p>
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
-              <span className="text-red-500 mr-1">*</span>
-              片段文件夹名称
+              <span className="text-red-500 mr-1">*</span>片段名称
             </label>
             <Input
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
-              placeholder="请输入片段文件夹名称"
-              className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+              placeholder="请输入片段名称"
+              className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm"
             />
           </div>
-
-          {/* 片段数量 */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[hsl(var(--on-surface))] flex items-center gap-1">
-              片段数量
-              <HelpCircle className="w-4 h-4 text-[hsl(var(--secondary))]" />
-            </label>
+            <label className="text-sm font-medium text-[hsl(var(--on-surface))]">集数 / 时长</label>
             <Input
-              type="number"
               value={episodeCount}
               onChange={(e) => setEpisodeCount(e.target.value)}
-              placeholder="请输入片段数量"
-              className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+              placeholder="可选"
+              className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm"
             />
           </div>
-
-          {/* 片段说明 */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
-              片段说明
-            </label>
-            <Textarea
+            <label className="text-sm font-medium text-[hsl(var(--on-surface))]">本集剧情</label>
+            <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="请输入片段说明"
-              rows={4}
-              className="rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] resize-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+              placeholder="本集场次、动作和关键对白。进入无限画布后会作为剧情提示带入。"
+              className="min-h-[180px] w-full resize-none rounded-2xl border border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] p-4 text-sm text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none"
             />
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 pb-6 pt-2">
-          <Button
-            onClick={handleSubmit}
-            disabled={!folderName.trim()}
-            className="w-full h-11 signature-gradient text-white rounded-xl font-bold text-base border-0 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            创建片段
-          </Button>
+        <div className="absolute bottom-0 left-0 right-0 flex gap-3 p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
+          {initialData ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSave}
+                className="h-12 flex-1 rounded-xl border-[hsl(var(--outline-variant))] bg-[hsl(var(--surface-container-low))] text-base font-bold"
+              >
+                保存
+              </Button>
+              <Button
+                type="button"
+                onClick={handleOpenCanvas}
+                className="h-12 flex-1 signature-gradient rounded-xl border-0 text-base font-bold text-white"
+              >
+                进入无限画布
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleSave}
+              className="w-full h-12 signature-gradient rounded-xl border-0 text-base font-bold text-white"
+            >
+              创建片段
+            </Button>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }

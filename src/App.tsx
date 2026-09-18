@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, Suspense, lazy } from "react"
-import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate, Navigate, useParams } from "react-router-dom"
 import LegacyHashRedirect from "@/components/LegacyHashRedirect"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -31,14 +31,21 @@ const Terms = lazy(() => import("./pages/Terms"))
 const Privacy = lazy(() => import("./pages/Privacy"))
 const Contact = lazy(() => import("./pages/Contact"))
 const Workflow = lazy(() => import("./pages/Workflow"))
-const Assets = lazy(() => import("./pages/Assets"))
+const ScriptStudio = lazy(() => import("./pages/ScriptStudio"))
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
   getStoredIdentity,
   getAuthToken,
+  getActiveProjectId,
   type IdentityOption,
 } from "@/lib/session"
+import {
+  isAssetTab,
+  projectAssetsPath,
+  projectDashboardPath,
+  projectSettingsPath,
+} from "@/lib/workspaceRoutes"
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const location = useLocation()
@@ -91,10 +98,8 @@ function IdentityRouteGuard() {
       // 延迟后跳转：有权限的跳转到看板，无权限的跳转到项目列表
       const timer = setTimeout(() => {
         if (canAccessProjectRoutes(currentIdentity)) {
-          // 有项目访问权限：跳转到看板
-          navigate("/dashboard", { replace: true })
+          navigate("/projects", { replace: true })
         } else {
-          // 无项目访问权限：跳转到项目列表
           navigate("/projects", {
             replace: true,
             state: {
@@ -389,6 +394,43 @@ function RouteLoading() {
   )
 }
 
+function RedirectToLastProject() {
+  const projectId = getActiveProjectId()
+  if (projectId) {
+    return <Navigate to={projectDashboardPath(projectId)} replace />
+  }
+  return <Navigate to="/projects" replace />
+}
+
+function RedirectGlobalAssets() {
+  const projectId = getActiveProjectId()
+  if (projectId) {
+    return <Navigate to={projectAssetsPath(projectId)} replace />
+  }
+  return <Navigate to="/projects" replace />
+}
+
+function RedirectProjectRoot() {
+  const { id } = useParams()
+  return <Navigate to={projectAssetsPath(id || "")} replace />
+}
+
+function RedirectLegacyAssetTab() {
+  const { id, tab } = useParams()
+  if (!id) {
+    return <Navigate to="/projects" replace />
+  }
+  if (isAssetTab(tab)) {
+    return <Navigate to={projectAssetsPath(id, tab)} replace />
+  }
+  return <Navigate to={projectAssetsPath(id)} replace />
+}
+
+function RedirectProjectSettings() {
+  const { id } = useParams()
+  return <Navigate to={projectSettingsPath(id || "")} replace />
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -405,17 +447,22 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/workflow" element={<Workflow />} />
 
-          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-          <Route path="/project/:id/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="/projects" element={<RequireAuth><ProjectsList /></RequireAuth>} />
+          <Route path="/members" element={<RequireAuth><Members /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth><RedirectToLastProject /></RequireAuth>} />
+          <Route path="/assets" element={<RequireAuth><RedirectGlobalAssets /></RequireAuth>} />
+
+          <Route path="/project/:id/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          <Route path="/project/:id/script" element={<RequireAuth><ScriptStudio /></RequireAuth>} />
+          <Route path="/project/:id/assets" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
+          <Route path="/project/:id/assets/:tab" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
+          <Route path="/project/:id/settings" element={<RequireAuth><ProjectPermissions /></RequireAuth>} />
+          <Route path="/project/:id/permissions" element={<RequireAuth><RedirectProjectSettings /></RequireAuth>} />
           <Route path="/project/:projectId/workflows/:workflowId" element={<RequireAuth><WorkflowCanvas /></RequireAuth>} />
           <Route path="/project/:projectId/episode/:episodeId/canvas" element={<RequireAuth><WorkflowCanvas /></RequireAuth>} />
-          <Route path="/project/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
-          <Route path="/project/:id/:tab" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
           <Route path="/project/:projectId/episode/:episodeId" element={<RequireAuth><EpisodeDetail /></RequireAuth>} />
-          <Route path="/project/:projectId/permissions" element={<RequireAuth><ProjectPermissions /></RequireAuth>} />
-          <Route path="/members" element={<RequireAuth><Members /></RequireAuth>} />
-          <Route path="/assets" element={<RequireAuth><Assets /></RequireAuth>} />
+          <Route path="/project/:id/:tab" element={<RequireAuth><RedirectLegacyAssetTab /></RequireAuth>} />
+          <Route path="/project/:id" element={<RequireAuth><RedirectProjectRoot /></RequireAuth>} />
         </Routes>
       </Suspense>
     </BrowserRouter>

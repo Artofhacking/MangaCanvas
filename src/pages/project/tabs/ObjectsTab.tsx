@@ -1,5 +1,12 @@
 import { Badge } from "@/components/ui/badge"
-import { Check, ArrowRight, Wand2, Workflow, Pencil, Trash2, Copy } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Check, ArrowRight, Wand2, Workflow, Trash2, Copy, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
 import { useProjectStore } from "@/store/projectStore"
@@ -8,6 +15,7 @@ import { useState } from "react"
 import ObjectCreator from "../ObjectCreator"
 
 interface ObjectsTabProps {
+  projectId?: number | null
   objects?: ObjectItem[]
   onAddNew?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
@@ -26,6 +34,7 @@ const typeColors: Record<ObjectType, string> = {
 }
 
 export default function ObjectsTab({
+  projectId,
   objects: objectsProp,
   onAddNew,
   onOpenCanvas,
@@ -62,21 +71,26 @@ export default function ObjectsTab({
       tone: "danger",
     })
     if (confirmed) {
-      await deleteObject(0, id)
+      if (!projectId) return
+      await deleteObject(projectId, id)
       notify.success("物品已删除")
     }
   }
 
   const handleDuplicate = async (object: ObjectItem) => {
-    await duplicateObject(0, object.id)
+    if (!projectId) return
+    await duplicateObject(projectId, object.id)
     notify.success("物品已复制")
   }
 
   const handleUpdate = async (data: { id: number; name: string; genMethod: "model" | "upload"; model?: string; prompt?: string; aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3"; referenceImage?: string; referenceImages?: string[] }) => {
-    await updateObject(0, data.id, data)
-    setCreatorOpen(false)
-    setEditObject(null)
-    notify.success("物品已更新")
+    if (!projectId) return
+    await updateObject(projectId, data.id, {
+      name: data.name,
+      description: data.prompt,
+      ...(data.referenceImage ? { image: data.referenceImage } : {}),
+    })
+    notify.success(data.referenceImage ? "物品已生成" : "物品已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -175,43 +189,56 @@ export default function ObjectsTab({
                 <Check className="h-4 w-4" />
               </button>
             ) : (
-              <div className={`absolute top-3 right-3 flex flex-col gap-2 transition-all opacity-0 group-hover:opacity-100`}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleOpenCanvas({
-                      id: object.id,
-                      name: object.name,
-                      image: object.image,
-                      description: object.description,
-                    })
-                  }
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-[hsl(var(--primary))]"
-                  title="打开画布"
-                >
-                  <Workflow className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleEdit(object)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-[hsl(var(--primary))]"
-                >
-                  <Pencil className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDuplicate(object)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-blue-500"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(object.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-all hover:bg-red-500"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="absolute inset-0 bg-gradient-to-t from-[hsl(var(--on-surface))]/60 to-transparent transition-opacity flex items-end p-3 opacity-0 group-hover:opacity-100">
+                <div className="flex gap-1.5 w-full">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() =>
+                      handleOpenCanvas({
+                        id: object.id,
+                        name: object.name,
+                        image: object.image,
+                        description: object.description,
+                      })
+                    }
+                    className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                  >
+                    打开画布
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleEdit(object)}
+                    className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                  >
+                    {object.hasImage ? "编辑" : "生成"}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="w-10 bg-white/20 backdrop-blur-md text-white py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem onClick={() => void handleDuplicate(object)}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        复制
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => void handleDelete(object.id)}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        删除
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             )}
 
@@ -233,6 +260,7 @@ export default function ObjectsTab({
         onUpdate={handleUpdate}
         initialData={editObject}
         mode={editObject ? 'edit' : 'create'}
+        projectId={projectId}
       />
     </div>
   )

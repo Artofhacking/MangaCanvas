@@ -4,6 +4,7 @@ import { DownloadOutlined } from '@ant-design/icons';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import type { CustomNode } from '../types';
+import { mediaUrl } from '@/lib/mediaUrl';
 
 interface DownloadModalProps {
   visible: boolean;
@@ -122,13 +123,13 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ visible, onClose, nodes }
                 />
                 {node.type === 'image' ? (
                   <img
-                    src={node.data.url}
+                    src={mediaUrl(node.data.url)}
                     alt={node.data.label}
                     className="w-16 h-16 object-cover rounded"
                   />
                 ) : (
                   <video
-                    src={node.data.url}
+                    src={mediaUrl(node.data.url)}
                     className="w-16 h-16 object-cover rounded"
                   />
                 )}

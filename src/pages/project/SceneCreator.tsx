@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,12 +16,20 @@ import {
   HelpCircle,
   ChevronDown,
   Check,
-  Loader2,
-  Image as ImageIcon,
 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { useImageModels, useImageGeneration } from "@/features/infinite-canvas/hooks"
+import { useImageModels } from "@/features/infinite-canvas/hooks"
+import GenerationTaskPanel, {
+  AssetEditorActions,
+  GenerationTaskListButton,
+} from "@/components/generation/GenerationTaskPanel"
+import {
+  assetTaskKey,
+  tasksForAsset,
+  useAssetGenerationStore,
+  withExistingAssetResult,
+} from "@/store/assetGenerationStore"
 import type { Scene } from "@/types"
 
 export interface SceneCreateData {
@@ -36,16 +43,6 @@ export interface SceneCreateData {
   referenceImage?: string
 }
 
-type SceneGenTask = {
-  id: string
-  name: string
-  prompt: string
-  status: "running" | "succeeded" | "failed"
-  progress: string
-  imageUrl?: string
-  error?: string
-}
-
 export interface SceneEditData extends SceneCreateData {
   id: number
 }
@@ -56,24 +53,36 @@ interface SceneCreatorProps {
   onCreate?: (data: SceneCreateData) => void
   onUpdate?: (data: SceneEditData) => void
   initialData?: Scene | null
-  mode?: 'create' | 'edit'
+  mode?: 'create' | 'edit' | 'generate'
+  projectId?: number | null
 }
 
 export default function SceneCreator({ 
   open, 
   onOpenChange, 
-  onCreate, 
   onUpdate, 
   initialData, 
-  mode = 'create' 
+  projectId,
 }: SceneCreatorProps) {
   const { notify } = useFeedback()
-  const isEditMode = mode === 'edit' && initialData != null
   const { models: imageModels, loading: modelsLoading, error: modelsError, refetch } = useImageModels()
-  const { generate } = useImageGeneration()
   const [selectedModel, setSelectedModel] = useState<string>("")
-  const [tasks, setTasks] = useState<SceneGenTask[]>([])
-  const [submitting, setSubmitting] = useState(false)
+  const allTasks = useAssetGenerationStore((state) => state.tasks)
+  const storeTasks = tasksForAsset(allTasks, "scene", projectId, initialData?.id)
+  const tasks = withExistingAssetResult(storeTasks, {
+    kind: "scene",
+    projectId: Number(projectId) || 0,
+    assetId: initialData?.id,
+    name: initialData?.name || "",
+    prompt: initialData?.description,
+    model: initialData?.model,
+    imageUrl: initialData?.hasImage ? initialData.image : "",
+  })
+  const runningKey = projectId ? assetTaskKey("scene", Number(projectId), initialData?.id) : ""
+  const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
+  const startGeneration = useAssetGenerationStore((state) => state.start)
+  const [highlightTasks, setHighlightTasks] = useState(false)
+  const taskPanelRef = useRef<HTMLDivElement>(null)
 
   const [distance, setDistance] = useState([8.0])
   const [zoom, setZoom] = useState(0.6)
@@ -100,8 +109,6 @@ export default function SceneCreator({
     setSelectedModel(imageModels[0]?.id || "")
     setDistance([8.0])
     setZoom(0.6)
-    setTasks([])
-    setSubmitting(false)
   }
 
   // 编辑模式下回填数据 / 关闭时重置表单
@@ -120,7 +127,7 @@ export default function SceneCreator({
     
     initializedRef.current = true
     
-    if (isEditMode && initialData) {
+    if (initialData) {
       setSceneName(initialData.name)
       setSelectedModel(initialData.model || imageModels[0]?.id || "")
       setDescription(initialData.description || "")
@@ -130,26 +137,35 @@ export default function SceneCreator({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const handleSubmit = async () => {
+  const handleOpenTaskList = () => {
+    taskPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
+    setHighlightTasks(true)
+    window.setTimeout(() => setHighlightTasks(false), 1600)
+  }
+
+  const handleSave = () => {
     if (!sceneName.trim()) {
       notify.warning("请输入场景名称")
       return
     }
+    if (!initialData) return
 
-    if (isEditMode && initialData) {
-      const updatedScene: SceneEditData = {
-        id: initialData.id,
-        name: sceneName,
-        genMethod: "model",
-        model: selectedModel,
-        description,
-        distance: distance[0],
-        zoom,
-        status: initialData.status === "in-use" ? "in-use" : "draft",
-      }
-      onUpdate?.(updatedScene)
-      notify.success("场景已更新")
-      onOpenChange(false)
+    onUpdate?.({
+      id: initialData.id,
+      name: sceneName.trim(),
+      genMethod: "model",
+      model: selectedModel,
+      description,
+      distance: distance[0],
+      zoom,
+      status: initialData.status === "in-use" ? "in-use" : "draft",
+    })
+    notify.success("场景已保存")
+  }
+
+  const handleGenerate = () => {
+    if (!sceneName.trim()) {
+      notify.warning("请输入场景名称")
       return
     }
 
@@ -163,86 +179,49 @@ export default function SceneCreator({
       return
     }
 
-    const taskId = `scene_${Date.now()}`
-    const task: SceneGenTask = {
-      id: taskId,
+    if (!projectId) {
+      notify.warning("缺少项目信息，无法生成")
+      return
+    }
+
+    handleOpenTaskList()
+    void startGeneration({
+      kind: "scene",
+      projectId: Number(projectId),
+      assetId: initialData?.id,
       name: sceneName.trim(),
       prompt: description.trim(),
-      status: "running",
-      progress: "准备中...",
-    }
-    setTasks((current) => [task, ...current])
-    setSubmitting(true)
-
-    try {
-      const urls = await generate(
-        {
-          model: selectedModel,
-          prompt: description.trim(),
-          size: "1536x1024",
-          quality: "medium",
-          n: 1,
-        },
-        (status) => {
-          setTasks((current) =>
-            current.map((item) => (item.id === taskId ? { ...item, progress: status } : item))
-          )
-        }
-      )
-      const imageUrl = urls?.[0]
-      if (!imageUrl) {
-        throw new Error("未返回生成结果")
-      }
-
-      setTasks((current) =>
-        current.map((item) =>
-          item.id === taskId
-            ? { ...item, status: "succeeded", progress: "生成完成", imageUrl }
-            : item
-        )
-      )
-      onCreate?.({
-        name: sceneName.trim(),
-        genMethod: "model",
-        model: selectedModel,
+      model: selectedModel,
+      size: "1536x1024",
+      extras: {
         description: description.trim(),
         distance: distance[0],
         zoom,
-        status: "draft",
-        referenceImage: imageUrl,
-      })
-      notify.success("场景已生成")
-    } catch (error) {
+      },
+    }).then((result) => {
+      if (result === "ok") notify.success("场景已生成")
+    }).catch((error) => {
       refetch()
-      const messageText = error instanceof Error ? error.message : "生成失败"
-      setTasks((current) =>
-        current.map((item) =>
-          item.id === taskId
-            ? { ...item, status: "failed", progress: "生成失败", error: messageText }
-            : item
-        )
-      )
-    } finally {
-      setSubmitting(false)
-    }
+      notify.error(error instanceof Error ? error.message : "生成失败")
+    })
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[900px] sm:max-w-[900px] p-0 overflow-hidden bg-[hsl(var(--surface))]" style={{ maxWidth: '900px' }} hideCloseButton>
         {/* 隐藏的标题用于无障碍访问 */}
-        <SheetTitle className="sr-only">创建场景</SheetTitle>
+        <SheetTitle className="sr-only">{initialData ? "编辑场景" : "创建场景"}</SheetTitle>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface))]">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
               <X className="w-5 h-5" />
             </Button>
-            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{isEditMode ? "编辑场景" : "创建场景"}</h2>
+            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">
+              {initialData ? "编辑场景" : "创建场景"}
+            </h2>
           </div>
-          <Badge className="signature-gradient text-white border-0 px-4 py-1.5">
-            场景生成任务列表
-          </Badge>
+          <GenerationTaskListButton label="场景生成任务列表" count={tasks.length} onClick={handleOpenTaskList} />
         </div>
 
         <div className="flex h-[calc(100vh-70px)]">
@@ -342,80 +321,16 @@ export default function SceneCreator({
               </div>
           </div>
 
-          <div className="flex h-full min-w-0 flex-1 flex-col bg-[hsl(var(--surface-container-low))]/40">
-            <div className="border-b border-[hsl(var(--outline-variant))]/15 px-6 py-4">
-              <p className="text-sm font-bold text-[hsl(var(--on-surface))]">生成进度与结果</p>
-              <p className="mt-1 text-xs text-[hsl(var(--secondary))]">提交后在这里查看任务状态和出图结果</p>
-            </div>
-            <div className="flex-1 space-y-4 overflow-y-auto p-6">
-              {tasks.length === 0 ? (
-                <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))]/70 px-6 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[hsl(var(--surface-container-high))] text-[hsl(var(--secondary))]">
-                    <ImageIcon className="h-6 w-6" />
-                  </div>
-                  <p className="text-sm font-semibold text-[hsl(var(--on-surface))]">还没有生成任务</p>
-                  <p className="mt-2 text-xs leading-5 text-[hsl(var(--secondary))]">
-                    填写名称和提示词后提交，进度和图片会显示在这里。
-                  </p>
-                </div>
-              ) : (
-                tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="overflow-hidden rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-lowest))] shadow-sm"
-                  >
-                    <div className="aspect-[3/2] bg-[hsl(var(--surface-container-low))]">
-                      {task.imageUrl ? (
-                        <img src={task.imageUrl} alt={task.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full flex-col items-center justify-center gap-3 text-[hsl(var(--secondary))]">
-                          {task.status === "running" ? (
-                            <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--primary))]" />
-                          ) : (
-                            <ImageIcon className="h-8 w-8" />
-                          )}
-                          <p className="text-xs">{task.progress}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="truncate text-sm font-bold text-[hsl(var(--on-surface))]">{task.name}</p>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                            task.status === "succeeded"
-                              ? "bg-[hsl(var(--primary))] text-white"
-                              : task.status === "failed"
-                                ? "bg-red-500 text-white"
-                                : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface-variant))]"
-                          }`}
-                        >
-                          {task.status === "succeeded" ? "已完成" : task.status === "failed" ? "失败" : "生成中"}
-                        </span>
-                      </div>
-                      <p className="line-clamp-2 text-xs leading-5 text-[hsl(var(--secondary))]">{task.prompt}</p>
-                      {task.error ? <p className="text-xs text-red-500">{task.error}</p> : null}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
         </div>
 
         <div className="absolute bottom-0 left-0 w-[52%] p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
-          <Button 
-            onClick={() => void handleSubmit()}
-            disabled={submitting}
-            className="w-full py-6 signature-gradient text-white rounded-xl font-bold text-lg border-0 disabled:opacity-60"
-          >
-            {submitting ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                生成中...
-              </span>
-            ) : isEditMode ? "保存修改" : "提交任务"}
-          </Button>
+          <AssetEditorActions
+            hasExisting={Boolean(initialData)}
+            submitting={submitting}
+            onSave={handleSave}
+            onGenerate={handleGenerate}
+          />
         </div>
       </SheetContent>
     </Sheet>

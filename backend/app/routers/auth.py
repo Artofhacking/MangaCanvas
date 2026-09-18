@@ -1,6 +1,7 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, Query
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -8,12 +9,27 @@ from .. import models, serialize
 from ..config import settings
 from ..db import get_db
 from ..deps import current_user, org_ids_of
-from ..errors import fail, ok
+from ..errors import ApiError, fail, ok
+from ..oauth import (
+    SUPPORTED_PROVIDERS,
+    build_feishu_authorize_url,
+    complete_feishu_login,
+    feishu_callback_uri,
+    feishu_enabled,
+    login_redirect,
+    make_state,
+    make_ticket,
+    parse_state,
+    parse_ticket,
+    pkce_pair,
+    resolve_frontend_origin,
+)
 from ..security import (
     create_access_token,
     hash_password,
     hash_token,
     new_refresh_token,
+    require_open_registration,
     verify_password,
 )
 from ..util import now
@@ -39,7 +55,12 @@ class RefreshIn(BaseModel):
 
 class OauthIn(BaseModel):
     code: str
-    redirectUri: str
+    redirectUri: str | None = None
+    state: str | None = None
+
+
+class OauthTicketIn(BaseModel):
+    ticket: str
 
 
 def _issue_tokens(db: Session, user: models.User) -> dict:
@@ -72,6 +93,7 @@ def _join_default_org(db: Session, user: models.User) -> None:
 
 @router.post("/register")
 def register(body: RegisterIn, db: Session = Depends(get_db)):
+    require_open_registration()
     if db.query(models.User).filter_by(email=body.email).first():
         fail(2001, "用户已存在", 409)
     if db.query(models.User).filter_by(username=body.username).first():
@@ -117,6 +139,87 @@ def me(user: models.User = Depends(current_user), db: Session = Depends(get_db))
     return ok(serialize.user_public(user, org_ids_of(db, user.id), with_role=True))
 
 
+def _oauth_tokens(db: Session, user: models.User) -> dict:
+    _join_default_org(db, user)
+    return _issue_tokens(db, user)
+
+
+def _require_provider(provider: str) -> None:
+    if provider not in SUPPORTED_PROVIDERS:
+        fail(1001, f"OAuth provider {provider} 未配置", 400)
+    if provider == "feishu" and not feishu_enabled():
+        fail(1001, "飞书登录未配置", 400)
+
+
+@router.get("/oauth/providers")
+def oauth_providers():
+    return ok(
+        {
+            "providers": [
+                {"id": "feishu", "name": "飞书", "enabled": feishu_enabled()},
+            ]
+        }
+    )
+
+
+@router.get("/oauth/{provider}/url")
+def oauth_url(
+    provider: str,
+    redirect_uri: str | None = Query(default=None, alias="redirect_uri"),
+    origin_header: str | None = Header(default=None, alias="origin"),
+    referer: str | None = Header(default=None),
+):
+    _require_provider(provider)
+    frontend_origin = resolve_frontend_origin(redirect_uri, origin_header, referer)
+    callback_uri = feishu_callback_uri(frontend_origin)
+    code_verifier, code_challenge = pkce_pair()
+    state = make_state(
+        provider=provider,
+        frontend_origin=frontend_origin,
+        redirect_uri=callback_uri,
+        code_verifier=code_verifier,
+    )
+    return ok({"url": build_feishu_authorize_url(redirect_uri=callback_uri, state=state, code_challenge=code_challenge)})
+
+
+@router.get("/oauth/{provider}/callback")
+def oauth_callback(
+    provider: str,
+    db: Session = Depends(get_db),
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    error: str | None = Query(default=None),
+    error_description: str | None = Query(default=None),
+):
+    frontend_origin = None
+    try:
+        if state:
+            frontend_origin = parse_state(state, provider).get("frontend_origin")
+        if error:
+            fail(2002, error_description or error, 400)
+        _require_provider(provider)
+        user = complete_feishu_login(db, code=code or "", state=state or "")
+        _join_default_org(db, user)
+        ticket = make_ticket(user.id)
+        return RedirectResponse(login_redirect(frontend_origin or "http://localhost:5174", ticket=ticket), status_code=302)
+    except ApiError as exc:
+        target = frontend_origin or "http://localhost:5174"
+        return RedirectResponse(
+            login_redirect(target, oauth_error=exc.message),
+            status_code=302,
+        )
+
+
+@router.post("/oauth/ticket")
+def oauth_ticket(body: OauthTicketIn, db: Session = Depends(get_db)):
+    user = db.get(models.User, parse_ticket(body.ticket))
+    if not user:
+        fail(1002, "未授权", 401)
+    return ok(_oauth_tokens(db, user))
+
+
 @router.post("/oauth/{provider}")
-def oauth(provider: str, body: OauthIn):
-    fail(1001, f"OAuth provider {provider} 未配置", 400)
+def oauth(provider: str, body: OauthIn, db: Session = Depends(get_db)):
+    _require_provider(provider)
+    user = complete_feishu_login(db, code=body.code, state=body.state or "")
+    return ok(_oauth_tokens(db, user))

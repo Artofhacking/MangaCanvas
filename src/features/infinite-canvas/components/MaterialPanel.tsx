@@ -3,6 +3,7 @@ import { CloseOutlined, InboxOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { projectApi } from '@/api/projectApi';
 import type { CanvasMaterialItem } from '../types';
+import { mediaUrl } from '@/lib/mediaUrl';
 
 interface MaterialPanelProps {
   visible: boolean;
@@ -184,7 +185,7 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
                 >
                   <div className="overflow-hidden rounded-2xl border border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-low))] transition-all group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--outline-variant))]/30 group-hover:shadow-md">
                     <div className="aspect-square overflow-hidden bg-[hsl(var(--surface-container-high))]">
-                      <img src={item.cover} alt={item.title} className="h-full w-full object-cover" />
+                      <img src={mediaUrl(item.cover)} alt={item.title} className="h-full w-full object-cover" />
                     </div>
                   </div>
                   <div className="px-0.5 pt-1">

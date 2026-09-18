@@ -36,8 +36,10 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
       const videoUrl = await videoService.generate({
         model: params.model,
         prompt: params.prompt,
-        firstFrameImage: params.first_frame_image,
+        firstFrameImage: params.first_frame_image || params.images?.[0],
         lastFrameImage: params.last_frame_image,
+        images: params.images,
+        imageNames: params.imageNames,
         size: params.size,
         resolution: params.resolution,
         duration: params.seconds,

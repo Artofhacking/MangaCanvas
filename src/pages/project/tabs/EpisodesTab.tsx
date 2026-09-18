@@ -6,11 +6,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, MoreHorizontal, Play, Check, Pencil, Trash2, Copy } from "lucide-react"
+import { Plus, MoreHorizontal, Play, Check, Trash2, Copy } from "lucide-react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useProjectStore } from "@/store/projectStore"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import type { Episode } from "@/types"
+import type { CanvasLaunchSource, Episode } from "@/types"
 import { useState } from "react"
 import EpisodeCreator from "../EpisodeCreator"
 
@@ -18,6 +18,7 @@ interface EpisodesTabProps {
   projectId?: number | null
   episodes?: Episode[]
   onAddNew?: () => void
+  onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
   onToggleSelect?: (id: number) => void
@@ -27,6 +28,7 @@ export default function EpisodesTab({
   projectId,
   episodes: episodesProp,
   onAddNew,
+  onOpenCanvas,
   batchMode = false,
   selectedIds = [],
   onToggleSelect,
@@ -46,6 +48,20 @@ export default function EpisodesTab({
       return
     }
     navigate(`/project/${projectId ?? routeProjectId}/episode/${episodeId}`)
+  }
+
+  const handleOpenCanvas = (episode: Episode, event?: React.MouseEvent) => {
+    event?.stopPropagation()
+    if (onOpenCanvas) {
+      onOpenCanvas({
+        id: episode.id,
+        name: episode.name,
+        image: episode.image,
+        description: episode.description,
+      })
+      return
+    }
+    handleEpisodeClick(episode.id)
   }
 
   const handleAddNew = () => {
@@ -88,9 +104,7 @@ export default function EpisodesTab({
       name: data.folderName,
       description: data.description,
     })
-    setCreatorOpen(false)
-    setEditEpisode(null)
-    notify.success("片段已更新")
+    notify.success("片段已保存")
   }
 
   return (
@@ -116,7 +130,7 @@ export default function EpisodesTab({
           "https://images.unsplash.com/photo-1514539079130-25950c84af65?w=600&h=400&fit=crop",
           "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&h=400&fit=crop",
         ]
-        const imageUrl = episodeImages[index % episodeImages.length]
+        const imageUrl = episode.image || episodeImages[index % episodeImages.length]
         
         return (
         <div
@@ -169,10 +183,21 @@ export default function EpisodesTab({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => handleEpisodeClick(episode.id)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleOpenCanvas(episode, event)
+                  }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
-                  {episode.status === "draft" ? "继续编辑" : "查看详情"}
+                  打开画布
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(event) => handleEdit(episode, event)}
+                  className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                >
+                  编辑资料
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -185,10 +210,6 @@ export default function EpisodesTab({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={(e) => handleEdit(episode, e)}>
-                      <Pencil className="w-4 h-4 mr-2" />
-                      编辑
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={(e) => handleDuplicate(episode, e)}>
                       <Copy className="w-4 h-4 mr-2" />
                       复制
@@ -207,6 +228,13 @@ export default function EpisodesTab({
           </div>
           <div className="p-4">
             <h3 className="text-sm font-extrabold text-[hsl(var(--on-surface))] mb-1">{episode.name}</h3>
+            {episode.description ? (
+              <p className="mb-2 text-xs leading-5 text-[hsl(var(--on-surface-variant))] line-clamp-3">
+                {episode.description}
+              </p>
+            ) : (
+              <p className="mb-2 text-xs text-[hsl(var(--secondary))]">暂无剧情</p>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-[hsl(var(--secondary))] font-medium">{episode.count} 个场景 · 修改于 {episode.modified}</span>
               <Badge variant="secondary" className="text-[10px] bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))] px-2 py-0.5 rounded-full font-bold border-0">
@@ -225,6 +253,12 @@ export default function EpisodesTab({
         onUpdate={handleUpdate}
         initialData={editEpisode}
         mode={editEpisode ? 'edit' : 'create'}
+        projectId={projectId ?? Number(routeProjectId)}
+        onOpenCanvas={
+          editEpisode
+            ? () => handleOpenCanvas(editEpisode)
+            : undefined
+        }
       />
     </div>
   )

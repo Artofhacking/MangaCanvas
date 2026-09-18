@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from . import models
-from .util import iso
+from .util import iso, rewrite_media_tree, rewrite_stored_media_url
 
 
 def user_public(user: models.User, organization_ids: list[int] | None = None, with_role: bool = False) -> dict:
@@ -9,7 +9,7 @@ def user_public(user: models.User, organization_ids: list[int] | None = None, wi
         "id": user.id,
         "username": user.username,
         "email": user.email,
-        "avatar": user.avatar,
+        "avatar": rewrite_stored_media_url(user.avatar),
         "roleId": user.role_id,
         "credits": user.credits,
         "createdAt": iso(user.created_at),
@@ -38,7 +38,7 @@ def project(row: models.Project, extra: dict | None = None) -> dict:
         "organizationId": row.organization_id,
         "name": row.name,
         "description": row.description,
-        "coverImage": row.cover_image,
+        "coverImage": rewrite_stored_media_url(row.cover_image),
         "status": row.status,
         "isPublic": row.is_public,
         "ownerId": row.owner_id,
@@ -62,7 +62,7 @@ def member(row: models.ProjectMember, user: models.User | None = None) -> dict:
         data["user"] = {
             "id": user.id,
             "username": user.username,
-            "avatar": user.avatar,
+            "avatar": rewrite_stored_media_url(user.avatar),
             "email": user.email,
         }
     return data
@@ -79,8 +79,8 @@ def character(row: models.Character) -> dict:
         "ageGroup": row.age_group,
         "style": row.style,
         "description": row.description,
-        "avatar": row.avatar,
-        "referenceImages": row.reference_images or [],
+        "avatar": rewrite_stored_media_url(row.avatar),
+        "referenceImages": rewrite_media_tree(row.reference_images or []),
         "modelId": row.model_id,
         "seed": row.seed,
         "creationMode": row.creation_mode,
@@ -99,13 +99,13 @@ def scene(row: models.Scene) -> dict:
         "projectId": row.project_id,
         "name": row.name,
         "description": row.description,
-        "image": row.image,
+        "image": rewrite_stored_media_url(row.image),
         "status": row.status,
         "genMethod": row.gen_method,
         "modelId": row.model_id,
         "style": row.style,
         "camera": row.camera,
-        "referenceImages": row.reference_images or [],
+        "referenceImages": rewrite_media_tree(row.reference_images or []),
         "seed": row.seed,
         "creationMode": row.creation_mode,
         "sourceWorkflowId": row.source_workflow_id,
@@ -124,11 +124,11 @@ def obj(row: models.ProjectObject) -> dict:
         "name": row.name,
         "type": row.type,
         "description": row.description,
-        "image": row.image,
+        "image": rewrite_stored_media_url(row.image),
         "sceneId": row.scene_id,
         "status": row.status,
         "genMethod": row.gen_method,
-        "referenceImages": row.reference_images or [],
+        "referenceImages": rewrite_media_tree(row.reference_images or []),
         "creationMode": row.creation_mode,
         "sourceWorkflowId": row.source_workflow_id,
         "sourceNodeId": row.source_node_id,
@@ -151,6 +151,7 @@ def episode(db: Session, row: models.Episode) -> dict:
         "name": row.name,
         "code": row.code,
         "description": row.description,
+        "coverImage": rewrite_stored_media_url(row.cover_image),
         "status": row.status,
         "progress": row.progress,
         "duration": row.duration,
@@ -164,17 +165,43 @@ def episode(db: Session, row: models.Episode) -> dict:
             {
                 "id": c.id,
                 "name": c.name,
-                "image": c.avatar,
+                "image": rewrite_stored_media_url(c.avatar),
                 "role": "主角" if c.role == "main" else "配角",
             }
             for c in chars
         ],
-        "scenes": [{"id": s.id, "name": s.name, "image": s.image} for s in scenes],
-        "objects": [{"id": o.id, "name": o.name, "image": o.image, "type": o.type} for o in objects],
+        "scenes": [{"id": s.id, "name": s.name, "image": rewrite_stored_media_url(s.image)} for s in scenes],
+        "objects": [{"id": o.id, "name": o.name, "image": rewrite_stored_media_url(o.image), "type": o.type} for o in objects],
         "sceneCount": len(scenes),
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),
     }
+
+
+def script_document(row, include_text: bool = False) -> dict:
+    parsed = row.parsed_json if isinstance(row.parsed_json, dict) else {}
+    data = {
+        "id": row.id,
+        "organizationId": row.organization_id,
+        "projectId": row.project_id,
+        "title": row.title,
+        "sourceFilename": row.source_filename,
+        "plot": parsed.get("plot") or {"summary": row.plot_summary or ""},
+        "characters": parsed.get("characters") or [],
+        "scenes": parsed.get("scenes") or [],
+        "props": parsed.get("props") or [],
+        "episodes": parsed.get("episodes") or [],
+        "agent": parsed.get("agent") or {"model": row.model},
+        "status": row.status,
+        "model": row.model,
+        "createdBy": row.created_by,
+        "importedAt": iso(row.imported_at),
+        "createdAt": iso(row.created_at),
+        "updatedAt": iso(row.updated_at),
+    }
+    if include_text:
+        data["sourceText"] = row.source_text
+    return data
 
 
 def normalize_canvas(canvas: dict | None) -> dict:
@@ -182,7 +209,7 @@ def normalize_canvas(canvas: dict | None) -> dict:
     nodes = []
     for raw in canvas.get("nodes") or []:
         node = dict(raw)
-        data = dict(node.get("data") or {})
+        data = rewrite_media_tree(dict(node.get("data") or {}))
         if node.get("type") == "text" and not data.get("content"):
             data["content"] = data.get("value") or ""
         node["data"] = data
@@ -200,7 +227,7 @@ def workflow(row: models.CanvasWorkflow, include_canvas: bool = True) -> dict:
         "organizationId": row.organization_id,
         "projectId": row.project_id,
         "name": row.name,
-        "thumbnail": row.thumbnail,
+        "thumbnail": rewrite_stored_media_url(row.thumbnail),
         "sourceType": row.source_type,
         "sourceAssetId": row.source_asset_id,
         "status": row.status,
@@ -222,7 +249,7 @@ def asset(row: models.ProjectAsset) -> dict:
         "sourceType": row.source_type,
         "sourceId": row.source_id,
         "prompt": row.prompt,
-        "url": row.url,
+        "url": rewrite_stored_media_url(row.url),
         "metadata": row.extra_metadata,
         "createdBy": row.created_by,
         "createdAt": iso(row.created_at),
@@ -233,7 +260,7 @@ def asset(row: models.ProjectAsset) -> dict:
 def uploaded(row: models.UploadedFile) -> dict:
     return {
         "id": row.id,
-        "url": row.url,
+        "url": rewrite_stored_media_url(row.url),
         "directory": row.directory,
         "filename": row.filename,
         "contentType": row.content_type,

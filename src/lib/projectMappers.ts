@@ -63,6 +63,8 @@ export const mapEpisode = (episode: EpisodeDTO): Episode => ({
   status: episode.status,
   modified: relativeTime(episode.updatedAt),
   code: episode.code,
+  image: episode.coverImage || undefined,
+  hasImage: Boolean(episode.coverImage),
   description: episode.description || undefined,
   progress: episode.progress ?? 0,
   characters: (episode.characters || []).map((item) => ({
@@ -91,6 +93,7 @@ export const mapScene = (scene: SceneDTO): Scene => ({
   id: scene.id,
   name: scene.name,
   image: scene.image || fallbackImage,
+  hasImage: Boolean(scene.image),
   status: scene.status,
   modified: relativeTime(scene.updatedAt),
   code: `SC_${String(scene.id).padStart(3, '0')}`,
@@ -103,6 +106,7 @@ export const mapCharacter = (character: CharacterDTO): Character => ({
   id: character.id,
   name: character.name,
   image: character.avatar || fallbackImage,
+  hasImage: Boolean(character.avatar),
   role: character.role === 'main' ? '主角' : '配角',
   style: character.style || '默认风格',
   scenes: character.usageCount ?? 0,
@@ -124,11 +128,13 @@ export const mapObject = (object: ObjectDTO): ObjectItem => ({
   id: object.id,
   name: object.name,
   image: object.image || fallbackImage,
+  hasImage: Boolean(object.image),
   type: objectTypeMap[object.type],
   status: object.status,
   scene: object.sceneId ? `场景 #${object.sceneId}` : '未关联场景',
   modified: relativeTime(object.updatedAt),
   description: object.description || undefined,
+  genMethod: object.genMethod || undefined,
 })
 
 export const mapMember = (member: ProjectMemberDTO) => ({

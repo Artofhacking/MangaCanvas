@@ -115,8 +115,16 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   // Node operations
   onNodesChange: (changes: NodeChange[]) => {
+    const current = get().nodes as unknown as Node[];
+    const nextChanges = changes.filter((change) => {
+      if (change.type !== 'dimensions' || !change.dimensions) return true;
+      const node = current.find((item) => item.id === change.id);
+      if (!node) return true;
+      return node.width !== change.dimensions.width || node.height !== change.dimensions.height;
+    });
+    if (nextChanges.length === 0) return;
     set({
-      nodes: applyNodeChanges(changes, get().nodes as unknown as Node[]) as unknown as CustomNode[],
+      nodes: applyNodeChanges(nextChanges, current) as unknown as CustomNode[],
     });
   },
 
@@ -188,9 +196,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   // Update node
   updateNode: (id: string, data: Partial<NodeData>) => {
+    const node = get().nodes.find((item) => item.id === id);
+    if (!node) return;
+    const unchanged = Object.entries(data).every(([key, value]) => node.data[key] === value);
+    if (unchanged) return;
     set({
-      nodes: get().nodes.map((node) =>
-        node.id === id ? { ...node, data: { ...node.data, ...data } } : node
+      nodes: get().nodes.map((item) =>
+        item.id === id ? { ...item, data: { ...item.data, ...data } } : item
       ),
     });
   },
@@ -230,6 +242,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     });
     get().saveHistory();
     return newId;
+  },
+
+  selectNode: (id: string) => {
+    set({
+      nodes: get().nodes.map((node) => ({
+        ...node,
+        selected: node.id === id,
+      })),
+    });
   },
 
   // Add edge
@@ -330,6 +351,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   // Update viewport
   updateViewport: (newViewport: { x: number; y: number; zoom: number }) => {
+    const current = get().viewport;
+    if (current.x === newViewport.x && current.y === newViewport.y && current.zoom === newViewport.zoom) return;
     set({ viewport: newViewport });
   },
 }));

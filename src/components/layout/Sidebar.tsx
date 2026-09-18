@@ -11,10 +11,13 @@ import {
   Users,
   Settings,
   ChevronDown,
+  ChevronLeft,
   Plus,
   Check,
   Loader2,
-  Box
+  Box,
+  ScrollText,
+  Shield,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
@@ -30,26 +33,14 @@ import {
 } from "@/lib/session"
 import { useProjectsStore, refreshProjects } from "@/store/projectsStore"
 import { projectsApi } from "@/api"
-
-// 根据身份返回导航项：员工只有基础权限，管理员和超级管理员有完整权限
-const getNavItems = (identity: IdentityOption, projectId?: number) => {
-  const baseItems = [
-    { icon: LayoutGrid, label: "工作台", href: projectId ? `/project/${projectId}/dashboard` : "/dashboard" },
-    { icon: Box, label: "资产管理", href: projectId ? `/project/${projectId}` : "/projects" },
-  ]
-
-  // 员工只有基础导航
-  if (identity === "employee") {
-    return baseItems
-  }
-
-  // 管理员和超级管理员有完整导航
-  return [
-    ...baseItems,
-    { icon: FolderOpen, label: "项目管理", href: "/projects" },
-    { icon: Users, label: "成员管理", href: "/members" },
-  ]
-}
+import {
+  isOrgShellPath,
+  projectAssetsPath,
+  projectDashboardPath,
+  projectScriptPath,
+  projectSettingsPath,
+  switchProjectPath,
+} from "@/lib/workspaceRoutes"
 
 const getProjectIdFromPath = (pathname: string) => {
   const matched = pathname.match(/^\/project\/(\d+)/)
@@ -65,29 +56,25 @@ export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const routeProjectId = getProjectIdFromPath(location.pathname)
+  const inProjectShell = Boolean(routeProjectId)
   const activeProjectId = routeProjectId ?? currentProject?.id ?? getActiveProjectId() ?? undefined
-  
-  // 使用全局缓存的项目列表
+  const canManageOrg = currentIdentity === "admin" || currentIdentity === "superadmin"
+
   const { projects: allProjects, isLoaded, fetchProjects } = useProjectsStore()
-  const projects = allProjects.map(p => ({ id: p.id, name: p.name }))
+  const projects = allProjects.map((project) => ({ id: project.id, name: project.name }))
 
-  const navItems = getNavItems(currentIdentity, activeProjectId)
-
-  // 自动加载项目列表（全局只请求一次）
   useEffect(() => {
     if (!isLoaded) {
       void fetchProjects()
     }
   }, [isLoaded, fetchProjects])
 
-  // 同步当前项目（只在需要时更新）
   useEffect(() => {
     if (projects.length === 0) return
-    
+
     const preferredId = routeProjectId ?? getActiveProjectId() ?? projects[0]?.id
     const matched = projects.find((project) => project.id === preferredId) || projects[0] || null
-    
-    // 只有当项目真的变化时才更新，避免无限循环
+
     if (matched && (!currentProject || currentProject.id !== matched.id)) {
       setCurrentProject(matched)
       if (routeProjectId && matched.id === routeProjectId) {
@@ -95,7 +82,7 @@ export default function Sidebar() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeProjectId])
+  }, [routeProjectId, isLoaded, allProjects])
 
   useEffect(() => {
     const syncIdentity = () => setCurrentIdentity(getStoredIdentity())
@@ -117,9 +104,52 @@ export default function Sidebar() {
     }
   }, [])
 
+  const switchToProject = (project: { id: number; name: string }) => {
+    if (project.id === currentProject?.id) return
+    setIsSwitching(true)
+    setCurrentProject(project)
+    setActiveProjectId(project.id)
+    const target = inProjectShell
+      ? switchProjectPath(location.pathname, project.id)
+      : projectDashboardPath(project.id)
+    window.setTimeout(() => {
+      setIsSwitching(false)
+      navigate(target, { replace: true })
+    }, 300)
+  }
+
+  const projectNav = activeProjectId
+    ? [
+        { icon: LayoutGrid, label: "工作台", href: projectDashboardPath(activeProjectId) },
+        { icon: ScrollText, label: "剧本", href: projectScriptPath(activeProjectId) },
+        { icon: Box, label: "资产", href: projectAssetsPath(activeProjectId) },
+      ]
+    : []
+
+  const orgNav = [
+    { icon: FolderOpen, label: "项目", href: "/projects" },
+    ...(canManageOrg ? [{ icon: Users, label: "成员", href: "/members" }] : []),
+  ]
+
+  const isWorkbenchPath =
+    /^\/project\/\d+\/dashboard$/.test(location.pathname) ||
+    /\/workflows\//.test(location.pathname) ||
+    /\/episode\/\d+\/canvas$/.test(location.pathname)
+  const isScriptPath = /\/project\/\d+\/script(?:\/|$)/.test(location.pathname)
+  const isAssetsPath =
+    /\/project\/\d+\/assets(?:\/|$)/.test(location.pathname) ||
+    /\/project\/\d+\/episode\/\d+(?:\/|$)/.test(location.pathname)
+  const isSettingsPath = /\/project\/\d+\/(settings|permissions)(?:\/|$)/.test(location.pathname)
+
+  const navClass = (active: boolean) =>
+    `flex items-center gap-4 px-4 py-3 rounded-lg transition-colors ${
+      active
+        ? "text-[hsl(var(--primary))] font-semibold bg-[hsl(var(--surface-container-high))]"
+        : "text-[hsl(var(--on-secondary-fixed-variant))] hover:bg-[hsl(var(--surface-container-high))]"
+    }`
+
   return (
     <>
-      {/* Loading Overlay */}
       {isSwitching && (
         <div className="fixed inset-0 z-[100] bg-[hsl(var(--surface))]/80 backdrop-blur-sm flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
@@ -129,131 +159,145 @@ export default function Sidebar() {
         </div>
       )}
       <aside className="h-screen w-64 fixed left-0 top-0 bg-[hsl(var(--surface-container-low))] flex flex-col p-6 gap-y-4 z-50">
-      {/* Project Selector */}
-      <div className="mb-6">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="w-full text-left p-3 rounded-xl hover:bg-[hsl(var(--surface-container-high))] transition-colors group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-lg font-bold text-[hsl(var(--on-surface))] truncate max-w-[160px]">
-                    {currentProject?.name || "未选择项目"}
-                  </h1>
-                  <p className="text-xs text-[hsl(var(--secondary))]">
-                    项目
-                  </p>
-                </div>
-                <ChevronDown className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--on-surface))]" />
-              </div>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <div className="px-2 py-1.5 text-xs font-medium text-[hsl(var(--secondary))]">
-              切换项目
-            </div>
-            <DropdownMenuSeparator />
-            {projects.map((project) => (
-              <DropdownMenuItem
-                key={project.id}
-                onClick={() => {
-                  if (project.id === currentProject?.id) return
-                  setIsSwitching(true)
-                  setCurrentProject(project)
-                  setActiveProjectId(project.id)
-                  setTimeout(() => {
-                    setIsSwitching(false)
-                    navigate(`/project/${project.id}/dashboard`, { replace: true })
-                  }, 2000)
-                }}
-                className="flex items-center justify-between cursor-pointer"
-              >
-                <span className={project.id === currentProject?.id ? "font-medium" : ""}>
-                  {project.name}
-                </span>
-                {project.id === currentProject?.id && (
-                  <Check className="w-4 h-4 text-[hsl(var(--primary))]" />
-                )}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="cursor-pointer"
-              onClick={() => setIsProjectCreatorOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              新建项目
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 space-y-2">
-        {navItems.map((item) => {
-          const isWorkbenchPath =
-            location.pathname === "/dashboard" ||
-            /^\/project\/\d+\/dashboard$/.test(location.pathname) ||
-            /\/workflows\//.test(location.pathname) ||
-            /\/episode\/\d+\/canvas$/.test(location.pathname)
-          const isActive = location.pathname === item.href ||
-            (item.label === "工作台" && isWorkbenchPath) ||
-            (item.label === "资产管理" && location.pathname.startsWith(item.href) && !isWorkbenchPath) ||
-            (item.label !== "所有项目" && item.label !== "项目配置" && item.label !== "工作台" && item.label !== "资产管理" && location.pathname.startsWith(item.href) && item.href !== "/projects")
-          return (
+        {inProjectShell ? (
+          <div className="mb-2">
             <Link
-              key={item.label}
-              to={item.href}
-              className={`flex items-center gap-4 px-4 py-3 rounded-lg transition-colors ${
-                isActive
-                  ? "text-[hsl(var(--primary))] font-semibold bg-[hsl(var(--surface-container-high))]" 
-                  : "text-[hsl(var(--on-secondary-fixed-variant))] hover:bg-[hsl(var(--surface-container-high))]"
-              }`}
+              to="/projects"
+              className="mb-3 flex items-center gap-1 px-2 text-xs font-medium text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
             >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <ChevronLeft className="h-3.5 w-3.5" />
+              全部项目
             </Link>
-          )
-        })}
-      </nav>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full text-left p-3 rounded-xl hover:bg-[hsl(var(--surface-container-high))] transition-colors group">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1 className="text-lg font-bold text-[hsl(var(--on-surface))] truncate max-w-[160px]">
+                        {currentProject?.name || "未选择项目"}
+                      </h1>
+                      <p className="text-xs text-[hsl(var(--secondary))]">当前项目</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--on-surface))]" />
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <div className="px-2 py-1.5 text-xs font-medium text-[hsl(var(--secondary))]">
+                  切换项目
+                </div>
+                <DropdownMenuSeparator />
+                {projects.map((project) => (
+                  <DropdownMenuItem
+                    key={project.id}
+                    onClick={() => switchToProject(project)}
+                    className="flex items-center justify-between cursor-pointer"
+                  >
+                    <span className={project.id === currentProject?.id ? "font-medium" : ""}>
+                      {project.name}
+                    </span>
+                    {project.id === currentProject?.id && (
+                      <Check className="w-4 h-4 text-[hsl(var(--primary))]" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => setIsProjectCreatorOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  新建项目
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : (
+          <div className="mb-6 px-2">
+            <h1 className="text-lg font-black text-[hsl(var(--on-surface))] tracking-tight">MangaCanvas</h1>
+            <p className="text-xs text-[hsl(var(--secondary))]">工作区</p>
+          </div>
+        )}
 
-      {/* User Section */}
-      <div className="pt-6 mt-6 border-t border-[hsl(var(--outline-variant))]/30">
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-[hsl(var(--on-secondary-fixed-variant))] hover:bg-[hsl(var(--surface-container-high))] transition-colors"
-        >
-          <Settings className="w-5 h-5" />
-          <span>设置</span>
-        </button>
+        <nav className="flex-1 space-y-2">
+          {inProjectShell ? (
+            <>
+              {projectNav.map((item) => {
+                const isActive =
+                  (item.label === "工作台" && isWorkbenchPath) ||
+                  (item.label === "剧本" && isScriptPath) ||
+                  (item.label === "资产" && isAssetsPath && !isWorkbenchPath && !isScriptPath)
+                return (
+                  <Link key={item.label} to={item.href} className={navClass(isActive)}>
+                    <item.icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+              {activeProjectId ? (
+                <>
+                  <div className="my-3 border-t border-[hsl(var(--outline-variant))]/30" />
+                  <Link
+                    to={projectSettingsPath(activeProjectId)}
+                    className={navClass(isSettingsPath)}
+                  >
+                    <Shield className="w-5 h-5" />
+                    <span>项目设置</span>
+                  </Link>
+                </>
+              ) : null}
+            </>
+          ) : (
+            orgNav.map((item) => {
+              const isActive =
+                item.href === "/projects"
+                  ? isOrgShellPath(location.pathname) && location.pathname !== "/members"
+                  : location.pathname === item.href
+              return (
+                <Link key={item.label} to={item.href} className={navClass(isActive)}>
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })
+          )}
+        </nav>
 
-      </div>
-    </aside>
+        <div className="pt-6 mt-6 border-t border-[hsl(var(--outline-variant))]/30">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-[hsl(var(--on-secondary-fixed-variant))] hover:bg-[hsl(var(--surface-container-high))] transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span>设置</span>
+          </button>
+        </div>
+      </aside>
 
-    {/* API Settings Dialog */}
-    <ApiSettings visible={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-    
-    {/* Project Creator Dialog */}
-    <ProjectCreator
-      open={isProjectCreatorOpen}
-      onOpenChange={setIsProjectCreatorOpen}
-      onCreate={async (project) => {
-        try {
-          const user = getCurrentUser()
-          const organizationId = user?.organizationIds?.[0] ?? 1
-          await projectsApi.create({
-            organizationId,
-            name: project.name,
-            description: project.description,
-            isPublic: false,
-          })
-          // 刷新全局项目列表
-          await refreshProjects()
-          setIsProjectCreatorOpen(false)
-        } catch (error) {
-          console.error('创建项目失败:', error)
-        }
-      }}
-    />
+      <ApiSettings visible={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+      <ProjectCreator
+        open={isProjectCreatorOpen}
+        onOpenChange={setIsProjectCreatorOpen}
+        onCreate={async (project) => {
+          try {
+            const user = getCurrentUser()
+            const organizationId = user?.organizationIds?.[0] ?? 1
+            const created = await projectsApi.create({
+              organizationId,
+              name: project.name,
+              description: project.description,
+              isPublic: false,
+            })
+            await refreshProjects()
+            setIsProjectCreatorOpen(false)
+            setActiveProjectId(created.id)
+            navigate(projectDashboardPath(created.id))
+          } catch (error) {
+            console.error("创建项目失败:", error)
+          }
+        }}
+      />
     </>
   )
 }

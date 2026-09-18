@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy import inspect, text
+
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .errors import ApiError, api_error_handler
@@ -17,6 +19,7 @@ from .routers import (
     health,
     orgs,
     projects,
+    scripts,
     upload,
     users,
     workflows,
@@ -24,6 +27,15 @@ from .routers import (
 from .seed import seed_demo_content, seed_if_empty
 
 Base.metadata.create_all(bind=engine)
+try:
+    inspector = inspect(engine)
+    if "episodes" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("episodes")}
+        if "cover_image" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE episodes ADD COLUMN cover_image VARCHAR(1024) NULL"))
+except Exception:
+    pass
 with SessionLocal() as db:
     seed_if_empty(db)
     seed_demo_content(db)
@@ -56,6 +68,7 @@ app.include_router(users.router, prefix=API)
 app.include_router(orgs.router, prefix=API)
 app.include_router(projects.router, prefix=API)
 app.include_router(catalog.router, prefix=API)
+app.include_router(scripts.router, prefix=API)
 app.include_router(workflows.router, prefix=API)
 app.include_router(assets.router, prefix=API)
 app.include_router(upload.router, prefix=API)

@@ -34,8 +34,8 @@ def presign(body: PresignIn, user: models.User = Depends(current_user), db: Sess
     put_token = secrets.token_urlsafe(24)
     suffix = Path(body.filename).suffix or ""
     stored_name = f"{file_key}{suffix}"
-    access_url = f"{settings.public_base_url}/static/uploads/{body.directory}/{stored_name}"
-    upload_url = f"{settings.public_base_url}/api/v1/upload/raw/{file_key}?token={put_token}"
+    access_url = f"/static/uploads/{body.directory}/{stored_name}"
+    upload_url = f"/api/v1/upload/raw/{file_key}?token={put_token}"
     row = models.UploadedFile(
         file_key=file_key,
         url=access_url,
