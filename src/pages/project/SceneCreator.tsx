@@ -24,6 +24,7 @@ import GenerationTaskPanel, {
   AssetEditorActions,
   GenerationTaskListButton,
 } from "@/components/generation/GenerationTaskPanel"
+import { useCollapsibleTaskPanel } from "@/hooks/useCollapsibleTaskPanel"
 import {
   assetTaskKey,
   tasksForAsset,
@@ -81,8 +82,8 @@ export default function SceneCreator({
   const runningKey = projectId ? assetTaskKey("scene", Number(projectId), initialData?.id) : ""
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
-  const [highlightTasks, setHighlightTasks] = useState(false)
-  const taskPanelRef = useRef<HTMLDivElement>(null)
+  const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
+    useCollapsibleTaskPanel(open)
 
   const [distance, setDistance] = useState([8.0])
   const [zoom, setZoom] = useState(0.6)
@@ -137,12 +138,6 @@ export default function SceneCreator({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const handleOpenTaskList = () => {
-    taskPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
-    setHighlightTasks(true)
-    window.setTimeout(() => setHighlightTasks(false), 1600)
-  }
-
   const handleSave = () => {
     if (!sceneName.trim()) {
       notify.warning("请输入场景名称")
@@ -184,7 +179,7 @@ export default function SceneCreator({
       return
     }
 
-    handleOpenTaskList()
+    revealTaskPanel()
     void startGeneration({
       kind: "scene",
       projectId: Number(projectId),
@@ -221,11 +216,21 @@ export default function SceneCreator({
               {initialData ? "编辑场景" : "创建场景"}
             </h2>
           </div>
-          <GenerationTaskListButton label="场景生成任务列表" count={tasks.length} onClick={handleOpenTaskList} />
+          <GenerationTaskListButton
+            label="场景生成任务列表"
+            count={tasks.length}
+            running={submitting || tasks.some((task) => task.status === "running")}
+            expanded={panelOpen}
+            onClick={handleOpenTaskList}
+          />
         </div>
 
         <div className="flex h-[calc(100vh-70px)]">
-          <div className="flex h-full w-[52%] flex-col space-y-6 overflow-y-auto border-r border-[hsl(var(--outline-variant))]/15 p-6 pb-24">
+          <div
+            className={`flex h-full flex-col space-y-6 overflow-y-auto p-6 pb-24 ${
+              panelOpen ? "w-[52%] border-r border-[hsl(var(--outline-variant))]/15" : "w-full"
+            }`}
+          >
             {/* Scene Name */}
             <div className="space-y-2">
               <Input 
@@ -321,10 +326,16 @@ export default function SceneCreator({
               </div>
           </div>
 
-          <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+          {panelOpen ? (
+            <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+          ) : null}
         </div>
 
-        <div className="absolute bottom-0 left-0 w-[52%] p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
+        <div
+          className={`absolute bottom-0 left-0 p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent ${
+            panelOpen ? "w-[52%]" : "w-full"
+          }`}
+        >
           <AssetEditorActions
             hasExisting={Boolean(initialData)}
             submitting={submitting}

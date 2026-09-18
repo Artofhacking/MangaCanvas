@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -11,6 +11,7 @@ import GenerationTaskPanel, {
   AssetEditorActions,
   GenerationTaskListButton,
 } from "@/components/generation/GenerationTaskPanel"
+import { useCollapsibleTaskPanel } from "@/hooks/useCollapsibleTaskPanel"
 import {
   assetTaskKey,
   tasksForAsset,
@@ -41,9 +42,8 @@ export default function CharacterCreator({
   const { notify } = useFeedback()
   const isEditMode = Boolean(initialData)
   const valuesRef = useRef<CharacterFormValues | null>(null)
-  const taskPanelRef = useRef<HTMLDivElement>(null)
-  const [highlightTasks, setHighlightTasks] = useState(false)
-  const [panelOpen, setPanelOpen] = useState(false)
+  const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
+    useCollapsibleTaskPanel(open)
   const allTasks = useAssetGenerationStore((state) => state.tasks)
   const storeTasks = tasksForAsset(allTasks, "character", projectId, initialData?.id)
   const tasks = withExistingAssetResult(storeTasks, {
@@ -62,24 +62,6 @@ export default function CharacterCreator({
   const handleValuesChange = useCallback((values: CharacterFormValues) => {
     valuesRef.current = values
   }, [])
-
-  useEffect(() => {
-    if (open) setPanelOpen(false)
-  }, [open])
-
-  const handleOpenTaskList = () => {
-    setPanelOpen((current) => {
-      const next = !current
-      if (next) {
-        window.setTimeout(() => {
-          taskPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })
-        }, 50)
-        setHighlightTasks(true)
-        window.setTimeout(() => setHighlightTasks(false), 1600)
-      }
-      return next
-    })
-  }
 
   const currentValues = () => valuesRef.current
 
@@ -137,7 +119,7 @@ export default function CharacterCreator({
       notify.warning("缺少项目信息，无法生成")
       return
     }
-    setPanelOpen(true)
+    revealTaskPanel()
     void startGeneration({
       kind: "character",
       projectId: Number(projectId),
