@@ -13,14 +13,15 @@ npm run dev
 
 ## 发布到生产
 
-GitHub Actions 不负责发版。在能 SSH 到服务器的开发机上：
+生产发版走 GitHub Actions `Deploy`：`ubuntu-latest` 构建产物，由 ECS 上已在线的 self-hosted runner（`mangacanvas-ecs`，labels：`self-hosted` + `mangacanvas` + `ecs`）本机安装。GitHub-hosted runner 到不了 ECS 的 22 端口，工作流不使用 SSH。
+
+本地兜底（开发机可以 SSH 到服务器时）：
 
 ```bash
-export MANGACANVAS_SSH_KEY=/path/to/your.pem
-npm run deploy
+MANGACANVAS_SSH_KEY=/path/to/your.pem npm run deploy
 ```
 
-脚本会构建前端、同步后端代码、重启服务，并做健康检查。不会覆盖服务器上的 `backend/.env`（数据库和模型 Key 留在机器上）。可选环境变量见 `scripts/deploy.env.example`。
+两条路径都调用服务器上的 `scripts/deploy-on-server.sh`：同步前端到 `/var/www/mangacanvas`、同步后端代码、重启 `mangacanvas` 并做健康检查。不会覆盖服务器上的 `backend/.env`（数据库和模型 Key 留在机器上）。可选 SSH 环境变量见 `scripts/deploy.env.example`。
 
 常用命令：
 
@@ -47,7 +48,7 @@ npm run verify:spa
 2. `/assets/*` 只返回真实 JS/CSS，绝不回退成 HTML
 3. React 路由 `/assets` 不能被物理目录 `assets/` 301/403
 
-参考配置：本地 Docker 用仓库根目录 `nginx.conf`；生产模板是 `deploy/nginx/mangacanvas.conf`。`npm run deploy` 会在服务器上幂等补丁 `/etc/nginx/conf.d/mangacanvas.conf`。GitHub Actions 只跑 `npm run build` + `npm run check:spa`，不负责发版。
+参考配置：本地 Docker 用仓库根目录 `nginx.conf`；生产模板是 `deploy/nginx/mangacanvas.conf`。`Deploy` 工作流和 `npm run deploy` 都会在服务器上幂等补丁 `/etc/nginx/conf.d/mangacanvas.conf`。PR / 分支检查仍由 `Check` 工作流跑 `npm run build` + `npm run check:spa`。
 
 ### 本地验证
 
