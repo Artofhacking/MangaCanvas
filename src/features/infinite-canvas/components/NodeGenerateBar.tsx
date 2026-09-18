@@ -24,7 +24,21 @@ import {
   isGenerateNodeType,
   type ReferenceSlot,
 } from '../utils/generateSlots'
+import {
+  ASPECT_RATIOS,
+  applyImageRatio,
+  applyModelDefaults,
+  applyVideoRatio,
+  applyVideoResolution,
+  coerceGenerateParams,
+  formatParamStub,
+  getSizeRatio,
+  listImageSizes,
+  listVideoResolutions,
+  parseVideoSize,
+} from '../utils/generateParams'
 import { reconcilePromptMentions, type SlotRef } from '../utils/promptMentions'
+import { isT2VModel } from '@/api/aigc'
 import type { CustomNode, ModelConfig } from '../types'
 import MentionPromptInput, { type MentionPromptInputHandle } from './MentionPromptInput'
 import { Button } from '@/components/ui/button'
@@ -84,24 +98,60 @@ function useGenerateBarAnchor(nodeId: string | null): GenerateBarAnchor | null {
   })
 }
 
-function applyModelDefaults(nodeType: string, modelKey: string): Partial<CustomNode['data']> {
-  if (nodeType === 'videoConfig') {
-    const nextKey = remapVideoModel(modelKey)
-    const model = VIDEO_MODELS.find((item) => item.key === nextKey)
-    return {
-      model: nextKey,
-      size: model?.defaultParams?.size,
-      resolution: model?.defaultParams?.resolution,
-      duration: model?.defaultParams?.duration,
-    }
-  }
-
-  const model = IMAGE_MODELS.find((item) => item.key === modelKey)
-  return {
-    model: modelKey,
-    quality: model?.defaultParams?.quality,
-    size: model?.defaultParams?.size,
-  }
+function AspectRatioPills({
+  selected,
+  supported,
+  onChange,
+}: {
+  selected: string
+  supported?: (ratio: string) => boolean
+  onChange: (ratio: string) => void
+}) {
+  return (
+    <div className="flex gap-1">
+      {ASPECT_RATIOS.map((ratio) => {
+        const enabled = supported ? supported(ratio) : true
+        const active = selected === ratio
+        const icon =
+          ratio === '16:9' ? { w: 16, h: 9 }
+            : ratio === '9:16' ? { w: 9, h: 16 }
+              : ratio === '4:3' ? { w: 14, h: 10 }
+                : ratio === '3:4' ? { w: 10, h: 14 }
+                  : { w: 12, h: 12 }
+        return (
+          <button
+            key={ratio}
+            type="button"
+            disabled={!enabled}
+            onClick={() => enabled && onChange(ratio)}
+            className={cn(
+              'flex flex-1 flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition-colors',
+              active
+                ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10'
+                : enabled
+                  ? 'border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] hover:border-[hsl(var(--primary))]/40'
+                  : 'cursor-not-allowed border-[hsl(var(--outline-variant))]/20 opacity-30'
+            )}
+          >
+            <span
+              className="rounded-[2px] border-2"
+              style={{
+                width: icon.w,
+                height: icon.h,
+                borderColor: active ? 'hsl(var(--primary))' : 'hsl(var(--on-surface-variant))',
+              }}
+            />
+            <span
+              className="text-[10px]"
+              style={{ color: active ? 'hsl(var(--primary))' : 'hsl(var(--on-surface-variant))' }}
+            >
+              {ratio}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function GenerateBarModelPicker({
@@ -128,20 +178,47 @@ function GenerateBarModelPicker({
       ? node.data.model
       : pickerModels[0]?.key || ''
   const selected = pickerModels.find((item) => item.key === currentKey) || catalog.find((item) => item.key === currentKey)
-  const paramStub = [node.data.size, node.data.ratio, node.data.resolution, node.data.duration ? `${node.data.duration}s` : '']
-    .filter((item) => typeof item === 'string' && item)
-    .slice(0, 2)
-    .join(' · ')
+  const paramStub = formatParamStub(node)
+  const currentModel = isVideo
+    ? VIDEO_MODELS.find((item) => item.key === currentKey)
+    : IMAGE_MODELS.find((item) => item.key === currentKey)
+  const imageSizes = useMemo(
+    () => (isVideo ? [] : listImageSizes(currentKey, typeof node.data.quality === 'string' ? node.data.quality : undefined)),
+    [currentKey, isVideo, node.data.quality]
+  )
+  const imageRatio = typeof node.data.size === 'string' ? getSizeRatio(node.data.size) : (node.data.ratio || '1:1')
+  const videoParsed = parseVideoSize(typeof node.data.size === 'string' ? node.data.size : undefined)
+  const videoResolution =
+    (typeof node.data.resolution === 'string' && node.data.resolution) || videoParsed.resolution
+  const videoRatio = (typeof node.data.ratio === 'string' && node.data.ratio) || videoParsed.ratio
+  const availableResolutions = listVideoResolutions(currentKey)
+  const showVideoAspect = isT2VModel(currentKey)
 
   useEffect(() => {
     if (loading || pickerModels.length === 0) return
     if (!pickerModels.some((item) => item.key === currentKey)) {
-      onChange(applyModelDefaults(node.type, pickerModels[0].key))
+      onChange(applyModelDefaults(node.type, pickerModels[0].key, node))
+      return
     }
-  }, [currentKey, loading, node.type, onChange, pickerModels])
+    const coerced = coerceGenerateParams(node)
+    if (coerced) onChange(coerced)
+  }, [
+    currentKey,
+    loading,
+    node,
+    node.data.duration,
+    node.data.model,
+    node.data.quality,
+    node.data.ratio,
+    node.data.resolution,
+    node.data.size,
+    node.type,
+    onChange,
+    pickerModels,
+  ])
 
   const handleSelect = (model: ModelConfig) => {
-    onChange(applyModelDefaults(node.type, model.key))
+    onChange(applyModelDefaults(node.type, model.key, node))
   }
 
   return (
@@ -171,8 +248,9 @@ function GenerateBarModelPicker({
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="z-[80] max-h-72 w-64 overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl"
+        className="z-[80] max-h-[420px] w-80 overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-2 shadow-xl"
       >
+        <p className="px-1.5 pb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">模型</p>
         {pickerModels.map((model) => (
           <DropdownMenuItem
             key={model.key}
@@ -188,6 +266,81 @@ function GenerateBarModelPicker({
             <span className="truncate">{model.label}</span>
           </DropdownMenuItem>
         ))}
+
+        <div
+          className="mt-2 space-y-2.5 border-t border-[hsl(var(--outline-variant))]/25 px-1 pb-1 pt-2.5"
+          onPointerDown={(event) => event.preventDefault()}
+        >
+          {isVideo ? (
+            <>
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">分辨率</p>
+                <div className="flex gap-1.5">
+                  {availableResolutions.map((res) => (
+                    <button
+                      key={res}
+                      type="button"
+                      onClick={() => onChange(applyVideoResolution(currentKey, res, typeof node.data.size === 'string' ? node.data.size : undefined))}
+                      className={cn(
+                        'flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
+                        videoResolution === res
+                          ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white'
+                          : 'border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] text-[hsl(var(--on-surface-variant))] hover:border-[hsl(var(--primary))]/40'
+                      )}
+                    >
+                      {res}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {showVideoAspect ? (
+                <div>
+                  <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">画面比例</p>
+                  <AspectRatioPills
+                    selected={videoRatio}
+                    onChange={(ratio) => onChange(applyVideoRatio(videoResolution, ratio))}
+                  />
+                </div>
+              ) : null}
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">时长</p>
+                <div className="flex gap-1.5">
+                  {(currentModel?.durs || []).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => onChange({ duration: item.key })}
+                      className={cn(
+                        'flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors',
+                        node.data.duration === item.key
+                          ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white'
+                          : 'border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] text-[hsl(var(--on-surface-variant))] hover:border-[hsl(var(--primary))]/40'
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">画面比例</p>
+              <AspectRatioPills
+                selected={imageRatio}
+                supported={(ratio) => imageSizes.some((item) => getSizeRatio(item.key) === ratio)}
+                onChange={(ratio) => {
+                  const next = applyImageRatio(
+                    currentKey,
+                    typeof node.data.quality === 'string' ? node.data.quality : undefined,
+                    ratio
+                  )
+                  if (next) onChange(next)
+                }}
+              />
+            </div>
+          )}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )
