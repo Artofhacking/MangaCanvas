@@ -76,6 +76,9 @@ jobs:
     needs: build
     runs-on: [self-hosted, mangacanvas, ecs]
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Download release artifact
         uses: actions/download-artifact@v4
@@ -86,7 +89,17 @@ jobs:
       - name: Publish on this host
         run: |
           set -euo pipefail
-          RELEASE="${{ runner.temp }}/mangacanvas-release"
-          test -f "$RELEASE/scripts/deploy-on-server.sh"
+          DOWNLOAD="${{ runner.temp }}/mangacanvas-release"
+          if [[ -f "$DOWNLOAD/scripts/deploy-on-server.sh" ]]; then
+            RELEASE="$DOWNLOAD"
+          elif [[ -f "$DOWNLOAD/release/scripts/deploy-on-server.sh" ]]; then
+            RELEASE="$DOWNLOAD/release"
+          else
+            echo "deploy-on-server.sh not found under $DOWNLOAD" >&2
+            find "$DOWNLOAD" -maxdepth 4 -type f >&2 || true
+            exit 1
+          fi
+          test ! -e "$RELEASE/backend/.env"
+          test ! -e "$RELEASE/backend/app/.env"
           bash "$RELEASE/scripts/deploy-on-server.sh" "$RELEASE"
-          rm -rf "$RELEASE"
+          rm -rf "$DOWNLOAD"
