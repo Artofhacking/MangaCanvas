@@ -8,7 +8,7 @@ import ReactFlow, {
   SelectionMode,
   Node as RFNode,
   Connection,
-  OnConnectStartParams,
+  OnConnectStart,
 } from 'reactflow';
 import {
   ArrowLeftOutlined,
@@ -62,15 +62,18 @@ import EffectConfigNode from './components/nodes/EffectConfigNode';
 import TemplateEffectNode from './components/nodes/TemplateEffectNode';
 import PromptOrderEdge from './components/edges/PromptOrderEdge';
 import ImageRoleEdge from './components/edges/ImageRoleEdge';
-import ConnectPreviewLine from './components/edges/ConnectPreviewLine';
+import ConnectPreviewOverlay from './components/edges/ConnectPreviewOverlay';
 import ApiSettings from './components/ApiSettings';
 import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
 import NodeGenerateBar from './components/NodeGenerateBar';
-import ConnectDropMenu, { type ConnectDropMenuState } from './components/ConnectDropMenu';
+import ConnectDropMenu, {
+  getConnectDropMenuLineTarget,
+  type ConnectDropMenuState,
+} from './components/ConnectDropMenu';
 import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
 import { spawnGenerateFromSource } from './utils/spawnGenerateFromSource';
-import { getSourceHandleScreenPoint } from './utils/connectPreview';
+import { getClientPoint, getHandleScreenPoint } from './utils/connectPreview';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -159,8 +162,17 @@ const CanvasInner: React.FC = () => {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [isCanvasMaterialDragOver, setIsCanvasMaterialDragOver] = useState(false);
   const [connectDropMenu, setConnectDropMenu] = useState<ConnectDropMenuState | null>(null);
-  const connectStartRef = useRef<{ nodeId: string; handleType: string } | null>(null);
+  const [connectPreview, setConnectPreview] = useState<{
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+  } | null>(null);
+  const connectStartRef = useRef<{
+    nodeId: string;
+    handleType: string;
+    handleId: string | null;
+  } | null>(null);
   const connectSucceededRef = useRef(false);
+  const connectingRef = useRef(false);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [episodesLoaded, setEpisodesLoaded] = useState(false);
   const [workflowsLoaded, setWorkflowsLoaded] = useState(false);
@@ -777,12 +789,24 @@ const CanvasInner: React.FC = () => {
     setShowNodeMenu(false);
   }, []);
 
-  const handleConnectStart = useCallback((_: unknown, params: OnConnectStartParams) => {
+  const clearConnectPreview = useCallback(() => {
+    connectingRef.current = false
+    setConnectPreview(null)
+    setConnectDropMenu(null)
+  }, []);
+
+  const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
     connectSucceededRef.current = false
     connectStartRef.current =
       params.nodeId && params.handleType
-        ? { nodeId: params.nodeId, handleType: params.handleType }
+        ? { nodeId: params.nodeId, handleType: params.handleType, handleId: params.handleId }
         : null
+    connectingRef.current = Boolean(params.nodeId)
+    const from = params.nodeId
+      ? getHandleScreenPoint(params.nodeId, params.handleType, params.handleId)
+      : null
+    const to = getClientPoint(event) || from
+    setConnectPreview(from && to ? { from, to } : null)
   }, []);
 
   const handleConnect = useCallback((connection: Connection) => {
@@ -793,23 +817,45 @@ const CanvasInner: React.FC = () => {
   const handleConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
     const start = connectStartRef.current
     connectStartRef.current = null
-    if (isLocked || !start || start.handleType !== 'source' || connectSucceededRef.current) return
+    connectingRef.current = false
+    const point = getClientPoint(event) || { x: 0, y: 0 }
 
-    const point = 'changedTouches' in event
-      ? { x: event.changedTouches[0]?.clientX ?? 0, y: event.changedTouches[0]?.clientY ?? 0 }
-      : { x: event.clientX, y: event.clientY }
-    const hit = document.elementFromPoint(point.x, point.y)
-    if (hit?.closest('.react-flow__node') || hit?.closest('[data-generate-bar]') || hit?.closest('header')) {
+    if (isLocked || !start || start.handleType !== 'source' || connectSucceededRef.current) {
+      setConnectPreview(null)
       return
     }
 
+    const hit = document.elementFromPoint(point.x, point.y)
+    if (hit?.closest('.react-flow__node') || hit?.closest('[data-generate-bar]') || hit?.closest('header')) {
+      setConnectPreview(null)
+      return
+    }
+
+    const from = getHandleScreenPoint(start.nodeId, start.handleType, start.handleId)
     setConnectDropMenu({
       sourceId: start.nodeId,
       screen: point,
       flow: screenToFlowPosition(point),
-      fromScreen: getSourceHandleScreenPoint(start.nodeId) || undefined,
     })
+    if (from) {
+      setConnectPreview({ from, to: getConnectDropMenuLineTarget(point) })
+    }
   }, [isLocked, screenToFlowPosition]);
+
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      if (!connectingRef.current || !connectStartRef.current) return
+      const from = getHandleScreenPoint(
+        connectStartRef.current.nodeId,
+        connectStartRef.current.handleType,
+        connectStartRef.current.handleId
+      )
+      if (!from) return
+      setConnectPreview({ from, to: { x: event.clientX, y: event.clientY } })
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
+  }, []);
 
   const handleSpawnFromDrop = useCallback((type: GenerateNodeType) => {
     if (!connectDropMenu) return
@@ -817,8 +863,8 @@ const CanvasInner: React.FC = () => {
       x: connectDropMenu.flow.x + 24,
       y: connectDropMenu.flow.y - 40,
     })
-    setConnectDropMenu(null)
-  }, [connectDropMenu]);
+    clearConnectPreview()
+  }, [clearConnectPreview, connectDropMenu]);
 
   const handleMaterialSelect = useCallback((item: CanvasMaterialItem) => {
     createImageNodeFromMaterial(item);
@@ -1141,8 +1187,7 @@ const CanvasInner: React.FC = () => {
           onConnect={isLocked ? undefined : handleConnect}
           onConnectStart={isLocked ? undefined : handleConnectStart}
           onConnectEnd={isLocked ? undefined : handleConnectEnd}
-          connectionLineComponent={ConnectPreviewLine}
-          connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
+          connectionLineComponent={() => null}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultViewport={viewport}
@@ -1167,11 +1212,12 @@ const CanvasInner: React.FC = () => {
           <MiniMap position="bottom-right" pannable zoomable />
         </ReactFlow>
         <NodeGenerateBar />
+        {connectPreview ? <ConnectPreviewOverlay from={connectPreview.from} to={connectPreview.to} /> : null}
         {connectDropMenu ? (
           <ConnectDropMenu
             state={connectDropMenu}
             onSelect={handleSpawnFromDrop}
-            onClose={() => setConnectDropMenu(null)}
+            onClose={clearConnectPreview}
           />
         ) : null}
 

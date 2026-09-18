@@ -1,25 +1,28 @@
 import React, { useEffect, useState } from 'react'
 import { ImageIcon, Video } from 'lucide-react'
 import type { GenerateNodeType } from '../utils/generateSlots'
-import { buildScreenBezier, getSourceHandleScreenPoint } from '../utils/connectPreview'
 
 export interface ConnectDropMenuState {
   sourceId: string
   screen: { x: number; y: number }
   flow: { x: number; y: number }
-  fromScreen?: { x: number; y: number }
 }
 
-const MENU_WIDTH = 220
-const MENU_HEIGHT = 140
+export const CONNECT_DROP_MENU_WIDTH = 220
+export const CONNECT_DROP_MENU_HEIGHT = 140
 
-function clampMenuPosition(x: number, y: number, width = MENU_WIDTH, height = MENU_HEIGHT) {
-  const maxX = typeof window !== 'undefined' ? window.innerWidth - width - 12 : x
-  const maxY = typeof window !== 'undefined' ? window.innerHeight - height - 12 : y
+export function getConnectDropMenuPosition(screen: { x: number; y: number }) {
+  const maxX = typeof window !== 'undefined' ? window.innerWidth - CONNECT_DROP_MENU_WIDTH - 12 : screen.x
+  const maxY = typeof window !== 'undefined' ? window.innerHeight - CONNECT_DROP_MENU_HEIGHT - 12 : screen.y
   return {
-    left: Math.max(12, Math.min(x, maxX)),
-    top: Math.max(12, Math.min(y, maxY)),
+    left: Math.max(12, Math.min(screen.x + 8, maxX)),
+    top: Math.max(12, Math.min(screen.y + 8, maxY)),
   }
+}
+
+export function getConnectDropMenuLineTarget(screen: { x: number; y: number }) {
+  const position = getConnectDropMenuPosition(screen)
+  return { x: position.left, y: position.top + CONNECT_DROP_MENU_HEIGHT / 2 }
 }
 
 const ConnectDropMenu: React.FC<{
@@ -27,10 +30,7 @@ const ConnectDropMenu: React.FC<{
   onSelect: (type: GenerateNodeType) => void
   onClose: () => void
 }> = ({ state, onSelect, onClose }) => {
-  const position = clampMenuPosition(state.screen.x + 8, state.screen.y + 8)
-  const fromScreen = state.fromScreen || getSourceHandleScreenPoint(state.sourceId)
-  const toScreen = { x: position.left, y: position.top + MENU_HEIGHT / 2 }
-  const previewPath = fromScreen ? buildScreenBezier(fromScreen, toScreen) : null
+  const position = getConnectDropMenuPosition(state.screen)
   const [armed, setArmed] = useState(false)
 
   useEffect(() => {
@@ -48,23 +48,6 @@ const ConnectDropMenu: React.FC<{
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[40]">
-      {previewPath && fromScreen ? (
-        <svg className="absolute inset-0 h-full w-full overflow-visible" aria-hidden>
-          <path
-            d={previewPath}
-            fill="none"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2}
-            className="react-flow__connection-path"
-          />
-          <circle
-            cx={toScreen.x}
-            cy={toScreen.y}
-            r={4}
-            fill="hsl(var(--primary))"
-          />
-        </svg>
-      ) : null}
       <button
         type="button"
         className="pointer-events-auto absolute inset-0 cursor-default bg-transparent"
