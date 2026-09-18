@@ -9,14 +9,14 @@ const getNodeId = () => `node_${nodeId++}`;
 const getDefaultNodeData = (type: string): NodeData => {
   switch (type) {
     case 'text':
-      return { content: '', label: '文本输入' };
+      return { content: '', label: '旁白' };
     case 'imageConfig':
       return {
         prompt: '',
         model: 'gpt-image-2',
         size: '1024x1024',
         quality: 'medium',
-        label: '文生图',
+        label: '画面节点',
       };
     case 'image':
       return { url: '', label: '图片节点' };
@@ -26,7 +26,7 @@ const getDefaultNodeData = (type: string): NodeData => {
         model: 'happyhorse-1.1-t2v',
         size: '1280*720',
         duration: 5,
-        label: '视频生成',
+        label: '视频节点',
       };
     case 'video':
       return { url: '', label: '视频节点' };

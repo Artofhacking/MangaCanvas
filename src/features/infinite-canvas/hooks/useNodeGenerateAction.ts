@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react'
 import { message } from 'antd'
 import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel, remapVideoModel } from '../config/models'
 import { useCanvasStore } from '../stores/canvasStore'
-import { collectGenerateInputs, isGenerateNodeType } from '../utils/generateSlots'
+import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from '../utils/generateSlots'
+import { resolveMentionsForSend } from '../utils/promptMentions'
 import { useImageGeneration } from './useImageGeneration'
 import { useVideoGeneration } from './useVideoGeneration'
 
@@ -34,9 +35,11 @@ export function useNodeGenerateAction(nodeId: string | null) {
       updateNode(nodeId, { prompt: barPrompt })
     }
 
+    const slots = getIncomingReferenceSlots(nodeId, nodes, edges)
+    const resolvedPrompt = resolveMentionsForSend(localPrompt, slots)
     const inputs = collectGenerateInputs(nodeId, nodes, edges, {
       includeCamera: node.type === 'videoConfig',
-      localPrompt,
+      localPrompt: resolvedPrompt,
       promptSource: 'bar',
     })
 

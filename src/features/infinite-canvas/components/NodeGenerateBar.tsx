@@ -24,7 +24,9 @@ import {
   isGenerateNodeType,
   type ReferenceSlot,
 } from '../utils/generateSlots'
+import { reconcilePromptMentions, type SlotRef } from '../utils/promptMentions'
 import type { CustomNode, ModelConfig } from '../types'
+import MentionPromptInput, { type MentionPromptInputHandle } from './MentionPromptInput'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -191,7 +193,7 @@ function GenerateBarModelPicker({
   )
 }
 
-function SlotThumb({ slot }: { slot: ReferenceSlot }) {
+function SlotThumb({ slot, onInsert }: { slot: ReferenceSlot; onInsert?: (slot: ReferenceSlot) => void }) {
   const removeEdge = useCallback((event: React.MouseEvent) => {
     event.stopPropagation()
     useCanvasStore.getState().onEdgesChange([{ id: slot.edgeId, type: 'remove' }])
@@ -253,13 +255,17 @@ function SlotThumb({ slot }: { slot: ReferenceSlot }) {
 
   return (
     <div
+      role={onInsert && !slot.dead ? 'button' : undefined}
+      onClick={() => {
+        if (!slot.dead) onInsert?.(slot)
+      }}
       className={cn(
         'group relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border bg-[hsl(var(--surface-container-lowest))]',
         slot.dead
           ? 'border-dashed border-[hsl(var(--outline-variant))]/70 opacity-70'
-          : 'border-[hsl(var(--outline-variant))]/35'
+          : 'cursor-pointer border-[hsl(var(--outline-variant))]/35'
       )}
-      title={slot.label}
+      title={slot.dead ? slot.label : `插入 @${slot.index}`}
     >
       {body}
       <span className="absolute left-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full signature-gradient px-1 text-[10px] font-bold text-white shadow-sm">
@@ -288,6 +294,8 @@ const NodeGenerateBar: React.FC = () => {
   const [draftPrompt, setDraftPrompt] = useState('')
   const overlayRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
+  const mentionRef = useRef<MentionPromptInputHandle>(null)
+  const prevSlotsRef = useRef<{ nodeId: string | null; slots: SlotRef[] }>({ nodeId: null, slots: [] })
   const [barSize, setBarSize] = useState({ width: BAR_WIDTH, height: BAR_ESTIMATED_HEIGHT })
 
   const slots = useMemo(
@@ -298,6 +306,25 @@ const NodeGenerateBar: React.FC = () => {
   useEffect(() => {
     setDraftPrompt(typeof node?.data.prompt === 'string' ? node.data.prompt : '')
   }, [node?.data.prompt, selectedId])
+
+  useEffect(() => {
+    if (!selectedId) {
+      prevSlotsRef.current = { nodeId: null, slots: [] }
+      return
+    }
+    const prev = prevSlotsRef.current
+    if (prev.nodeId === selectedId && prev.slots.length > 0) {
+      const nextPrompt = reconcilePromptMentions(draftPrompt, prev.slots, slots)
+      if (nextPrompt !== draftPrompt) {
+        setDraftPrompt(nextPrompt)
+        updateNode(selectedId, { prompt: nextPrompt })
+      }
+    }
+    prevSlotsRef.current = {
+      nodeId: selectedId,
+      slots: slots.map((slot) => ({ index: slot.index, sourceId: slot.sourceId })),
+    }
+  }, [draftPrompt, selectedId, slots, updateNode])
 
   useEffect(() => {
     const element = barRef.current
@@ -339,6 +366,10 @@ const NodeGenerateBar: React.FC = () => {
     updateNode(selectedId, { prompt: value })
   }
 
+  const handleInsertMention = (slot: ReferenceSlot) => {
+    mentionRef.current?.insertSlot(slot)
+  }
+
   const handleChipClick = () => {
     message.info('能力面板将在后续版本接入')
   }
@@ -373,11 +404,13 @@ const NodeGenerateBar: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-[hsl(var(--on-surface))]">参考资源</p>
-                    <p className="text-[11px] text-[hsl(var(--secondary))]">连入节点后按 1、2、3… 编号</p>
+                    <p className="text-[11px] text-[hsl(var(--secondary))]">连入后编号，输入 @ 可引用</p>
                   </div>
                 </div>
               ) : (
-                slots.map((slot) => <SlotThumb key={slot.edgeId} slot={slot} />)
+                slots.map((slot) => (
+                  <SlotThumb key={slot.edgeId} slot={slot} onInsert={handleInsertMention} />
+                ))
               )}
             </div>
             <span className="shrink-0 rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
@@ -385,11 +418,16 @@ const NodeGenerateBar: React.FC = () => {
             </span>
           </div>
 
-          <textarea
+          <MentionPromptInput
+            ref={mentionRef}
             value={draftPrompt}
-            onChange={(event) => handlePromptChange(event.target.value)}
-            placeholder={node.type === 'videoConfig' ? '描述你想生成的视频…' : '描述你想生成的画面…'}
-            className="min-h-[88px] w-full resize-none rounded-2xl bg-[hsl(var(--surface-container-low))] px-3 py-2.5 text-sm text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+            slots={slots}
+            onChange={handlePromptChange}
+            placeholder={
+              node.type === 'videoConfig'
+                ? '描述视频，输入 @ 引用已连入的参考…'
+                : '描述画面，输入 @ 引用已连入的参考…'
+            }
           />
 
           <div className="mt-2 flex items-center gap-2">

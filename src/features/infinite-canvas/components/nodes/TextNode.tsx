@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
-import { Input, Button, Tooltip, message } from 'antd';
-import { LoadingOutlined, CopyOutlined, DeleteOutlined, PictureOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { Input, Button, message } from 'antd';
+import { LoadingOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { chatService } from '@/api/aigc';
-import { generateActVideo } from '@/lib/actVideo';
 import PlotMentionText from '@/components/PlotMentionText';
 import { mentionizePlot, seedNodeId, type PlotAsset } from '@/lib/plotMentions';
 import type { CustomNode } from '../../types';
@@ -45,13 +44,11 @@ const POLISH_SYSTEM_PROMPT = `你是一位顶级的AI绘画提示词（Prompt）
 忠于原创：你的优化必须围绕用户的核心意图，不能凭空捏造完全无关的内容。`;
 
 const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { updateNode, duplicateNode, removeNode, addNode, addEdgeManually, selectNode, nodes } = useCanvasStore(
+  const { updateNode, duplicateNode, removeNode, selectNode, nodes } = useCanvasStore(
     useShallow((state) => ({
       updateNode: state.updateNode,
       duplicateNode: state.duplicateNode,
       removeNode: state.removeNode,
-      addNode: state.addNode,
-      addEdgeManually: state.addEdgeManually,
       selectNode: state.selectNode,
       nodes: state.nodes,
     }))
@@ -59,16 +56,14 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
   const { setCenter } = useReactFlow();
   const [localContent, setLocalContent] = useState(data.content || '');
   const [polishing, setPolishing] = useState(false);
-  const [makingVideo, setMakingVideo] = useState(false);
   const isActNode = id.startsWith('act_');
   const [editingPlot, setEditingPlot] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
-  const [editLabel, setEditLabel] = useState(data.label || '文本输入');
+  const [editLabel, setEditLabel] = useState(data.label || '旁白');
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditLabel(data.label || '文本输入');
+    setEditLabel(data.label || '旁白');
     setIsEditingLabel(true);
   }, [data.label]);
 
@@ -88,7 +83,7 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
       handleLabelBlur();
     } else if (e.key === 'Escape') {
       setIsEditingLabel(false);
-      setEditLabel(data.label || '文本输入');
+      setEditLabel(data.label || '旁白');
     }
   }, [handleLabelBlur, data.label]);
 
@@ -187,56 +182,8 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
     removeNode(id);
   };
 
-  const handleImageGen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentNode = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    const nodeX = currentNode?.position?.x || 0;
-    const nodeY = currentNode?.position?.y || 0;
-
-    const configNodeId = addNode(
-      'imageConfig',
-      { x: nodeX + 400, y: nodeY },
-      { model: 'wan2.6-t2i', size: '1280*1280', label: '文生图' }
-    );
-
-    addEdgeManually({
-      source: id,
-      target: configNodeId,
-    });
-  };
-
-  const handleVideoGen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isActNode) {
-      void handleActVideo();
-      return;
-    }
-    const currentNode = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    const nodeX = currentNode?.position?.x || 0;
-    const nodeY = currentNode?.position?.y || 0;
-    const configNodeId = addNode('videoConfig', { x: nodeX + 400, y: nodeY }, { label: '视频生成', model: 'happyhorse-1.1-i2v' });
-    addEdgeManually({
-      source: id,
-      target: configNodeId,
-    });
-  };
-
-  const handleActVideo = async () => {
-    if (makingVideo) return;
-    setMakingVideo(true);
-    try {
-      await generateActVideo(id);
-    } finally {
-      setMakingVideo(false);
-    }
-  };
-
   return (
-    <div 
-      className="relative group pr-16"
-      onMouseEnter={() => setShowTools(true)}
-      onMouseLeave={() => setShowTools(false)}
-    >
+    <div className="relative group">
       {/* Main node content */}
       <div
         className={`rounded-lg shadow-lg border-2 ${
@@ -280,7 +227,7 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
               {isActNode ? (
                 <PlotMentionText text={`📝 ${data.label || '本幕'}`} assets={plotAssets} onMentionClick={focusAsset} />
               ) : (
-                <>📝 {data.label || '文本输入'}</>
+                <>📝 {data.label || '旁白'}</>
               )}
             </span>
           )}
@@ -323,7 +270,7 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
               value={localContent}
               onChange={(e) => setLocalContent(e.target.value)}
               onBlur={finishPlotEdit}
-              placeholder="输入文本内容..."
+              placeholder="输入旁白或便签…"
               rows={6}
               autoFocus={isActNode && editingPlot}
               className="nodrag nowheel"
@@ -331,17 +278,7 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
             />
           )}
 
-          {isActNode ? (
-            <Button
-              type="primary"
-              icon={makingVideo ? <LoadingOutlined /> : <VideoCameraOutlined />}
-              onClick={() => void handleActVideo()}
-              disabled={makingVideo || !localContent.trim()}
-              block
-            >
-              {makingVideo ? '本幕视频生成中...' : '生成本幕视频'}
-            </Button>
-          ) : (
+          {!isActNode && (
             <Button
               type="primary"
               icon={polishing ? <LoadingOutlined /> : <AIPolishIcon />}
@@ -353,33 +290,11 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
             </Button>
           )}
 
-          <div className="text-xs" style={{ color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))' }}>字符数: {localContent.length}</div>
+          <div className="text-xs" style={{ color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))' }}>
+            旁白 / 便签 · {localContent.length} 字
+          </div>
         </div>
       </div>
-      
-      {/* Tools on right side */}
-      {showTools && (
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
-          <Tooltip title="图片生成" placement="right">
-            <button
-              onClick={handleImageGen}
-              className="w-10 h-10 flex items-center justify-center rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-            >
-              <PictureOutlined style={{ fontSize: 18 }} />
-            </button>
-          </Tooltip>
-          <Tooltip title={isActNode ? '生成本幕视频' : '视频生成'} placement="right">
-            <button
-              onClick={handleVideoGen}
-              className="w-10 h-10 flex items-center justify-center rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-            >
-              <VideoCameraOutlined style={{ fontSize: 18 }} />
-            </button>
-          </Tooltip>
-        </div>
-      )}
     </div>
   );
 };
