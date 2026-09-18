@@ -63,11 +63,14 @@ export default function WorkflowsTab() {
     let cancelled = false
     const load = async () => {
       setIsLoading(true)
-      await initProjects()
-      if (projectId) {
-        await syncProjectWorkflows(projectId)
+      try {
+        await initProjects()
+        if (projectId) {
+          await syncProjectWorkflows(projectId)
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
-      if (!cancelled) setIsLoading(false)
     }
     void load()
     return () => {
