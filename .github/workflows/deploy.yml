@@ -1,18 +1,105 @@
 name: Deploy
 
 # GitHub-hosted runners cannot reach the ECS on port 22.
-# Publish from a developer machine:
-#   MANGACANVAS_SSH_KEY=/path/to/key.pem npm run deploy
+# Build on ubuntu-latest, then publish on the ECS self-hosted runner.
+# Do not use appleboy/ssh, scp-action, or any remote SSH from GitHub-hosted jobs.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: mangacanvas-production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
-  notice:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Use the local deploy script
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install frontend deps
+        run: npm ci
+        env:
+          HUSKY: "0"
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          CI: "true"
+          VITE_MOCK_MODE: "false"
+          VITE_APP_API_BASE_URL: /api/v1
+
+      - name: Assert absolute /assets URLs
+        run: npm run check:spa
+
+      - name: Stage release payload
         run: |
-          echo "Do not deploy from GitHub Actions."
-          echo "On a machine that can SSH to the server:"
-          echo "  MANGACANVAS_SSH_KEY=/path/to/key.pem npm run deploy"
-          exit 1
+          set -euo pipefail
+          mkdir -p release/backend release/deploy/nginx release/scripts
+          cp -a dist release/dist
+          cp -a backend/app release/backend/app
+          cp backend/requirements.txt release/backend/requirements.txt
+          cp deploy/nginx/mangacanvas.conf release/deploy/nginx/mangacanvas.conf
+          cp scripts/ensure-nginx-spa.py release/scripts/ensure-nginx-spa.py
+          cp scripts/deploy-on-server.sh release/scripts/deploy-on-server.sh
+          chmod +x release/scripts/deploy-on-server.sh release/scripts/ensure-nginx-spa.py
+          if [[ -e release/backend/.env || -e release/backend/app/.env ]]; then
+            echo "refusing to upload a payload that includes .env" >&2
+            exit 1
+          fi
+          test -f release/dist/index.html
+          test -f release/backend/app/main.py
+          test -f release/backend/requirements.txt
+          test -f release/scripts/deploy-on-server.sh
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangacanvas-release
+          path: release/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, mangacanvas, ecs]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mangacanvas-release
+          path: ${{ runner.temp }}/mangacanvas-release
+
+      - name: Publish on this host
+        run: |
+          set -euo pipefail
+          DOWNLOAD="${{ runner.temp }}/mangacanvas-release"
+          if [[ -f "$DOWNLOAD/scripts/deploy-on-server.sh" ]]; then
+            RELEASE="$DOWNLOAD"
+          elif [[ -f "$DOWNLOAD/release/scripts/deploy-on-server.sh" ]]; then
+            RELEASE="$DOWNLOAD/release"
+          else
+            echo "deploy-on-server.sh not found under $DOWNLOAD" >&2
+            find "$DOWNLOAD" -maxdepth 4 -type f >&2 || true
+            exit 1
+          fi
+          test ! -e "$RELEASE/backend/.env"
+          test ! -e "$RELEASE/backend/app/.env"
+          bash "$RELEASE/scripts/deploy-on-server.sh" "$RELEASE"
+          rm -rf "$DOWNLOAD"
