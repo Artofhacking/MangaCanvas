@@ -1,35 +1,10 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { message, Input } from 'antd';
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
-import { useImageModels } from '../../hooks';
-import { IMAGE_MODELS, resolvePickerModels } from '../../config/models';
 import type { CustomNode } from '../../types';
-import NodeSelect from '../NodeSelect';
-
-// 画面比例选项
-const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'];
-
-// 从尺寸字符串解析比例
-const getSizeRatio = (size: string): string => {
-  const ratioMap: Record<string, string> = {
-    '1280*1280': '1:1', '1024*1024': '1:1', '1024x1024': '1:1', '1440*1440': '1:1', '960*960': '1:1',
-    '1696*960': '16:9', '1280*720': '16:9', '1536x1024': '3:2',
-    '960*1696': '9:16', '720*1280': '9:16', '1024x1536': '2:3',
-    '1472*1104': '4:3', '1280*960': '4:3', '1088*832': '4:3',
-    '1104*1472': '3:4', '960*1280': '3:4', '832*1088': '3:4',
-    '1200*800': '3:2', '800*1200': '2:3', '1344*576': '21:9',
-  };
-  return ratioMap[size] || '1:1';
-};
-
-// 从模型名称提取简短标签（如"万相 2.6 文生图" -> "文生图"）
-const getShortLabelFromModel = (modelLabel: string): string => {
-  const match = modelLabel.match(/[文图]生[图视频]+|关键帧生视频/);
-  return match ? match[0] : '文生图';
-};
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -38,15 +13,6 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       duplicateNode: state.duplicateNode,
       removeNode: state.removeNode,
     }))
-  );
-  const { models: liveImageModels, loading: liveModelsLoading } = useImageModels();
-  const pickerModels = useMemo(
-    () => resolvePickerModels(IMAGE_MODELS, liveImageModels.map((item) => item.id), liveModelsLoading),
-    [liveImageModels, liveModelsLoading]
-  );
-  const modelOptions = useMemo(
-    () => pickerModels.map((item) => ({ label: item.label, value: item.key })),
-    [pickerModels]
   );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '画面节点');
@@ -77,98 +43,6 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     }
   }, [handleLabelBlur, data.label]);
 
-  // Get initial model and its default params
-  const getInitialValues = () => {
-    const modelKey = data.model || 'gpt-image-2';
-    const model = IMAGE_MODELS.find((m) => m.key === modelKey);
-    return {
-      model: modelKey,
-      quality: data.quality || model?.defaultParams?.quality || 'medium',
-      size: data.size || model?.defaultParams?.size || '1024x1024',
-    };
-  };
-
-  const initialValues = getInitialValues();
-  const [localModel, setLocalModel] = useState(initialValues.model);
-  const [localQuality, setLocalQuality] = useState(initialValues.quality);
-  const [localSize, setLocalSize] = useState(initialValues.size);
-  const [localRatio, setLocalRatio] = useState(getSizeRatio(initialValues.size));
-
-  useEffect(() => {
-    if (liveModelsLoading || pickerModels.length === 0) return
-    if (pickerModels.some((model) => model.key === localModel)) return
-    const next = pickerModels[0]
-    if (!next || next.key === localModel) return
-    setLocalModel(next.key)
-    updateNode(id, { model: next.key })
-  }, [liveModelsLoading, pickerModels, localModel, id, updateNode])
-
-  const currentModel = useMemo(() => IMAGE_MODELS.find((m) => m.key === localModel), [localModel]);
-
-  useEffect(() => {
-    if (typeof data.model === 'string' && data.model && data.model !== localModel) {
-      setLocalModel(data.model)
-    }
-    if (typeof data.size === 'string' && data.size && data.size !== localSize) {
-      setLocalSize(data.size)
-      setLocalRatio(getSizeRatio(data.size))
-    }
-    if (typeof data.quality === 'string' && data.quality && data.quality !== localQuality) {
-      setLocalQuality(data.quality)
-    }
-  }, [data.model, data.quality, data.size, localModel, localQuality, localSize])
-  
-  // Get size options based on current model and quality
-  const sizeOptions = useMemo(() => {
-    if (!currentModel?.getSizesByQuality) return [];
-    return currentModel.getSizesByQuality(localQuality);
-  }, [currentModel, localQuality]);
-
-  useEffect(() => {
-    if (sizeOptions.length === 0 || sizeOptions.some((item) => item.key === localSize)) return
-    const nextSize = sizeOptions[0].key
-    if (nextSize === localSize) return
-    setLocalSize(nextSize)
-    updateNode(id, { size: nextSize })
-  }, [sizeOptions, localSize, id, updateNode])
-
-  const handleModelChange = (value: string) => {
-    setLocalModel(value);
-    const model = IMAGE_MODELS.find((m) => m.key === value);
-    if (model?.defaultParams) {
-      const newQuality = model.defaultParams.quality || 'standard';
-      const newSize = model.defaultParams.size || '1280*1280';
-      setLocalQuality(newQuality);
-      setLocalSize(newSize);
-      
-      // 如果用户没有自定义名称，则跟随模型更新节点名称
-      const updateData: Record<string, string | boolean | undefined> = {
-        model: value,
-        quality: newQuality,
-        size: newSize,
-      };
-      
-      if (!data.isLabelCustomized) {
-        const shortLabel = getShortLabelFromModel(model.label);
-        updateData.label = shortLabel;
-        setEditLabel(shortLabel);
-      }
-      
-      updateNode(id, updateData);
-    }
-  };
-
-  // 根据比例选择尺寸
-  const handleRatioChange = (ratio: string) => {
-    setLocalRatio(ratio);
-    // 找到对应比例的第一个尺寸
-    const matchingSize = sizeOptions.find(s => getSizeRatio(s.key) === ratio);
-    if (matchingSize) {
-      setLocalSize(matchingSize.key);
-      updateNode(id, { size: matchingSize.key });
-    }
-  };
-
   const handleDuplicate = (e: React.MouseEvent) => {
     e.stopPropagation();
     duplicateNode(id);
@@ -182,26 +56,21 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
   return (
     <div className="relative">
-      {/* Main node content */}
       <div
         className={`rounded-lg shadow-lg border-2 ${
           selected ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_rgba(172,46,0,0.24)]' : 'border-[var(--border-color)]'
-        } min-w-[320px] transition-colors relative`}
-        style={{ 
+        } min-w-[260px] transition-colors relative`}
+        style={{
           backgroundColor: 'var(--bg-primary, var(--ic-surface-container-lowest, #ffffff))',
           borderColor: selected ? undefined : 'var(--border-color, var(--ic-outline-variant, rgba(26,26,26,0.18)))',
         }}
       >
-        {/* Handles */}
         <Handle type="target" position={Position.Left} className="!bg-[hsl(var(--primary))]" />
         <Handle type="source" position={Position.Right} className="!bg-[hsl(var(--primary))]" />
 
-        {/* Header */}
         <div
           className={`px-4 py-2 font-semibold rounded-t-md flex items-center justify-between ${
-            selected
-              ? 'text-white'
-              : ''
+            selected ? 'text-white' : ''
           }`}
           style={selected ? { background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, #d73b00 100%)' } : { backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))', color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}
         >
@@ -217,7 +86,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span 
+            <span
               className="cursor-pointer hover:opacity-80"
               onDoubleClick={handleLabelDoubleClick}
               title="双击编辑"
@@ -245,92 +114,18 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
           </div>
         </div>
 
-      <div className="p-4 space-y-3 nodrag">
-        {/* Model Selection */}
-        <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}>
-            模型
-          </label>
-          <NodeSelect
-            value={modelOptions.some((item) => item.value === localModel) ? localModel : modelOptions[0]?.value}
-            onChange={(next) => handleModelChange(String(next))}
-            options={modelOptions}
-            placeholder={liveModelsLoading ? '检测可用模型...' : '暂无可用模型'}
-            loading={liveModelsLoading}
-          />
-        </div>
-
-        {/* Aspect Ratio Selection */}
-        <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}>
-            画面比例
-          </label>
-          <div className="flex gap-1.5">
-            {ASPECT_RATIOS.map((ratio) => {
-              const isSelected = localRatio === ratio;
-              // 根据比例设置图标大小
-              const getIconSize = () => {
-                switch (ratio) {
-                  case '16:9': return { w: 20, h: 11 };
-                  case '9:16': return { w: 11, h: 20 };
-                  case '4:3': return { w: 16, h: 12 };
-                  case '3:4': return { w: 12, h: 16 };
-                  case '1:1': return { w: 14, h: 14 };
-                  default: return { w: 14, h: 14 };
-                }
-              };
-              const iconSize = getIconSize();
-              // 检查当前模型是否支持该比例
-              const isSupported = sizeOptions.some(s => getSizeRatio(s.key) === ratio);
-              return (
-                <button
-                  key={ratio}
-                  onClick={() => isSupported && handleRatioChange(ratio)}
-                  disabled={!isSupported}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-lg transition-all border ${
-                    isSelected
-                      ? 'bg-[hsl(var(--primary))]/10 border-[hsl(var(--primary))]'
-                      : isSupported
-                        ? 'border-[var(--border-color)] hover:border-[hsl(var(--primary))]/40'
-                        : 'border-[var(--border-color)] opacity-30 cursor-not-allowed'
-                  }`}
-                  style={!isSelected ? { backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))' } : undefined}
-                >
-                  <div
-                    className="rounded-sm border-2"
-                    style={{ 
-                      width: iconSize.w, 
-                      height: iconSize.h,
-                      borderColor: isSelected ? 'hsl(var(--primary))' : 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))',
-                    }}
-                  />
-                  <span 
-                    className="text-xs"
-                    style={{ 
-                      color: isSelected ? 'hsl(var(--primary))' : 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))',
-                      fontWeight: isSelected ? 500 : 400,
-                    }}
-                  >
-                    {ratio}
-                  </span>
-                </button>
-              );
-            })}
+        <div className="p-4 nodrag">
+          <div
+            className="rounded-lg px-3 py-2 text-[11px] leading-5"
+            style={{
+              backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))',
+              color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))',
+            }}
+          >
+            选中后用底部生成栏发送
           </div>
         </div>
-
-        <div
-          className="rounded-lg px-3 py-2 text-[11px] leading-5"
-          style={{
-            backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))',
-            color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))',
-          }}
-        >
-          选中后用底部生成栏发送
-        </div>
       </div>
-      </div>
-
     </div>
   );
 };

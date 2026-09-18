@@ -1,21 +1,14 @@
 import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Upload, Spin, Tooltip, message, Input } from 'antd';
-import { DeleteOutlined, DownloadOutlined, CopyOutlined, VideoCameraOutlined, PictureOutlined, BgColorsOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined } from '@ant-design/icons';
+import { Upload, Spin, message, Input } from 'antd';
+import { DeleteOutlined, DownloadOutlined, CopyOutlined, PictureOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CanvasMaterialItem, CustomNode } from '../../types';
 import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
 import { mediaUrl } from '@/lib/mediaUrl';
-
-// 视频特效图标
-const EffectIcon: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" style={style}>
-    <path d="M7.5 5.6L5 7l1.4-2.5L5 2l2.5 1.4L10 2 8.6 4.5 10 7 7.5 5.6zm12 9.8L22 14l-1.4 2.5L22 19l-2.5-1.4L17 19l1.4-2.5L17 14l2.5 1.4zM22 2l-1.4 2.5L22 7l-2.5-1.4L17 7l1.4-2.5L17 2l2.5 1.4L22 2zm-8.66 10.78l2.44-2.44-2.12-2.12-2.44 2.44 2.12 2.12zm1.03-5.49l2.34 2.34c.39.37.39 1.02 0 1.41L5.04 22.71c-.39.39-1.04.39-1.41 0l-2.34-2.34c-.39-.39-.39-1.02 0-1.41L12.96 7.29c.39-.39 1.04-.39 1.41 0z"/>
-  </svg>
-);
 
 // 自定义 Loading 动画组件
 const ImageLoadingAnimation: React.FC = () => (
@@ -38,9 +31,8 @@ const ImageLoadingAnimation: React.FC = () => (
 );
 
 const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
-  const { updateNode, removeNode, duplicateNode, addNode, addEdgeManually, selectNode, nodes } = useCanvasStore();
+  const { updateNode, removeNode, duplicateNode } = useCanvasStore();
   const [uploading, setUploading] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '');
@@ -151,38 +143,6 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     duplicateNode(id);
     message.success('节点已复制');
   }, [duplicateNode, id]);
-
-  const handleVideoGen = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentNode = nodes.find((n) => n.id === id);
-    const nodeX = currentNode?.position?.x || 0;
-    const nodeY = currentNode?.position?.y || 0;
-
-    const configNodeId = addNode('videoConfig', { x: nodeX + 400, y: nodeY }, { label: '图生视频' });
-    addEdgeManually({ source: id, target: configNodeId });
-    selectNode(configNodeId);
-  }, [id, nodes, addNode, addEdgeManually, selectNode]);
-
-  const handleImageGen = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentNode = nodes.find((n) => n.id === id);
-    const nodeX = currentNode?.position?.x || 0;
-    const nodeY = currentNode?.position?.y || 0;
-
-    const configNodeId = addNode('imageConfig', { x: nodeX + 400, y: nodeY - 100 }, { label: '图生图', model: 'wan2.6-image' });
-    addEdgeManually({ source: id, target: configNodeId });
-    selectNode(configNodeId);
-  }, [id, nodes, addNode, addEdgeManually, selectNode]);
-
-  const handleTemplateEffect = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentNode = nodes.find((n) => n.id === id);
-    const nodeX = currentNode?.position?.x || 0;
-    const nodeY = currentNode?.position?.y || 0;
-
-    const configNodeId = addNode('templateEffect', { x: nodeX + 400, y: nodeY + 100 }, { label: '图生视频-特效' });
-    addEdgeManually({ source: id, target: configNodeId });
-  }, [id, nodes, addNode, addEdgeManually]);
 
   const applyMaterialToNode = useCallback((item: CanvasMaterialItem) => {
     if (!item.cover) return;
@@ -393,9 +353,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   return (
     <div 
-      className="relative group pr-16"
-      onMouseEnter={() => setShowTools(true)}
-      onMouseLeave={() => setShowTools(false)}
+      className="relative group"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -519,39 +477,6 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           )}
         </div>
       </div>
-      
-      {/* Tools on right side */}
-      {showTools && (
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
-          <Tooltip title="图生图" placement="right">
-            <button
-              onClick={handleImageGen}
-              className="w-10 h-10 flex items-center justify-center rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-            >
-              <BgColorsOutlined style={{ fontSize: 18 }} />
-            </button>
-          </Tooltip>
-          <Tooltip title="图生视频" placement="right">
-            <button
-              onClick={handleVideoGen}
-              className="w-10 h-10 flex items-center justify-center rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-            >
-              <VideoCameraOutlined style={{ fontSize: 18 }} />
-            </button>
-          </Tooltip>
-          <Tooltip title="视频特效" placement="right">
-            <button
-              onClick={handleTemplateEffect}
-              className="w-10 h-10 flex items-center justify-center rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer"
-              style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}
-            >
-              <EffectIcon style={{ fontSize: 18 }} />
-            </button>
-          </Tooltip>
-        </div>
-      )}
 
       {/* Preview Modal */}
       <PreviewModal

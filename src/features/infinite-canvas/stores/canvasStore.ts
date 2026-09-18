@@ -16,6 +16,7 @@ const getDefaultNodeData = (type: string): NodeData => {
         model: 'gpt-image-2',
         size: '1024x1024',
         quality: 'medium',
+        ratio: '1:1',
         label: '画面节点',
       };
     case 'image':
@@ -25,6 +26,8 @@ const getDefaultNodeData = (type: string): NodeData => {
         prompt: '',
         model: 'happyhorse-1.1-t2v',
         size: '1280*720',
+        resolution: '720P',
+        ratio: '16:9',
         duration: 5,
         label: '视频节点',
       };

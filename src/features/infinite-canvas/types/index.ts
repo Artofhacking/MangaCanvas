@@ -12,6 +12,7 @@ export interface NodeData {
   size?: string;
   quality?: string;
   ratio?: string;
+  resolution?: string;
   duration?: number;
   prompt?: string;
   executed?: boolean;
