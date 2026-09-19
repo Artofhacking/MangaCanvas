@@ -6,13 +6,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Check, Wand2, Workflow, Trash2, Copy, MoreHorizontal } from "lucide-react"
+import { Check, Trash2, Copy, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, ObjectItem, ObjectType } from "@/types"
 import { useState } from "react"
 import ObjectCreator from "../ObjectCreator"
+import AssetQuickCreateCard from "./AssetQuickCreateCard"
 
 interface ObjectsTabProps {
   projectId?: number | null
@@ -104,47 +105,14 @@ export default function ObjectsTab({
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 3xl:grid-cols-10 gap-4">
-      {/* Add New Object Card */}
-      <div
-        className="aspect-square rounded-xl border-2 border-dashed border-[hsl(var(--outline-variant))] bg-[linear-gradient(180deg,hsl(var(--surface-container))_0%,hsl(var(--surface-container-low))_100%)] p-3 transition-all hover:border-[hsl(var(--primary))]/35 hover:shadow-lg hover:shadow-[hsl(var(--primary))]/5"
-      >
-        <div className="mb-3">
-          <h3 className="text-sm font-bold text-[hsl(var(--on-surface))]">添加物品</h3>
-          <p className="mt-1 text-[10px] text-[hsl(var(--secondary))]">
-            选择创作方式
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={handleAddNew}
-            className="flex w-full items-center gap-2 rounded-xl bg-[hsl(var(--surface-container-high))] px-2 py-2 text-left transition-all hover:bg-[hsl(var(--surface-container-highest))]"
-          >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-              <Wand2 className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0">
-              <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">快捷创作</div>
-              <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">快速建物品</div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleOpenCanvas()}
-            className="flex w-full items-center gap-2 rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-2 py-2 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
-          >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))]">
-              <Workflow className="h-3.5 w-3.5" />
-            </div>
-            <div className="min-w-0">
-              <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">无限画布</div>
-              <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">自由编排</div>
-            </div>
-          </button>
-        </div>
-      </div>
+      <AssetQuickCreateCard
+        variant="object"
+        title="添加物品"
+        description="选择创作方式"
+        quickHint="快速建物品"
+        onQuickCreate={handleAddNew}
+        onOpenCanvas={() => handleOpenCanvas()}
+      />
 
       {/* Object Cards */}
       {objects.map((object) => (
