@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, Trash2, Copy, Check, Wand2, Workflow } from "lucide-react"
+import { MoreHorizontal, Trash2, Copy, Check } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import { useAssetGenerationStore } from "@/store/assetGenerationStore"
 import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
 import SceneCreator from "../SceneCreator"
+import AssetQuickCreateCard from "./AssetQuickCreateCard"
 
 interface ScenesTabProps {
   projectId?: number | null
@@ -111,47 +112,14 @@ export default function ScenesTab({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-      {/* Add New Scene Card */}
-      <div
-        className="aspect-[4/3] rounded-xl border-2 border-dashed border-[hsl(var(--outline-variant))] bg-[linear-gradient(180deg,hsl(var(--surface-container))_0%,hsl(var(--surface-container-low))_100%)] p-4 transition-all hover:border-[hsl(var(--primary))]/35 hover:shadow-lg hover:shadow-[hsl(var(--primary))]/5"
-      >
-        <div className="mb-4 pt-1">
-          <h3 className="text-base font-bold text-[hsl(var(--on-surface))]">添加场景</h3>
-          <p className="mt-1 text-xs leading-5 text-[hsl(var(--secondary))]">
-            选择创作方式。
-          </p>
-        </div>
-
-        <div className="space-y-2.5">
-          <button
-            type="button"
-            onClick={handleAddNew}
-            className="flex w-full items-center gap-2 rounded-xl bg-[hsl(var(--surface-container-high))] px-2.5 py-2.5 text-left transition-all hover:bg-[hsl(var(--surface-container-highest))]"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-              <Wand2 className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">快捷创作</div>
-              <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">快速建场景</div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleOpenCanvas()}
-            className="flex w-full items-center gap-2 rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-2.5 py-2.5 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))]">
-              <Workflow className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">无限画布</div>
-              <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">自由编排</div>
-            </div>
-          </button>
-        </div>
-      </div>
+      <AssetQuickCreateCard
+        variant="scene"
+        title="添加场景"
+        description="选择创作方式。"
+        quickHint="快速建场景"
+        onQuickCreate={handleAddNew}
+        onOpenCanvas={() => handleOpenCanvas()}
+      />
 
       {/* Scene Cards */}
       {scenes.map((scene) => (

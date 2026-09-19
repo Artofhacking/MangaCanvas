@@ -13,11 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
-import { Trash2, Check, Wand2, Workflow, User, Sparkles, Image, Settings, Copy, MoreHorizontal } from "lucide-react"
+import { Trash2, Check, User, Sparkles, Image, Settings, Copy, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
 import CharacterCreator from "../CharacterCreator"
+import AssetQuickCreateCard from "./AssetQuickCreateCard"
 
 
 interface CharactersTabProps {
@@ -130,47 +131,14 @@ export default function CharactersTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
-        {/* Add New Character Card */}
-        <div
-          className="aspect-[4/5] rounded-lg border-2 border-dashed border-[hsl(var(--outline-variant))] bg-[linear-gradient(180deg,hsl(var(--surface-container))_0%,hsl(var(--surface-container-low))_100%)] p-3.5 transition-all hover:border-[hsl(var(--primary))]/35 hover:shadow-lg hover:shadow-[hsl(var(--primary))]/5"
-        >
-          <div className="mb-5 pt-2">
-            <h3 className="text-sm font-bold text-[hsl(var(--on-surface))]">添加角色</h3>
-            <p className="mt-1 text-[11px] leading-5 text-[hsl(var(--secondary))]">
-              选择创作方式。
-            </p>
-          </div>
-
-          <div className="mt-auto space-y-2">
-            <button
-              type="button"
-              onClick={handleAddNew}
-              className="flex w-full items-center gap-2 rounded-xl bg-[hsl(var(--surface-container-high))] px-2.5 py-2.5 text-left transition-all hover:bg-[hsl(var(--surface-container-highest))]"
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">
-                <Wand2 className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">快捷创作</div>
-                <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">快速建角色</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOpenCanvas()}
-              className="flex w-full items-center gap-2 rounded-xl border border-[hsl(var(--outline-variant))]/60 bg-[hsl(var(--surface))]/75 px-2.5 py-2.5 text-left transition-all hover:border-[hsl(var(--primary))]/30 hover:bg-[hsl(var(--surface-container-lowest))]"
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[hsl(var(--secondary-container))] text-[hsl(var(--on-secondary-container))]">
-                <Workflow className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="cn-nowrap text-xs font-bold text-[hsl(var(--on-surface))]">无限画布</div>
-                <div className="cn-nowrap text-[13px] text-[hsl(var(--secondary))]">自由编排</div>
-              </div>
-            </button>
-          </div>
-        </div>
+        <AssetQuickCreateCard
+          variant="character"
+          title="添加角色"
+          description="选择创作方式。"
+          quickHint="快速建角色"
+          onQuickCreate={handleAddNew}
+          onOpenCanvas={() => handleOpenCanvas()}
+        />
 
         {/* Character Cards */}
         {characters.map((character) => (
