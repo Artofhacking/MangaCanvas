@@ -1,31 +1,19 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
-import { message, Input } from 'antd';
-import { DownloadOutlined, CopyOutlined, DeleteOutlined, VideoCameraOutlined, PictureOutlined, SoundOutlined, MutedOutlined } from '@ant-design/icons';
+import { Position, NodeProps } from 'reactflow';
+import { message } from 'antd';
+import { Copy, Download, Image as ImageIcon, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
-
-// 自定义视频 Loading 动画组件
-const VideoLoadingAnimation: React.FC = () => (
-  <div className="flex flex-col items-center justify-center h-48 bg-gradient-to-br from-amber-50 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg overflow-hidden relative">
-    {/* Shimmer 效果 */}
-    <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-    
-    {/* 图标和圆点 */}
-    <div className="relative z-10 flex flex-col items-center gap-4">
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center animate-pulse shadow-lg">
-        <VideoCameraOutlined className="text-white text-xl" />
-      </div>
-      <div className="flex gap-1.5">
-        <span className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-        <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-        <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-      </div>
-    </div>
-  </div>
-);
+import { PlusHandle } from './PlusHandle';
+import {
+  MediaEmptyGlyph,
+  MediaPreviewCard,
+  MediaStageLoading,
+  VIDEO_PREVIEW_WIDTH,
+  cssAspectRatio,
+} from './MediaPreviewCard';
 
 const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { nodes, edges, updateNode, duplicateNode, removeNode, addNode, addEdgeManually } = useCanvasStore();
@@ -53,7 +41,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     }
   }, [editLabel, data.label, id, updateNode]);
 
-  const handleLabelKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleLabelKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleLabelBlur();
     } else if (e.key === 'Escape') {
@@ -156,154 +144,109 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     }
   };
 
+  const handleToggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMuted((prev) => {
+      const next = !prev;
+      if (videoRef.current) {
+        videoRef.current.muted = next;
+        if (!next) videoRef.current.play().catch(() => {});
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="relative">
-      {/* Main node content */}
-      <div
-        className={`rounded-lg shadow-lg border-2 ${
-          selected ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_rgba(172,46,0,0.24)]' : 'border-[var(--border-color)]'
-        } min-w-[320px] transition-colors relative`}
-        style={{ backgroundColor: 'var(--bg-primary)' }}
+      <MediaPreviewCard
+        selected={selected}
+        label={data.label || '视频节点'}
+        icon={<Video />}
+        width={VIDEO_PREVIEW_WIDTH}
+        aspectRatio={cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, '16 / 9')}
+        isEditingLabel={isEditingLabel}
+        editLabel={editLabel}
+        onLabelDoubleClick={handleLabelDoubleClick}
+        onLabelChange={handleLabelChange}
+        onLabelBlur={handleLabelBlur}
+        onLabelKeyDown={handleLabelKeyDown}
+        handles={
+          <>
+            <PlusHandle type="target" position={Position.Left} />
+            <PlusHandle type="source" position={Position.Right} />
+          </>
+        }
+        actions={[
+          {
+            key: 'mute',
+            label: muted ? '打开声音' : '静音',
+            icon: muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />,
+            onClick: handleToggleMute,
+            hidden: !data.url,
+          },
+          {
+            key: 'extract',
+            label: extracting ? '提取中…' : '提取尾帧',
+            icon: <ImageIcon className="h-4 w-4" />,
+            onClick: handleExtractLastFrame,
+            hidden: !data.url,
+            disabled: extracting,
+          },
+          { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !data.url },
+          { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
+          { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
+        ]}
       >
-        {/* Handles */}
-        <Handle type="target" position={Position.Left} className="!bg-[hsl(var(--primary))]" />
-        <Handle type="source" position={Position.Right} className="!bg-[hsl(var(--primary))]" />
-
-        {/* Header */}
-        <div
-          className={`px-4 py-2 font-semibold rounded-t-md flex items-center justify-between ${
-            selected
-              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white'
-              : ''
-          }`}
-          style={selected ? { background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, #d73b00 100%)' } : { backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-        >
-          {isEditingLabel ? (
-            <Input
-              value={editLabel}
-              onChange={handleLabelChange}
-              onBlur={handleLabelBlur}
-              onKeyDown={handleLabelKeyDown}
-              autoFocus
-              size="small"
-              className="nodrag w-32 text-sm"
-              onClick={(e) => e.stopPropagation()}
+        {data.loading ? (
+          <MediaStageLoading kind="video" />
+        ) : data.url ? (
+          <div className="relative h-full w-full">
+            <video
+              ref={videoRef}
+              src={mediaUrl(data.url)}
+              autoPlay
+              loop
+              muted={muted}
+              playsInline
+              className="h-full w-full bg-black object-cover"
+              poster={mediaUrl(data.thumbnail)}
+              onCanPlay={() => {
+                videoRef.current?.play().catch(() => {});
+              }}
             />
-          ) : (
-            <span 
-              className="cursor-pointer hover:opacity-80"
-              onDoubleClick={handleLabelDoubleClick}
-              title="双击编辑"
-            >
-              🎥 {data.label || '视频节点'}
-            </span>
-          )}
-          <div className="flex items-center gap-1">
-            {data.url && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMuted((prev) => {
-                    const next = !prev;
-                    if (videoRef.current) {
-                      videoRef.current.muted = next;
-                      if (!next) videoRef.current.play().catch(() => {});
-                    }
-                    return next;
-                  });
-                }}
-                className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-                title={muted ? '打开声音' : '静音'}
-              >
-                {muted ? <MutedOutlined style={{ fontSize: 14 }} /> : <SoundOutlined style={{ fontSize: 14 }} />}
-              </button>
-            )}
-            {data.url && (
-              <button
-                onClick={handleExtractLastFrame}
-                className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-                title="提取尾帧"
-                disabled={extracting}
-              >
-                <PictureOutlined style={{ fontSize: 14 }} spin={extracting} />
-              </button>
-            )}
-            {data.url && (
-              <button
-                onClick={handleDownload}
-                className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-                title="下载"
-              >
-                <DownloadOutlined style={{ fontSize: 14 }} />
-              </button>
-            )}
+            <div
+              className="absolute inset-0 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (videoRef.current) {
+                  videoRef.current.pause();
+                }
+                setShowPreview(true);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+            />
             <button
-              onClick={handleDelete}
-              className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-              title="删除"
+              type="button"
+              onClick={handleToggleMute}
+              className="nodrag nopan absolute bottom-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm"
+              title={muted ? '打开声音' : '静音'}
             >
-              <DeleteOutlined style={{ fontSize: 14 }} />
-            </button>
-            <button
-              onClick={handleDuplicate}
-              className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-              title="复制"
-            >
-              <CopyOutlined style={{ fontSize: 14 }} />
+              {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </button>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-4">
-          {data.loading ? (
-            <VideoLoadingAnimation />
-          ) : data.error ? (
-            <div className="flex items-center justify-center h-48 bg-red-50 dark:bg-red-900/20 rounded text-red-500">
-              ❌ {data.error}
-            </div>
-          ) : data.url ? (
-            <div className="relative group">
-              <video
-                ref={videoRef}
-                src={mediaUrl(data.url)}
-                autoPlay
-                loop
-                muted={muted}
-                playsInline
-                className="w-full max-h-64 rounded object-contain bg-black"
-                poster={mediaUrl(data.thumbnail)}
-                onCanPlay={() => {
-                  // 确保视频能够自动播放
-                  videoRef.current?.play().catch(() => {});
-                }}
-              />
-              {/* 透明覆盖层用于捕获点击打开预览，避免与视频控件冲突 */}
-              <div
-                className="absolute inset-0 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  // 点击预览时停止播放
-                  if (videoRef.current) {
-                    videoRef.current.pause();
-                  }
-                  setShowPreview(true);
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                style={{ pointerEvents: 'auto' }}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-48 rounded" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
-              等待视频生成...
-            </div>
-          )}
-        </div>
-      </div>
+        ) : (
+          <MediaEmptyGlyph kind="video" />
+        )}
+        {data.error ? (
+          <div className="absolute inset-x-0 bottom-0 bg-[#b42318]/80 px-3 py-1.5 text-[11px] text-white">
+            {data.error}
+          </div>
+        ) : null}
+      </MediaPreviewCard>
 
       {/* Preview Modal */}
       <PreviewModal

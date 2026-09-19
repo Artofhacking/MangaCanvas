@@ -1,34 +1,23 @@
 import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Handle, Position, NodeProps } from 'reactflow';
-import { Upload, Spin, message, Input } from 'antd';
+import { Position, NodeProps } from 'reactflow';
+import { Upload, Spin, message } from 'antd';
 import { DeleteOutlined, DownloadOutlined, CopyOutlined, PictureOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined } from '@ant-design/icons';
+import { Copy, Download, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CanvasMaterialItem, CustomNode } from '../../types';
 import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
 import { mediaUrl } from '@/lib/mediaUrl';
-
-// 自定义 Loading 动画组件
-const ImageLoadingAnimation: React.FC = () => (
-  <div className="aspect-square flex flex-col items-center justify-center rounded-lg overflow-hidden relative bg-gradient-to-br from-orange-50 to-stone-100">
-    {/* Shimmer 效果 */}
-    <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-    
-    {/* 图标和圆点 */}
-    <div className="relative z-10 flex flex-col items-center gap-4">
-      <div className="w-14 h-14 rounded-2xl flex items-center justify-center animate-pulse shadow-lg signature-gradient">
-        <PictureOutlined className="text-white text-xl" />
-      </div>
-      <div className="flex gap-1.5">
-        <span className="w-2 h-2 rounded-full animate-bounce bg-orange-300" style={{ animationDelay: '0ms' }} />
-        <span className="w-2 h-2 rounded-full animate-bounce bg-orange-400" style={{ animationDelay: '150ms' }} />
-        <span className="w-2 h-2 rounded-full animate-bounce bg-orange-500" style={{ animationDelay: '300ms' }} />
-      </div>
-    </div>
-  </div>
-);
+import { PlusHandle } from './PlusHandle';
+import {
+  IMAGE_PREVIEW_WIDTH,
+  MediaEmptyGlyph,
+  MediaPreviewCard,
+  MediaStageLoading,
+  cssAspectRatio,
+} from './MediaPreviewCard';
 
 const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, removeNode, duplicateNode } = useCanvasStore();
@@ -62,7 +51,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     }
   }, [editLabel, data.label, id, updateNode]);
 
-  const handleLabelKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleLabelKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleLabelBlur();
     } else if (e.key === 'Escape') {
@@ -353,130 +342,65 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   return (
     <div 
-      className="relative group"
+      className="image-node relative group"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={handleContextMenu}
     >
-      {/* Main node content */}
-      <div
-        className={`image-node rounded-xl border-2 ${
-          isDropActive
-            ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_rgba(172,46,0,0.18)]'
-            : selected
-            ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_rgba(172,46,0,0.24)]'
-            : 'border-[var(--border-color)]'
-        } shadow-lg w-[280px] transition-all duration-200 relative`}
-        style={{ backgroundColor: 'var(--bg-primary)' }}
+      <MediaPreviewCard
+        selected={selected}
+        dropActive={isDropActive}
+        label={data.label || '图片节点'}
+        icon={<ImageIcon />}
+        width={IMAGE_PREVIEW_WIDTH}
+        aspectRatio={cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, '1 / 1')}
+        isEditingLabel={isEditingLabel}
+        editLabel={editLabel}
+        onLabelDoubleClick={handleLabelDoubleClick}
+        onLabelChange={handleLabelChange}
+        onLabelBlur={handleLabelBlur}
+        onLabelKeyDown={handleLabelKeyDown}
+        handles={
+          <>
+            <PlusHandle type="target" position={Position.Left} />
+            <PlusHandle type="source" position={Position.Right} />
+          </>
+        }
+        actions={[
+          { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !data?.url },
+          { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
+          { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
+        ]}
       >
-        {/* Handles */}
-        <Handle type="target" position={Position.Left} className="!bg-[hsl(var(--primary))]" />
-        <Handle type="source" position={Position.Right} className="!bg-[hsl(var(--primary))]" />
-
-        {/* Header */}
-        <div
-          className={`flex items-center justify-between px-3 py-2 rounded-t-xl ${
-            selected
-              ? 'text-white'
-              : ''
-          }`}
-          style={selected ? { background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, #d73b00 100%)' } : { backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-        >
-          {isEditingLabel ? (
-            <Input
-              value={editLabel}
-              onChange={handleLabelChange}
-              onBlur={handleLabelBlur}
-              onKeyDown={handleLabelKeyDown}
-              autoFocus
-              size="small"
-              className="nodrag w-32 text-sm"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span 
-              className="text-sm font-semibold cursor-pointer hover:opacity-80"
-              onDoubleClick={handleLabelDoubleClick}
-              title="双击编辑"
-            >
-              🖼️ {data.label}
-            </span>
-          )}
-          <div className="flex items-center gap-1">
-            {data?.url && (
-              <button
-                onClick={handleDownload}
-                className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-                title="下载"
-              >
-                <DownloadOutlined style={{ fontSize: 14 }} />
-              </button>
-            )}
-            <button
-              onClick={handleDelete}
-              className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-              title="删除"
-            >
-              <DeleteOutlined style={{ fontSize: 14 }} />
-            </button>
-            <button
-              onClick={handleDuplicate}
-              className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-              title="复制"
-            >
-              <CopyOutlined style={{ fontSize: 14 }} />
-            </button>
+        {data?.loading ? (
+          <MediaStageLoading kind="image" />
+        ) : data?.url ? (
+          <img
+            src={mediaUrl(data.url)}
+            alt={data.label}
+            className="h-full w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+            onClick={() => setShowPreview(true)}
+          />
+        ) : (
+          <Upload
+            accept="image/*"
+            showUploadList={false}
+            beforeUpload={handleUpload}
+            disabled={uploading}
+            className="block h-full w-full"
+          >
+            <div className="flex h-full w-full cursor-pointer items-center justify-center">
+              {uploading ? <Spin /> : <MediaEmptyGlyph kind="image" />}
+            </div>
+          </Upload>
+        )}
+        {data?.error ? (
+          <div className="absolute inset-x-0 bottom-0 bg-[#b42318]/80 px-3 py-1.5 text-[11px] text-white">
+            {data.error}
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-3" style={{ backgroundColor: 'var(--bg-primary)' }}>
-          {isDropActive && (
-            <div className="mb-3 rounded-lg border border-dashed border-[hsl(var(--primary))]/40 bg-[hsl(var(--primary))]/6 px-3 py-2 text-xs font-medium text-[hsl(var(--primary))]">
-              松手替换为该素材
-            </div>
-          )}
-          {data?.loading ? (
-            <ImageLoadingAnimation />
-          ) : data?.url ? (
-            <div className="aspect-square rounded-lg overflow-hidden bg-[var(--bg-tertiary)]">
-              <img
-                src={mediaUrl(data.url)}
-                alt={data.label}
-                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => setShowPreview(true)}
-              />
-            </div>
-          ) : (
-            <Upload 
-              accept="image/*" 
-              showUploadList={false} 
-              beforeUpload={handleUpload} 
-              disabled={uploading}
-              className="block w-full"
-            >
-              <div 
-                className="w-full h-48 flex flex-col items-center justify-center rounded-lg border-2 border-dashed cursor-pointer hover:border-[var(--text-secondary)] transition-colors"
-                style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-color)' }}
-              >
-                {uploading ? (
-                  <Spin size="large" />
-                ) : (
-                  <>
-                    <PictureOutlined style={{ fontSize: 40, color: 'var(--text-secondary)' }} />
-                    <p className="text-sm mt-3" style={{ color: 'var(--text-secondary)' }}>拖放图片或点击上传</p>
-                  </>
-                )}
-              </div>
-            </Upload>
-          )}
-
-          {data?.error && (
-            <div className="mt-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">{data.error}</div>
-          )}
-        </div>
-      </div>
+        ) : null}
+      </MediaPreviewCard>
 
       {/* Preview Modal */}
       <PreviewModal
