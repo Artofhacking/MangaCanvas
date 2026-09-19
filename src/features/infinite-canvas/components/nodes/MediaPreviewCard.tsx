@@ -12,11 +12,21 @@ import { cn } from '@/lib/utils'
 export const IMAGE_PREVIEW_WIDTH = 360
 export const VIDEO_PREVIEW_WIDTH = 420
 
+function parseAspectParts(ratio?: string, fallback = '1 / 1') {
+  const source = ratio || fallback
+  const parts = source.split(/[:/x×*]/i).map((part) => Number(part.trim()))
+  const w = parts[0] && parts[0] > 0 ? parts[0] : 1
+  const h = parts[1] && parts[1] > 0 ? parts[1] : 1
+  return { w, h, css: `${w} / ${h}` }
+}
+
 export function cssAspectRatio(ratio?: string, fallback = '1 / 1') {
-  if (!ratio) return fallback
-  const parts = ratio.split(/[:/x×*]/i).map((part) => Number(part.trim()))
-  if (parts.length < 2 || !parts[0] || !parts[1]) return fallback
-  return `${parts[0]} / ${parts[1]}`
+  return parseAspectParts(ratio, fallback).css
+}
+
+export function previewCardHeight(width: number, ratio?: string, fallback = '1 / 1') {
+  const { w, h } = parseAspectParts(ratio, fallback)
+  return Math.round((width * h) / w)
 }
 
 export interface MediaCardAction {
@@ -105,28 +115,34 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const visibleActions = (actions || []).filter((action) => !action.hidden)
+  const height = previewCardHeight(width, aspectRatio)
 
   return (
-    <div className={cn('media-preview-card group/media-card relative', className)} style={{ width }}>
+    <div
+      className={cn('media-preview-card group/media-card relative', className)}
+      style={{ width, height }}
+    >
       {handles}
       <div
         className={cn(
-          'relative overflow-hidden rounded-[22px] border transition-[border-color,box-shadow] duration-200',
+          'relative h-full w-full overflow-hidden rounded-[22px] border transition-[border-color,box-shadow] duration-200',
           dropActive
             ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
             : selected
               ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_hsl(var(--primary)/0.28)]'
-              : 'border-[hsl(var(--media-stage-fg)/0.14)]'
+              : 'border-[hsl(var(--media-stage-fg)/0.16)]'
         )}
         style={{
-          aspectRatio,
           backgroundColor: 'hsl(var(--media-stage))',
         }}
       >
         <div className="absolute inset-0">{children}</div>
 
-        <div className="absolute left-3 top-3 z-10 flex max-w-[72%] items-center gap-1.5">
-          <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[hsl(var(--media-stage-fg))]/72 [&>svg]:h-3.5 [&>svg]:w-3.5">
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-10 flex max-w-[74%] items-center gap-1.5 rounded-full bg-black/40 px-2 py-1 backdrop-blur-[2px]">
+          <span
+            className="flex h-4 w-4 shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
+            style={{ color: 'hsl(var(--media-stage-fg))' }}
+          >
             {icon}
           </span>
           {isEditingLabel ? (
@@ -143,7 +159,8 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
             />
           ) : (
             <span
-              className="cursor-text truncate text-[12px] font-medium tracking-wide text-[hsl(var(--media-stage-fg))]/88"
+              className="pointer-events-auto cursor-text truncate text-[13px] font-medium tracking-wide"
+              style={{ color: 'hsl(var(--media-stage-fg))', textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
               onDoubleClick={onLabelDoubleClick}
               title="双击编辑"
             >
@@ -165,7 +182,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="nodrag nopan nowheel flex h-7 w-7 items-center justify-center rounded-full border border-[hsl(var(--media-stage-fg)/0.12)] bg-[hsl(var(--media-stage))]/70 text-[hsl(var(--media-stage-fg))]/88 backdrop-blur-sm transition-colors hover:bg-[hsl(var(--media-stage-fg)/0.12)]"
+                  className="nodrag nopan nowheel flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
                   title="更多"
                   onClick={(event) => event.stopPropagation()}
                   onPointerDown={(event) => event.stopPropagation()}

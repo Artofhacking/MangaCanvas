@@ -86,8 +86,8 @@ function useGenerateBarAnchor(nodeId: string | null): GenerateBarAnchor | null {
     if (!node) return null
     const [translateX, translateY, zoom] = state.transform
     const abs = node.positionAbsolute ?? node.position
-    const width = node.width ?? node.measured?.width ?? 320
-    const height = node.height ?? node.measured?.height ?? 220
+    const width = node.width ?? node.measured?.width ?? 360
+    const height = node.height ?? node.measured?.height ?? Math.round(width * 0.85)
     return {
       id: nodeId,
       left: abs.x * zoom + translateX,
