@@ -9,8 +9,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-export const IMAGE_PREVIEW_WIDTH = 360
-export const VIDEO_PREVIEW_WIDTH = 420
+export const IMAGE_PREVIEW_WIDTH = 448
+export const VIDEO_PREVIEW_WIDTH = 448
+export const IMAGE_EMPTY_ASPECT = '16 / 10'
 
 function parseAspectParts(ratio?: string, fallback = '1 / 1') {
   const source = ratio || fallback
@@ -64,10 +65,10 @@ export function MediaEmptyGlyph({ kind }: { kind: 'image' | 'video' }) {
       <div className="flex h-full w-full items-center justify-center" aria-hidden>
         <svg
           viewBox="0 0 24 24"
-          className="h-14 w-14 text-[hsl(var(--media-stage-muted))]"
+          className="h-12 w-12 text-[hsl(var(--media-stage-muted))]"
           fill="currentColor"
         >
-          <path d="M4 7.2A2.2 2.2 0 0 1 6.2 5h7.6A2.2 2.2 0 0 1 16 7.2v9.6A2.2 2.2 0 0 1 13.8 19H6.2A2.2 2.2 0 0 1 4 16.8V7.2Zm13.15 1.16 4.12-2.47A1 1 0 0 1 22.8 6.76v10.48a1 1 0 0 1-1.53.87l-4.12-2.47V8.36Z" />
+          <path d="M15 8.6v6.8l4.7 2.82A.8.8 0 0 0 21 17.54V6.46a.8.8 0 0 0-1.3-.68L15 8.6ZM4.8 6.5h9.1c.94 0 1.7.76 1.7 1.7v7.6c0 .94-.76 1.7-1.7 1.7H4.8c-.94 0-1.7-.76-1.7-1.7V8.2c0-.94.76-1.7 1.7-1.7Z" />
         </svg>
       </div>
     )
@@ -76,11 +77,12 @@ export function MediaEmptyGlyph({ kind }: { kind: 'image' | 'video' }) {
   return (
     <div className="flex h-full w-full items-center justify-center" aria-hidden>
       <svg
-        viewBox="0 0 24 24"
-        className="h-16 w-16 text-[hsl(var(--media-stage-muted))]"
+        viewBox="0 0 64 48"
+        className="h-14 w-[4.5rem] text-[hsl(var(--media-stage-muted))]"
         fill="currentColor"
       >
-        <path d="M19 4H5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3ZM8.2 8.1a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2ZM5.1 17.2l3.4-4.7a1 1 0 0 1 1.58-.06L12.7 15l1.72-2.2a1 1 0 0 1 1.58 0L19 17.2H5.1Z" />
+        <path d="M8 40 27.5 13.5 39 28.5 45 20 58 40H8Z" />
+        <circle cx="43.5" cy="13.5" r="3.6" />
       </svg>
     </div>
   )
@@ -118,31 +120,10 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
   const height = previewCardHeight(width, aspectRatio)
 
   return (
-    <div
-      className={cn('media-preview-card group/media-card relative', className)}
-      style={{ width, height }}
-    >
-      {handles}
-      <div
-        className={cn(
-          'relative h-full w-full overflow-hidden rounded-[22px] border transition-[border-color,box-shadow] duration-200',
-          dropActive
-            ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
-            : selected
-              ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_hsl(var(--primary)/0.28)]'
-              : 'border-[hsl(var(--media-stage-fg)/0.16)]'
-        )}
-        style={{
-          backgroundColor: 'hsl(var(--media-stage))',
-        }}
-      >
-        <div className="absolute inset-0">{children}</div>
-
-        <div className="pointer-events-none absolute left-2.5 top-2.5 z-10 flex max-w-[74%] items-center gap-1.5 rounded-full bg-black/40 px-2 py-1 backdrop-blur-[2px]">
-          <span
-            className="flex h-4 w-4 shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
-            style={{ color: 'hsl(var(--media-stage-fg))' }}
-          >
+    <div className={cn('media-preview-card group/media-card relative', className)} style={{ width }}>
+      <div className="mb-1.5 flex h-6 items-center justify-between gap-2 px-0.5">
+        <div className="flex min-w-0 items-center gap-1.5 text-[hsl(var(--on-surface-variant))]">
+          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5">
             {icon}
           </span>
           {isEditingLabel ? (
@@ -153,14 +134,13 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
               onKeyDown={onLabelKeyDown}
               autoFocus
               size="small"
-              className="nodrag nopan nowheel pointer-events-auto h-6 w-36 text-xs"
+              className="nodrag nopan nowheel h-6 w-36 text-xs"
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
             />
           ) : (
             <span
-              className="pointer-events-auto cursor-text truncate text-[13px] font-medium tracking-wide"
-              style={{ color: 'hsl(var(--media-stage-fg))', textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}
+              className="cursor-text truncate text-[12px] font-medium tracking-wide"
               onDoubleClick={onLabelDoubleClick}
               title="双击编辑"
             >
@@ -168,11 +148,10 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
             </span>
           )}
         </div>
-
         {visibleActions.length > 0 ? (
           <div
             className={cn(
-              'absolute right-2 top-2 z-20 transition-opacity duration-150',
+              'shrink-0 transition-opacity duration-150',
               selected || menuOpen || dropActive
                 ? 'opacity-100'
                 : 'opacity-0 group-hover/media-card:opacity-100'
@@ -182,12 +161,12 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="nodrag nopan nowheel flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                  className="nodrag nopan nowheel flex h-6 w-6 items-center justify-center rounded-full text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-high))] hover:text-[hsl(var(--on-surface))]"
                   title="更多"
                   onClick={(event) => event.stopPropagation()}
                   onPointerDown={(event) => event.stopPropagation()}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -217,6 +196,23 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
             </DropdownMenu>
           </div>
         ) : null}
+      </div>
+
+      <div className="relative" style={{ height }}>
+        {handles}
+        <div
+          className={cn(
+            'relative h-full w-full overflow-hidden rounded-[20px] border transition-[border-color,box-shadow] duration-200',
+            dropActive
+              ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
+              : selected
+                ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_hsl(var(--primary)/0.28)]'
+                : 'border-[hsl(var(--media-stage-fg)/0.14)]'
+          )}
+          style={{ backgroundColor: 'hsl(var(--media-stage))' }}
+        >
+          <div className="absolute inset-0">{children}</div>
+        </div>
       </div>
     </div>
   )

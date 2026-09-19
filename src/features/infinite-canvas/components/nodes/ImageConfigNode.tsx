@@ -7,10 +7,10 @@ import { useCanvasStore } from '../../stores/canvasStore';
 import type { CustomNode } from '../../types';
 import { PlusHandle } from './PlusHandle';
 import {
+  IMAGE_EMPTY_ASPECT,
   IMAGE_PREVIEW_WIDTH,
   MediaEmptyGlyph,
   MediaPreviewCard,
-  cssAspectRatio,
 } from './MediaPreviewCard';
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
@@ -67,7 +67,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       label={data.label || '画面节点'}
       icon={<ImageIcon />}
       width={IMAGE_PREVIEW_WIDTH}
-      aspectRatio={cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, '1 / 1')}
+      aspectRatio={IMAGE_EMPTY_ASPECT}
       isEditingLabel={isEditingLabel}
       editLabel={editLabel}
       onLabelDoubleClick={handleLabelDoubleClick}

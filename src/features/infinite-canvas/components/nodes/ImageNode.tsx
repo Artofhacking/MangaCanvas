@@ -12,6 +12,7 @@ import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { PlusHandle } from './PlusHandle';
 import {
+  IMAGE_EMPTY_ASPECT,
   IMAGE_PREVIEW_WIDTH,
   MediaEmptyGlyph,
   MediaPreviewCard,
@@ -354,7 +355,11 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         label={data.label || '图片节点'}
         icon={<ImageIcon />}
         width={IMAGE_PREVIEW_WIDTH}
-        aspectRatio={cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, '1 / 1')}
+        aspectRatio={
+          data?.url
+            ? cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, IMAGE_EMPTY_ASPECT)
+            : IMAGE_EMPTY_ASPECT
+        }
         isEditingLabel={isEditingLabel}
         editLabel={editLabel}
         onLabelDoubleClick={handleLabelDoubleClick}
