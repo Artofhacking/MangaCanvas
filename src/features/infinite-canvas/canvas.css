@@ -66,6 +66,51 @@ code {
   border: 2px solid var(--ic-primary);
 }
 
+/* Image / video result cards: always-dark preview stage + LibTV-like + ports */
+.media-preview-card {
+  --media-stage: 0 0% 11%;
+  --media-stage-fg: 0 0% 88%;
+  --media-stage-muted: 0 0% 40%;
+}
+
+.react-flow__handle.media-plus-handle {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  border-radius: 999px !important;
+  background: hsl(var(--surface-container-lowest)) !important;
+  border: 1.5px solid color-mix(in srgb, hsl(var(--on-surface)) 22%, transparent) !important;
+  box-shadow: 0 1px 8px rgba(26, 26, 26, 0.16);
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.react-flow__handle.media-plus-handle.react-flow__handle-left {
+  left: -11px;
+}
+
+.react-flow__handle.media-plus-handle.react-flow__handle-right {
+  right: -11px;
+}
+
+.react-flow__handle.media-plus-handle .media-plus-handle__mark {
+  display: flex;
+  color: hsl(var(--on-surface));
+  pointer-events: none;
+}
+
+.react-flow__handle.media-plus-handle:hover,
+.react-flow__node.selected .react-flow__handle.media-plus-handle {
+  border-color: hsl(var(--primary)) !important;
+}
+
+.react-flow__handle.media-plus-handle:hover .media-plus-handle__mark,
+.react-flow__node.selected .react-flow__handle.media-plus-handle .media-plus-handle__mark {
+  color: hsl(var(--primary));
+}
+
 .react-flow__controls {
   background: rgba(255, 255, 255, 0.82) !important;
   border: 1px solid color-mix(in srgb, var(--ic-outline-variant) 72%, transparent) !important;
@@ -135,11 +180,13 @@ code {
 .image-node .ant-upload {
   display: block !important;
   width: 100% !important;
+  height: 100% !important;
 }
 
 .image-node .ant-upload-wrapper {
   display: block !important;
   width: 100% !important;
+  height: 100% !important;
 }
 
 /* Ant Design Theme Integration */

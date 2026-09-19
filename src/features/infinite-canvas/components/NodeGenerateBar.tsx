@@ -51,8 +51,8 @@ import {
 import { cn } from '@/lib/utils'
 
 const BAR_WIDTH = 560
-const BAR_GAP = 12
-const BAR_ESTIMATED_HEIGHT = 268
+const BAR_GAP = 6
+const BAR_ESTIMATED_HEIGHT = 176
 const CAPABILITY_CHIPS = [
   { id: 'mark', label: '标记', icon: Tag },
   { id: 'fx', label: '特效', icon: Sparkles },
@@ -86,8 +86,8 @@ function useGenerateBarAnchor(nodeId: string | null): GenerateBarAnchor | null {
     if (!node) return null
     const [translateX, translateY, zoom] = state.transform
     const abs = node.positionAbsolute ?? node.position
-    const width = node.width ?? node.measured?.width ?? 320
-    const height = node.height ?? node.measured?.height ?? 220
+    const width = node.width ?? node.measured?.width ?? 360
+    const height = node.height ?? node.measured?.height ?? Math.round(width * 0.85)
     return {
       id: nodeId,
       left: abs.x * zoom + translateX,
@@ -511,7 +511,12 @@ const NodeGenerateBar: React.FC = () => {
 
   const containerWidth = overlayRef.current?.clientWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1280)
   const containerHeight = overlayRef.current?.clientHeight ?? (typeof window !== 'undefined' ? window.innerHeight : 720)
-  const placeAbove = anchor.top + anchor.height + BAR_GAP + barSize.height > containerHeight - 16
+  const spaceBelow = containerHeight - (anchor.top + anchor.height)
+  const spaceAbove = anchor.top
+  const overflowBelow = barSize.height + BAR_GAP - spaceBelow
+  // Prefer docking under the card. Flip above only when the bar would clip
+  // badly below *and* the space above is meaningfully larger.
+  const placeAbove = overflowBelow > 48 && spaceAbove > spaceBelow + 24
   const left = Math.min(
     Math.max(anchor.left + anchor.width / 2 - barSize.width / 2, 76),
     Math.max(76, containerWidth - barSize.width - 16)
@@ -548,13 +553,17 @@ const NodeGenerateBar: React.FC = () => {
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
+        {placeAbove ? (
+          <div className="absolute left-1/2 top-full h-1.5 w-px -translate-x-1/2 bg-[hsl(var(--outline-variant))]/55" />
+        ) : null}
         <div
           className={cn(
-            'absolute left-1/2 h-3 w-px -translate-x-1/2 bg-[hsl(var(--outline-variant))]/70',
-            placeAbove ? 'top-full' : '-top-3'
+            'border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/96 p-3 backdrop-blur-md',
+            placeAbove
+              ? 'rounded-[24px] shadow-[0_18px_50px_rgba(42,28,24,0.12)]'
+              : 'rounded-[22px] shadow-[0_10px_28px_rgba(42,28,24,0.10)]'
           )}
-        />
-        <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/96 p-3 shadow-[0_18px_50px_rgba(42,28,24,0.12)] backdrop-blur-md">
+        >
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
               {slots.length === 0 ? (
