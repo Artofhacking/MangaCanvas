@@ -76,7 +76,7 @@ function PromptChromePills<T extends string | number>({
             disabled={disabled}
             onClick={() => onChange(option)}
             className={cn(
-              "h-7 rounded-full px-2.5 text-[11px] font-semibold tracking-tight transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))] disabled:opacity-50",
+              "h-8 min-w-[2.25rem] whitespace-nowrap rounded-full px-3 text-xs font-semibold tracking-tight transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))] disabled:opacity-50",
               active
                 ? "signature-gradient text-white shadow-sm"
                 : "text-[hsl(var(--on-surface-variant))] hover:bg-[hsl(var(--surface-container-high))]"
@@ -314,7 +314,7 @@ export function ImageGenerationForm({
               </button>
             </div>
 
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
               <PromptChromePills
                 label="生成比例"
                 options={[...aspectRatioValues]}
@@ -323,23 +323,29 @@ export function ImageGenerationForm({
                 onChange={(next) => updateField("aspectRatio", next)}
               />
               {showQuantity ? (
-                <div className="flex items-center gap-1.5">
-                  <PromptChromePills
-                    label="生成数量"
-                    options={quantityOptions}
-                    value={value.quantity}
-                    disabled={disabled}
-                    onChange={(next) => updateField("quantity", next)}
-                    format={(qty) => `${qty}张`}
-                    title="每次生成会消耗相应积分"
-                  />
+                <>
                   <span
-                    className="text-[10px] leading-none text-[hsl(var(--secondary))]"
-                    title="每次生成会消耗相应积分"
-                  >
-                    耗积分
-                  </span>
-                </div>
+                    className="h-4 w-px bg-[hsl(var(--outline-variant))]/45"
+                    aria-hidden
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <PromptChromePills
+                      label="生成数量"
+                      options={quantityOptions}
+                      value={value.quantity}
+                      disabled={disabled}
+                      onChange={(next) => updateField("quantity", next)}
+                      format={(qty) => `${qty}张`}
+                      title="每次生成会消耗相应积分"
+                    />
+                    <span
+                      className="text-[10px] leading-none text-[hsl(var(--secondary))]"
+                      title="每次生成会消耗相应积分"
+                    >
+                      耗积分
+                    </span>
+                  </div>
+                </>
               ) : null}
             </div>
           </div>
