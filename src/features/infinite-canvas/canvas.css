@@ -60,22 +60,24 @@ code {
 }
 
 .react-flow__handle {
-  /* RF11 pins left/right to the handle box edge (no X translate). */
-  --canvas-handle-size: 10px;
+  /* RF11 pins the handle box edge (left/right: -4px, no X translate).
+     Shift by the handle's own width plus a small gap so ports float outside. */
   --canvas-handle-outset: 6px;
-  width: var(--canvas-handle-size);
-  height: var(--canvas-handle-size);
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--ic-surface-container-lowest);
   border: 2px solid var(--ic-primary);
 }
 
 .react-flow__handle.react-flow__handle-left {
-  left: calc(-1 * (var(--canvas-handle-size) + var(--canvas-handle-outset)));
+  left: 0;
+  transform: translate(calc(-100% - var(--canvas-handle-outset)), -50%);
 }
 
 .react-flow__handle.react-flow__handle-right {
-  right: calc(-1 * (var(--canvas-handle-size) + var(--canvas-handle-outset)));
+  right: 0;
+  transform: translate(calc(100% + var(--canvas-handle-outset)), -50%);
 }
 
 /* Image / video preview cards: warm-paper empty stage; filled media keeps a dark well */
@@ -91,7 +93,6 @@ code {
 }
 
 .react-flow__handle.media-plus-handle {
-  --canvas-handle-size: 22px;
   width: 22px !important;
   height: 22px !important;
   min-width: 22px !important;
