@@ -1,28 +1,3 @@
-import React from 'react';
-import { BaseEdge, getBezierPath, EdgeProps } from 'reactflow';
-import type { CustomEdge } from '../../types';
+import CanvasFlowEdge from './CanvasFlowEdge';
 
-const ImageRoleEdge: React.FC<EdgeProps<CustomEdge['data']>> = ({
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  markerEnd,
-}) => {
-  const [edgePath] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-  });
-
-  return (
-    <BaseEdge path={edgePath} markerEnd={markerEnd} />
-  );
-};
-
-export default ImageRoleEdge;
+export default CanvasFlowEdge;

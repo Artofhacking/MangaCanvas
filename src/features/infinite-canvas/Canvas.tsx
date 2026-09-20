@@ -60,6 +60,7 @@ import VideoNode from './components/nodes/VideoNode';
 import VideoConfigNode from './components/nodes/VideoConfigNode';
 import EffectConfigNode from './components/nodes/EffectConfigNode';
 import TemplateEffectNode from './components/nodes/TemplateEffectNode';
+import CanvasFlowEdge from './components/edges/CanvasFlowEdge';
 import PromptOrderEdge from './components/edges/PromptOrderEdge';
 import ImageRoleEdge from './components/edges/ImageRoleEdge';
 import ApiSettings from './components/ApiSettings';
@@ -83,6 +84,7 @@ const nodeTypes = {
 };
 
 const edgeTypes = {
+  default: CanvasFlowEdge,
   promptOrder: PromptOrderEdge,
   imageRole: ImageRoleEdge,
 };

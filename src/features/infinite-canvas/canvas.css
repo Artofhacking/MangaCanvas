@@ -55,7 +55,42 @@ code {
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--ic-primary);
+  stroke: var(--ic-primary, hsl(var(--primary)));
+}
+
+.canvas-edge-flow {
+  fill: none;
+  stroke: var(--ic-primary, hsl(var(--primary)));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 7 12;
+  animation: canvas-edge-dash 0.7s linear infinite;
+  pointer-events: none;
+}
+
+.canvas-edge-particle {
+  fill: var(--ic-primary, hsl(var(--primary)));
+  stroke: hsl(var(--primary-foreground));
+  stroke-width: 1.15;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ic-primary, hsl(var(--primary))) 70%, transparent));
+}
+
+.canvas-edge-particle--trail {
+  opacity: 0.45;
+}
+
+@keyframes canvas-edge-dash {
+  to {
+    stroke-dashoffset: -19;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-edge-flow,
+  .canvas-edge-particle {
+    display: none;
+  }
 }
 
 .react-flow__handle {
