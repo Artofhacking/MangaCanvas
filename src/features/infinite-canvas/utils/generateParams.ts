@@ -1,6 +1,9 @@
 import { isMiniMaxModel, isSeedanceModel, isT2VModel } from '@/api/aigc'
 import { IMAGE_MODELS, VIDEO_MODELS, remapVideoModel } from '../config/models'
 import type { CustomNode, NodeData, SizeOption } from '../types'
+import { getSizeRatio, uniqueAspectRatios } from './aspectRatio'
+
+export { getSizeRatio, uniqueAspectRatios } from './aspectRatio'
 
 export const ASPECT_RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'] as const
 export const RESOLUTIONS = ['1080P', '720P'] as const
@@ -23,37 +26,6 @@ export const VIDEO_SIZE_MAP: Record<Resolution, Record<AspectRatio, string>> = {
     '4:3': '1632*1248',
     '3:4': '1248*1632',
   },
-}
-
-const SIZE_RATIO_MAP: Record<string, string> = {
-  '1280*1280': '1:1',
-  '1024*1024': '1:1',
-  '1024x1024': '1:1',
-  '1440*1440': '1:1',
-  '960*960': '1:1',
-  '1696*960': '16:9',
-  '1280*720': '16:9',
-  '1920*1080': '16:9',
-  '1536x1024': '3:2',
-  '960*1696': '9:16',
-  '720*1280': '9:16',
-  '1080*1920': '9:16',
-  '1024x1536': '2:3',
-  '1472*1104': '4:3',
-  '1280*960': '4:3',
-  '1088*832': '4:3',
-  '1632*1248': '4:3',
-  '1104*1472': '3:4',
-  '960*1280': '3:4',
-  '832*1088': '3:4',
-  '1248*1632': '3:4',
-  '1200*800': '3:2',
-  '800*1200': '2:3',
-  '1344*576': '21:9',
-}
-
-export function getSizeRatio(size: string): string {
-  return SIZE_RATIO_MAP[size] || '1:1'
 }
 
 export function getShortLabelFromModel(modelLabel: string): string {
@@ -96,6 +68,10 @@ export function listImageSizes(modelKey: string, quality?: string): SizeOption[]
     return model.getSizesByQuality(quality || model.defaultParams?.quality || 'medium')
   }
   return model.sizes || []
+}
+
+export function listImageAspectRatios(modelKey: string, quality?: string): string[] {
+  return uniqueAspectRatios(listImageSizes(modelKey, quality))
 }
 
 export function formatParamStub(node: CustomNode): string {
@@ -175,10 +151,20 @@ export function coerceGenerateParams(node: CustomNode): Partial<NodeData> | null
     if (!sizes.length) return null
     const currentSize = typeof node.data.size === 'string' ? node.data.size : ''
     if (sizes.some((item) => item.key === currentSize)) {
-      if (!node.data.ratio) return { ratio: getSizeRatio(currentSize) }
+      const actual = getSizeRatio(currentSize)
+      if (node.data.ratio !== actual) return { ratio: actual }
       return null
     }
-    const nextSize = sizes[0].key
+    const currentRatio =
+      typeof node.data.ratio === 'string' && node.data.ratio
+        ? node.data.ratio
+        : currentSize
+          ? getSizeRatio(currentSize)
+          : ''
+    const matching = currentRatio
+      ? sizes.find((item) => getSizeRatio(item.key) === currentRatio)
+      : undefined
+    const nextSize = matching?.key || sizes[0].key
     return { size: nextSize, ratio: getSizeRatio(nextSize) }
   }
 

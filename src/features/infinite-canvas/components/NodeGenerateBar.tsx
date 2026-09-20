@@ -33,10 +33,11 @@ import {
   coerceGenerateParams,
   formatParamStub,
   getSizeRatio,
-  listImageSizes,
+  listImageAspectRatios,
   listVideoResolutions,
   parseVideoSize,
 } from '../utils/generateParams'
+import { aspectRatioIconSize } from '../utils/aspectRatio'
 import { reconcilePromptMentions, type SlotRef } from '../utils/promptMentions'
 import { isT2VModel } from '@/api/aigc'
 import type { CustomNode, ModelConfig } from '../types'
@@ -99,38 +100,29 @@ function useGenerateBarAnchor(nodeId: string | null): GenerateBarAnchor | null {
 }
 
 function AspectRatioPills({
+  ratios,
   selected,
-  supported,
   onChange,
 }: {
+  ratios: readonly string[]
   selected: string
-  supported?: (ratio: string) => boolean
   onChange: (ratio: string) => void
 }) {
   return (
-    <div className="flex gap-1">
-      {ASPECT_RATIOS.map((ratio) => {
-        const enabled = supported ? supported(ratio) : true
+    <div className="flex flex-wrap gap-1">
+      {ratios.map((ratio) => {
         const active = selected === ratio
-        const icon =
-          ratio === '16:9' ? { w: 16, h: 9 }
-            : ratio === '9:16' ? { w: 9, h: 16 }
-              : ratio === '4:3' ? { w: 14, h: 10 }
-                : ratio === '3:4' ? { w: 10, h: 14 }
-                  : { w: 12, h: 12 }
+        const icon = aspectRatioIconSize(ratio)
         return (
           <button
             key={ratio}
             type="button"
-            disabled={!enabled}
-            onClick={() => enabled && onChange(ratio)}
+            onClick={() => onChange(ratio)}
             className={cn(
-              'flex flex-1 flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition-colors',
+              'flex min-w-[52px] flex-1 flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition-colors',
               active
                 ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10'
-                : enabled
-                  ? 'border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] hover:border-[hsl(var(--primary))]/40'
-                  : 'cursor-not-allowed border-[hsl(var(--outline-variant))]/20 opacity-30'
+                : 'border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] hover:border-[hsl(var(--primary))]/40'
             )}
           >
             <span
@@ -182,8 +174,8 @@ function GenerateBarModelPicker({
   const currentModel = isVideo
     ? VIDEO_MODELS.find((item) => item.key === currentKey)
     : IMAGE_MODELS.find((item) => item.key === currentKey)
-  const imageSizes = useMemo(
-    () => (isVideo ? [] : listImageSizes(currentKey, typeof node.data.quality === 'string' ? node.data.quality : undefined)),
+  const imageRatios = useMemo(
+    () => (isVideo ? [] : listImageAspectRatios(currentKey, typeof node.data.quality === 'string' ? node.data.quality : undefined)),
     [currentKey, isVideo, node.data.quality]
   )
   const imageRatio = typeof node.data.size === 'string' ? getSizeRatio(node.data.size) : (node.data.ratio || '1:1')
@@ -297,6 +289,7 @@ function GenerateBarModelPicker({
                 <div>
                   <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">画面比例</p>
                   <AspectRatioPills
+                    ratios={ASPECT_RATIOS}
                     selected={videoRatio}
                     onChange={(ratio) => onChange(applyVideoRatio(videoResolution, ratio))}
                   />
@@ -327,8 +320,8 @@ function GenerateBarModelPicker({
             <div>
               <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">画面比例</p>
               <AspectRatioPills
+                ratios={imageRatios}
                 selected={imageRatio}
-                supported={(ratio) => imageSizes.some((item) => getSizeRatio(item.key) === ratio)}
                 onChange={(ratio) => {
                   const next = applyImageRatio(
                     currentKey,

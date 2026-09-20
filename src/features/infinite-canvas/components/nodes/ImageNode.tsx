@@ -20,6 +20,7 @@ import {
   MediaStageLoading,
   cssAspectRatio,
 } from './MediaPreviewCard';
+import { nodeAspectRatio } from '../../utils/aspectRatio';
 
 const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, removeNode, duplicateNode } = useCanvasStore();
@@ -360,7 +361,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         width={IMAGE_PREVIEW_WIDTH}
         aspectRatio={
           data?.url
-            ? cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, IMAGE_EMPTY_ASPECT)
+            ? cssAspectRatio(nodeAspectRatio(data), IMAGE_EMPTY_ASPECT)
             : IMAGE_EMPTY_ASPECT
         }
         isEditingLabel={isEditingLabel}
@@ -426,7 +427,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         params={{
           prompt: data?.prompt,
           model: data?.model,
-          ratio: data?.ratio,
+          ratio: nodeAspectRatio(data || {}),
           size: data?.size,
         }}
       />
