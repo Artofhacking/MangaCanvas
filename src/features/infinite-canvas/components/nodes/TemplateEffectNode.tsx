@@ -5,6 +5,8 @@ import { DeleteOutlined, CopyOutlined, PlayCircleOutlined } from '@ant-design/ic
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useVideoGeneration } from '../../hooks';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { isCanceledError } from '@/api/core';
+import { finishGenerationJob, startGenerationJob } from '../../utils/generationJobs';
 import type { CustomNode } from '../../types';
 import NodeSelect from '../NodeSelect';
 
@@ -159,6 +161,8 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
 
     addEdgeManually({ source: id, target: videoNodeId });
 
+    const signal = startGenerationJob(videoNodeId);
+
     try {
       const videoUrl = await generate({
         model: 'happyhorse-1.1-i2v',
@@ -166,22 +170,37 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         first_frame_image: imageUrl,
         resolution: localResolution as string,
         template: localTemplate as string,
+        signal,
+      }, (_status, percent) => {
+        if (signal.aborted) return
+        if (typeof percent === 'number' && Number.isFinite(percent)) {
+          updateNode(videoNodeId, { progress: percent })
+        }
       });
 
+      if (signal.aborted || !finishGenerationJob(videoNodeId, signal)) {
+        persistOpenCanvas();
+        return;
+      }
+
       if (videoUrl) {
-        updateNode(videoNodeId, { url: videoUrl, loading: false, updatedAt: Date.now() });
+        updateNode(videoNodeId, { url: videoUrl, loading: false, progress: undefined, updatedAt: Date.now() });
       } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败' });
+        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined });
       }
       persistOpenCanvas();
     } catch (err: unknown) {
-      if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
+      if (signal.aborted || isCanceledError(err)) {
+        updateNode(videoNodeId, { loading: false, error: '', progress: undefined });
+      } else if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
         removeNode(videoNodeId);
         message.warning('请求过于频繁，请稍后重试');
       } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败' });
+        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined });
       }
       persistOpenCanvas();
+    } finally {
+      finishGenerationJob(videoNodeId, signal);
     }
   };
 

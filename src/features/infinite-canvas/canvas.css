@@ -112,6 +112,17 @@ code {
   --media-stage: 0 0% 8%;
 }
 
+/* Dark well while generating so the centered progress chip stays readable */
+.media-preview-card__stage--generating {
+  --media-stage: 0 0% 16%;
+}
+
+.media-generating-chip {
+  background: hsl(0 0% 8% / 0.92);
+  color: hsl(0 0% 100%);
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.28);
+}
+
 .react-flow__handle.media-plus-handle {
   width: 22px !important;
   height: 22px !important;

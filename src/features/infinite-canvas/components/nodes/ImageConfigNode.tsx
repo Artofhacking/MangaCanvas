@@ -8,6 +8,7 @@ import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
 import PreviewModal from '../PreviewModal';
 import { PlusHandle } from './PlusHandle';
+import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
 import {
   IMAGE_EMPTY_ASPECT,
   IMAGE_PREVIEW_WIDTH,
@@ -84,6 +85,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       <MediaPreviewCard
         selected={selected}
         filled={hasMedia && !data.loading}
+        generating={Boolean(data.loading)}
         label={data.label || '画面节点'}
         icon={<ImageIcon />}
         width={IMAGE_PREVIEW_WIDTH}
@@ -111,7 +113,11 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         ]}
       >
         {data.loading ? (
-          <MediaStageLoading kind="image" />
+          <MediaStageLoading
+            kind="image"
+            progress={readNodeProgress(data)}
+            onCancel={bindNodeGenerationCancel(id, updateNode)}
+          />
         ) : data.url ? (
           <img
             src={mediaUrl(data.url)}

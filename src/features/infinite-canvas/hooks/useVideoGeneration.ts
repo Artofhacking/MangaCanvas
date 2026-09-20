@@ -2,7 +2,9 @@ import { useState, useCallback } from 'react';
 import { message } from 'antd';
 import { videoService } from '@/api/aigc';
 import type { TaskStatus } from '@/api/aigc';
+import { isCanceledError } from '@/api/core';
 import type { VideoGenerationParams } from '../types';
+import type { GenerationProgressHandler } from './useImageGeneration';
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
   PENDING: '任务排队中...',
@@ -13,7 +15,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 };
 
 interface UseVideoGenerationReturn {
-  generate: (params: VideoGenerationParams, onProgress?: (status: string) => void) => Promise<string | null>;
+  generate: (params: VideoGenerationParams, onProgress?: GenerationProgressHandler) => Promise<string | null>;
   loading: boolean;
   error: string | null;
   status: string;
@@ -26,7 +28,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
 
   const generate = useCallback(async (
     params: VideoGenerationParams,
-    onProgress?: (status: string) => void
+    onProgress?: GenerationProgressHandler
   ): Promise<string | null> => {
     setLoading(true);
     setError(null);
@@ -44,10 +46,11 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         resolution: params.resolution,
         duration: params.seconds,
         template: params.template,
+        signal: params.signal,
         onProgress: (progress) => {
           const label = STATUS_LABEL[progress.status] ?? progress.status;
           setStatus(label);
-          onProgress?.(label);
+          onProgress?.(label, progress.percent);
         },
       });
 
@@ -56,17 +59,20 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
       setStatus('');
       return videoUrl;
     } catch (err: unknown) {
+      setLoading(false);
+      setStatus('');
+      if (isCanceledError(err) || params.signal?.aborted) {
+        throw err;
+      }
       const is429 = err instanceof Error && (
         err.message.includes('429') ||
         (err as { response?: { status?: number } }).response?.status === 429
       );
       const errorMessage = is429 ? 'API_RATE_LIMIT' : (err instanceof Error ? err.message : '视频生成失败');
       setError(errorMessage);
-      setStatus('');
       if (!is429) {
         message.error(errorMessage);
       }
-      setLoading(false);
       throw new Error(errorMessage);
     }
   }, []);

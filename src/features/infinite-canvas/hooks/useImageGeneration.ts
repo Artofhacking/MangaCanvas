@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { message } from 'antd';
 import { imageService, isI2IModel } from '@/api/aigc';
 import type { TaskStatus } from '@/api/aigc';
+import { isCanceledError } from '@/api/core';
 import type { ImageGenerationParams } from '../types';
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -12,8 +13,10 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   UNKNOWN: '处理中...',
 };
 
+export type GenerationProgressHandler = (status: string, percent?: number) => void;
+
 interface UseImageGenerationReturn {
-  generate: (params: ImageGenerationParams, onProgress?: (status: string) => void) => Promise<string[] | null>;
+  generate: (params: ImageGenerationParams, onProgress?: GenerationProgressHandler) => Promise<string[] | null>;
   loading: boolean;
   error: string | null;
   status: string;
@@ -26,7 +29,7 @@ export function useImageGeneration(): UseImageGenerationReturn {
 
   const generate = useCallback(async (
     params: ImageGenerationParams,
-    onProgress?: (status: string) => void
+    onProgress?: GenerationProgressHandler
   ): Promise<string[] | null> => {
     setLoading(true);
     setError(null);
@@ -40,10 +43,11 @@ export function useImageGeneration(): UseImageGenerationReturn {
         quality: params.quality,
         images: isI2IModel(params.model) ? params.images : undefined,
         n: params.n,
+        signal: params.signal,
         onProgress: (progress) => {
           const label = STATUS_LABEL[progress.status] ?? progress.status;
           setStatus(label);
-          onProgress?.(label);
+          onProgress?.(label, progress.percent);
         },
       });
 
@@ -51,17 +55,20 @@ export function useImageGeneration(): UseImageGenerationReturn {
       setStatus('');
       return urls;
     } catch (err: unknown) {
+      setLoading(false);
+      setStatus('');
+      if (isCanceledError(err) || params.signal?.aborted) {
+        throw err;
+      }
       const is429 = err instanceof Error && (
         err.message.includes('429') ||
         (err as { response?: { status?: number } }).response?.status === 429
       );
       const errorMessage = is429 ? 'API_RATE_LIMIT' : (err instanceof Error ? err.message : '图片生成失败');
       setError(errorMessage);
-      setStatus('');
       if (!is429) {
         message.error(errorMessage);
       }
-      setLoading(false);
       throw new Error(errorMessage);
     }
   }, []);
