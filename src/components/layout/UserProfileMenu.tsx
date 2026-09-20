@@ -15,6 +15,7 @@ import {
   getUserRoleId,
   type IdentityOption,
 } from "@/lib/session"
+import { useProjectsStore } from "@/store/projectsStore"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Check, LogOut, Shield, User, Users } from "lucide-react"
 
@@ -202,6 +203,7 @@ export default function UserProfileMenu({
           onClick={() => {
             clearSession()
             clearActiveProjectId()
+            useProjectsStore.getState().clearCache()
             navigate("/login")
             notify.success("已退出登录")
           }}

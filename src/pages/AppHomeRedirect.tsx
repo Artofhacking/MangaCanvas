@@ -19,27 +19,22 @@ function HomeLoading() {
  */
 export default function AppHomeRedirect() {
   const location = useLocation()
-  const { projects, isLoaded, fetchProjects } = useProjectsStore()
-  const [hydrated, setHydrated] = useState(() => useProjectsStore.persist.hasHydrated())
+  const { projects, fetchProjects } = useProjectsStore()
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const unsub = useProjectsStore.persist.onFinishHydration(() => setHydrated(true))
-    if (useProjectsStore.persist.hasHydrated()) {
-      setHydrated(true)
+    let cancelled = false
+    void fetchProjects(true).finally(() => {
+      if (!cancelled) {
+        setReady(true)
+      }
+    })
+    return () => {
+      cancelled = true
     }
-    return unsub
-  }, [])
-
-  useEffect(() => {
-    void fetchProjects()
   }, [fetchProjects])
 
-  if (!hydrated) {
-    return <HomeLoading />
-  }
-
-  const hasCachedProjects = projects.length > 0
-  if (!isLoaded && !hasCachedProjects) {
+  if (!ready) {
     return <HomeLoading />
   }
 

@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { authApi } from "@/api"
 import { clearUnauthorizedRedirectFlag, getAuthToken, getIdentityHomePath, saveSession } from "@/lib/session"
+import { useProjectsStore } from "@/store/projectsStore"
 
 function FeishuMark() {
   return (
@@ -53,6 +54,7 @@ export default function Login() {
             refreshToken: payload.refreshToken,
             user: { ...payload.user },
           })
+          useProjectsStore.getState().clearCache()
           notify.success("飞书登录成功")
           navigate(getIdentityHomePath(), { replace: true })
         } catch (error) {
@@ -107,6 +109,7 @@ export default function Login() {
           ...payload.user,
         },
       })
+      useProjectsStore.getState().clearCache()
 
       notify.success("登录成功")
       navigate(getIdentityHomePath())
