@@ -35,6 +35,7 @@ code {
    ============================================ */
 .react-flow__node {
   cursor: default;
+  overflow: visible;
 }
 
 .react-flow__edge-path {
@@ -94,6 +95,9 @@ code {
 }
 
 .react-flow__handle {
+  /* RF11 pins the handle box edge (left/right: -4px, no X translate).
+     Shift by the handle's own width plus a small gap so ports float outside. */
+  --canvas-handle-outset: 6px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -101,11 +105,22 @@ code {
   border: 2px solid var(--ic-primary);
 }
 
+.react-flow__handle.react-flow__handle-left {
+  left: 0;
+  transform: translate(calc(-100% - var(--canvas-handle-outset)), -50%);
+}
+
+.react-flow__handle.react-flow__handle-right {
+  right: 0;
+  transform: translate(calc(100% + var(--canvas-handle-outset)), -50%);
+}
+
 /* Image / video preview cards: warm-paper empty stage; filled media keeps a dark well */
 .media-preview-card {
   --media-stage: var(--surface-container-low);
   --media-stage-fg: var(--on-surface-variant);
   --media-stage-muted: var(--secondary);
+  overflow: visible;
 }
 
 .media-preview-card__stage--filled {
@@ -135,14 +150,6 @@ code {
   display: flex !important;
   align-items: center;
   justify-content: center;
-}
-
-.react-flow__handle.media-plus-handle.react-flow__handle-left {
-  left: -11px;
-}
-
-.react-flow__handle.media-plus-handle.react-flow__handle-right {
-  right: -11px;
 }
 
 .react-flow__handle.media-plus-handle .media-plus-handle__mark {
