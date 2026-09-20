@@ -6,6 +6,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useEffect, useMemo, useState } from "react"
 import { projectApi } from "@/api/projectApi"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
+import { projectEpisodePath } from "@/lib/workspaceRoutes"
 import type { Character, Episode, EpisodeRelationItem, ObjectItem, Scene } from "@/types"
 import PlotMentionText from "@/components/PlotMentionText"
 import type { PlotAsset } from "@/lib/plotMentions"
@@ -82,6 +83,8 @@ export default function EpisodeDetail() {
     [relatedCharacters, relatedObjects, relatedScenes]
   )
 
+  const episodeReturnTo = projectId && episodeId ? projectEpisodePath(projectId, episodeId) : undefined
+
   const openCanvas = async () => {
     if (!projectId || !episodeId || !episode) return
     await launchWorkflow({
@@ -90,6 +93,8 @@ export default function EpisodeDetail() {
       sourceName: episode.name,
       sourceAssetId: Number(episodeId),
       seedPrompt: episode.description,
+      returnTo: episodeReturnTo,
+      from: "episode",
       relatedAssets: [
         ...relatedCharacters.map((item) => ({
           id: item.id,
@@ -357,6 +362,8 @@ export default function EpisodeDetail() {
                           sourceName: char.name,
                           sourceAssetId: char.id,
                           seedImage: char.image,
+                          returnTo: episodeReturnTo,
+                          from: "episode",
                         })
                       }
                       className="flex w-full items-center gap-3 rounded-2xl bg-[hsl(var(--surface-container-high))] p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
@@ -392,6 +399,8 @@ export default function EpisodeDetail() {
                           sourceName: scene.name,
                           sourceAssetId: scene.id,
                           seedImage: scene.image,
+                          returnTo: episodeReturnTo,
+                          from: "episode",
                         })
                       }
                       className="block w-full overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-high))] text-left"
@@ -426,6 +435,8 @@ export default function EpisodeDetail() {
                           sourceName: obj.name,
                           sourceAssetId: obj.id,
                           seedImage: obj.image,
+                          returnTo: episodeReturnTo,
+                          from: "episode",
                         })
                       }
                       className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-2 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"

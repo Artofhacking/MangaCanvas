@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactFlow, {
   Background,
   MiniMap,
@@ -50,6 +50,14 @@ import { projectApi } from '@/api/projectApi';
 import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, type WorkflowSeedAsset } from '@/lib/workflows';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import {
+  persistWorkflowCanvasNavState,
+  projectAssetsPath,
+  projectEpisodePath,
+  readWorkflowCanvasNavState,
+  resolveWorkflowCanvasReturnTo,
+  workflowCanvasNavState,
+} from '@/lib/workspaceRoutes';
 import { useTwoFingerPan } from './hooks/useTwoFingerPan';
 import type { Episode } from '@/types';
 
@@ -96,6 +104,7 @@ const CanvasInner: React.FC = () => {
     episodeId?: string;
   }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
   const canvasPaneRef = useRef<HTMLDivElement>(null);
   useTwoFingerPan(canvasPaneRef);
@@ -200,9 +209,10 @@ const CanvasInner: React.FC = () => {
     }
 
     if (currentWorkflow?.sourceType === 'episode' && currentWorkflow.sourceAssetId) {
+      const episodeAssetId = currentWorkflow.sourceAssetId
       return {
         label: '返回片段',
-        action: () => navigate(`/project/${projectId}/episode/${currentWorkflow.sourceAssetId}`),
+        action: () => navigate(projectEpisodePath(projectId, episodeAssetId)),
       };
     }
 
@@ -229,9 +239,20 @@ const CanvasInner: React.FC = () => {
 
     return {
       label: '返回项目',
-      action: () => navigate(`/project/${projectId}/assets/scenes`),
+      action: () => navigate(projectAssetsPath(projectId, 'workflows')),
     };
   }, [currentWorkflow?.sourceAssetId, currentWorkflow?.sourceType, navigate, projectId]);
+
+  const canvasNavState = useMemo(() => readWorkflowCanvasNavState(location.state), [location.state]);
+
+  const canvasReturnTo = useMemo(
+    () => resolveWorkflowCanvasReturnTo(projectId, location.state, canvasDocumentId || workflowId),
+    [canvasDocumentId, location.state, projectId, workflowId]
+  );
+
+  useEffect(() => {
+    persistWorkflowCanvasNavState(projectId, canvasDocumentId || workflowId, canvasNavState);
+  }, [canvasDocumentId, canvasNavState, projectId, workflowId]);
 
   const cleanupCanvasTransientUi = useCallback(() => {
     setShowApiSettings(false);
@@ -259,7 +280,12 @@ const CanvasInner: React.FC = () => {
     };
   }, [cleanupCanvasTransientUi]);
 
-  const handleBackNavigation = useCallback(() => {
+  const handleExitCanvas = useCallback(() => {
+    cleanupCanvasTransientUi();
+    navigate(canvasReturnTo);
+  }, [canvasReturnTo, cleanupCanvasTransientUi, navigate]);
+
+  const handleSourceReturn = useCallback(() => {
     cleanupCanvasTransientUi();
     backTarget.action();
   }, [backTarget, cleanupCanvasTransientUi]);
@@ -276,9 +302,11 @@ const CanvasInner: React.FC = () => {
       }
       persistCurrentCanvas();
       cleanupCanvasTransientUi();
-      navigate(`/project/${projectId}/workflows/${nextWorkflowId}`);
+      navigate(`/project/${projectId}/workflows/${nextWorkflowId}`, {
+        state: location.state,
+      });
     },
-    [cleanupCanvasTransientUi, navigate, persistCurrentCanvas, projectId, workflowId]
+    [cleanupCanvasTransientUi, location.state, navigate, persistCurrentCanvas, projectId, workflowId]
   );
 
   const handleSwitchEpisode = useCallback(
@@ -296,10 +324,12 @@ const CanvasInner: React.FC = () => {
         relatedAssets: toEpisodeSeedAssets(episodeResponse.data),
       });
       if (result) {
-        navigate(`/project/${projectId}/workflows/${result.id}`);
+        navigate(`/project/${projectId}/workflows/${result.id}`, {
+          state: location.state,
+        });
       }
     },
-    [cleanupCanvasTransientUi, navigate, persistCurrentCanvas, projectId]
+    [cleanupCanvasTransientUi, location.state, navigate, persistCurrentCanvas, projectId]
   );
 
   // 直接从 nodes 中计算选中的节点
@@ -628,13 +658,18 @@ const CanvasInner: React.FC = () => {
         relatedAssets: toEpisodeSeedAssets(episodeResponse.data),
       });
       if (!cancelled && result) {
-        navigate(`/project/${projectId}/workflows/${result.id}`, { replace: true });
+        navigate(`/project/${projectId}/workflows/${result.id}`, {
+          replace: true,
+          state:
+            readWorkflowCanvasNavState(location.state) ||
+            workflowCanvasNavState(projectEpisodePath(projectId, episodeId), 'episode'),
+        });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [episodeId, navigate, projectId, workflowId]);
+  }, [episodeId, location.state, navigate, projectId, workflowId]);
 
   useEffect(() => {
     if (!projectId || !canvasDocumentId) return;
@@ -993,7 +1028,7 @@ const CanvasInner: React.FC = () => {
       <header className="h-14 flex items-center justify-between px-6 bg-[hsl(var(--surface))]/95 backdrop-blur-md border-b border-[hsl(var(--outline-variant))]/20 z-50">
         <div className="flex items-center gap-4">
           <button 
-            onClick={handleBackNavigation}
+            onClick={handleExitCanvas}
             className="w-9 h-9 flex items-center justify-center rounded-xl text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-high))] hover:text-[hsl(var(--on-surface))] transition-colors"
           >
             <ArrowLeftOutlined style={{ fontSize: 16 }} />
@@ -1105,7 +1140,7 @@ const CanvasInner: React.FC = () => {
             画布
           </button>
           <button 
-            onClick={handleBackNavigation}
+            onClick={handleSourceReturn}
             className="px-3 py-2 text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))] transition-colors"
           >
             {backTarget.label}
