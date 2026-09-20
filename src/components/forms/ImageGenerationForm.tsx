@@ -11,6 +11,7 @@ import { useMultiUpload } from "@/hooks/useUpload"
 import type { UploadDirectory } from "@/api/uploadApi"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useImageModels } from "@/features/infinite-canvas/hooks/useModels"
+import { cn } from "@/lib/utils"
 
 export interface ImageGenerationConfig {
   model: string
@@ -38,12 +39,56 @@ const fallbackModels = [
   { id: "sdxl", name: "SDXL", desc: "通用型底模，便于快速出图" },
 ]
 
-const aspectRatioOptions = [
-  { value: "1:1" as const, label: "1:1", desc: "正方形" },
-  { value: "16:9" as const, label: "16:9", desc: "横屏" },
-  { value: "9:16" as const, label: "9:16", desc: "竖屏" },
-  { value: "4:3" as const, label: "4:3", desc: "经典" },
-]
+const aspectRatioValues = ["1:1", "16:9", "9:16", "4:3"] as const
+
+function PromptChromePills<T extends string | number>({
+  label,
+  options,
+  value,
+  disabled,
+  onChange,
+  format,
+  title,
+}: {
+  label: string
+  options: T[]
+  value: T
+  disabled?: boolean
+  onChange: (next: T) => void
+  format?: (option: T) => string
+  title?: string
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      title={title}
+      className="flex items-center gap-0.5 rounded-full bg-[hsl(var(--surface-container-lowest))] p-0.5"
+    >
+      {options.map((option) => {
+        const active = option === value
+        return (
+          <button
+            key={String(option)}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            disabled={disabled}
+            onClick={() => onChange(option)}
+            className={cn(
+              "h-7 rounded-full px-2.5 text-[11px] font-semibold tracking-tight transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))] disabled:opacity-50",
+              active
+                ? "signature-gradient text-white shadow-sm"
+                : "text-[hsl(var(--on-surface-variant))] hover:bg-[hsl(var(--surface-container-high))]"
+            )}
+          >
+            {format ? format(option) : String(option)}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export function ImageGenerationForm({
   value,
@@ -188,7 +233,7 @@ export function ImageGenerationForm({
         </p>
       </div>
 
-      {/* Prompt with Reference Images */}
+      {/* Prompt composer: refs + ratio/qty live in the box chrome */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
           <span className="mr-1 text-red-500">*</span>提示词
@@ -208,49 +253,29 @@ export function ImageGenerationForm({
           }}
           onDragLeave={() => setIsReferenceDragOver(false)}
           onDrop={handleReferenceDrop}
-          className={`rounded-2xl border bg-[hsl(var(--surface-container-low))] p-4 transition-all ${
+          className={cn(
+            "rounded-2xl border bg-[hsl(var(--surface-container-low))] transition-all",
             isReferenceDragOver
               ? "border-[hsl(var(--primary))]/60 bg-[hsl(var(--primary))]/5"
               : "border-[hsl(var(--outline-variant))]/35"
-          }`}
+          )}
         >
-          <div className="flex gap-4">
-            {value.referenceImages.length === 0 ? (
-              <button
-                type="button"
-                onClick={() =>
-                  !uploading && !disabled && fileInputRef.current?.click()
-                }
-                disabled={uploading || disabled}
-                className="flex h-28 w-24 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-[hsl(var(--outline-variant))]/45 bg-[hsl(var(--surface-container-lowest))] text-[hsl(var(--secondary))] transition-all hover:border-[hsl(var(--primary))]/45 hover:text-[hsl(var(--primary))] disabled:opacity-50"
-              >
-                {uploading ? (
-                  <Loader2 className="h-7 w-7 animate-spin" />
-                ) : (
-                  <ImagePlus className="h-7 w-7" />
-                )}
-              </button>
-            ) : null}
+          <textarea
+            value={value.prompt}
+            onChange={(e) => updateField("prompt", e.target.value)}
+            placeholder={
+              uploading ? "正在上传..." : "上传参考图、输入文字，描述你想生成的图片。"
+            }
+            disabled={uploading || disabled}
+            className="min-h-[132px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none disabled:opacity-50"
+          />
 
-            <div className="min-w-0 flex-1">
-              <textarea
-                value={value.prompt}
-                onChange={(e) => updateField("prompt", e.target.value)}
-                placeholder={
-                  uploading ? "正在上传..." : "上传参考图、输入文字，描述你想生成的图片。"
-                }
-                disabled={uploading || disabled}
-                className="min-h-[110px] w-full resize-none bg-transparent text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none disabled:opacity-50"
-              />
-            </div>
-          </div>
-
-          {value.referenceImages.length > 0 || uploading ? (
-            <div className="mt-4 flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[hsl(var(--outline-variant))]/20 px-3 py-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               {value.referenceImages.map((image, index) => (
                 <div
                   key={`${image}-${index}`}
-                  className="group relative h-20 w-20 overflow-hidden rounded-2xl border border-[hsl(var(--outline-variant))]/25 bg-[hsl(var(--surface-container-lowest))]"
+                  className="group relative h-12 w-12 overflow-hidden rounded-xl border border-[hsl(var(--outline-variant))]/25 bg-[hsl(var(--surface-container-lowest))]"
                 >
                   <img
                     src={image}
@@ -261,15 +286,15 @@ export function ImageGenerationForm({
                     type="button"
                     onClick={() => removeReferenceImage(index)}
                     disabled={disabled}
-                    className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
+                    className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
               ))}
               {uploading && (
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-2 border-dashed border-[hsl(var(--outline-variant))]/40">
-                  <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--primary))]" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-dashed border-[hsl(var(--outline-variant))]/40">
+                  <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--primary))]" />
                 </div>
               )}
               <button
@@ -278,89 +303,48 @@ export function ImageGenerationForm({
                   !uploading && !disabled && fileInputRef.current?.click()
                 }
                 disabled={uploading || disabled}
-                className="flex h-20 w-20 items-center justify-center rounded-2xl border-2 border-dashed border-[hsl(var(--outline-variant))]/40 text-[hsl(var(--secondary))] transition-all hover:border-[hsl(var(--primary))]/45 hover:text-[hsl(var(--primary))] disabled:opacity-50"
+                aria-label="上传参考图"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-[hsl(var(--outline-variant))]/40 text-[hsl(var(--secondary))] transition-all hover:border-[hsl(var(--primary))]/45 hover:text-[hsl(var(--primary))] disabled:opacity-50"
               >
-                <ImagePlus className="h-5 w-5" />
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
               </button>
             </div>
-          ) : null}
-        </div>
-        <p className="text-xs text-[hsl(var(--secondary))]">
-          支持拖入多张参考图，图片会作为多参考输入一起参与生成。
-        </p>
-      </div>
 
-      {/* Aspect Ratio Selection */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
-          生成比例
-        </label>
-        <div className="flex gap-3">
-          {aspectRatioOptions.map((ratio) => (
-            <button
-              key={ratio.value}
-              type="button"
-              disabled={disabled}
-              onClick={() => updateField("aspectRatio", ratio.value)}
-              className={`flex-1 rounded-xl border-2 px-2 py-3 transition-all disabled:opacity-50 ${
-                value.aspectRatio === ratio.value
-                  ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5"
-                  : "border-[hsl(var(--outline-variant))]/30 bg-transparent hover:border-[hsl(var(--outline-variant))]/60"
-              }`}
-            >
-              <span
-                className={`block text-sm font-bold ${
-                  value.aspectRatio === ratio.value
-                    ? "text-[hsl(var(--primary))]"
-                    : "text-[hsl(var(--on-surface))]"
-                }`}
-              >
-                {ratio.label}
-              </span>
-              <span className="mt-0.5 block text-[10px] text-[hsl(var(--secondary))]">
-                {ratio.desc}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Quantity Selection */}
-      {showQuantity && (
-        <div className="space-y-3">
-          <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
-            生成数量
-          </label>
-          <div className="flex gap-3">
-            {quantityOptions.map((qty) => (
-              <button
-                key={qty}
-                type="button"
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              <PromptChromePills
+                label="生成比例"
+                options={[...aspectRatioValues]}
+                value={value.aspectRatio}
                 disabled={disabled}
-                onClick={() => updateField("quantity", qty)}
-                className={`flex-1 rounded-xl border-2 px-2 py-3 transition-all disabled:opacity-50 ${
-                  value.quantity === qty
-                    ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5"
-                    : "border-[hsl(var(--outline-variant))]/30 bg-transparent hover:border-[hsl(var(--outline-variant))]/60"
-                }`}
-              >
-                <span
-                  className={`block text-sm font-bold ${
-                    value.quantity === qty
-                      ? "text-[hsl(var(--primary))]"
-                      : "text-[hsl(var(--on-surface))]"
-                  }`}
-                >
-                  {qty}张
-                </span>
-              </button>
-            ))}
+                onChange={(next) => updateField("aspectRatio", next)}
+              />
+              {showQuantity ? (
+                <div className="flex items-center gap-1.5">
+                  <PromptChromePills
+                    label="生成数量"
+                    options={quantityOptions}
+                    value={value.quantity}
+                    disabled={disabled}
+                    onChange={(next) => updateField("quantity", next)}
+                    format={(qty) => `${qty}张`}
+                    title="每次生成会消耗相应积分"
+                  />
+                  <span
+                    className="text-[10px] leading-none text-[hsl(var(--secondary))]"
+                    title="每次生成会消耗相应积分"
+                  >
+                    耗积分
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
-          <p className="text-xs text-[hsl(var(--secondary))]">
-            每次生成会消耗相应积分
-          </p>
         </div>
-      )}
+      </div>
     </div>
   )
 }
