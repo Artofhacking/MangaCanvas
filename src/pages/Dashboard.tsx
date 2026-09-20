@@ -374,7 +374,7 @@ export default function Dashboard() {
         {/* 快捷入口网格 */}
         <section className="mb-7">
           <h3 className="text-base font-bold text-[hsl(var(--on-surface))] mb-4">快速入口</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
             <Card 
               onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}
               className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-4 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
