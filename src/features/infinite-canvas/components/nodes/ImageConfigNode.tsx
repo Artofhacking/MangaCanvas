@@ -1,16 +1,20 @@
 import React, { useState, useCallback } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Copy, Download, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import type { CustomNode } from '../../types';
+import { mediaUrl } from '@/lib/mediaUrl';
+import PreviewModal from '../PreviewModal';
 import { PlusHandle } from './PlusHandle';
 import {
   IMAGE_EMPTY_ASPECT,
   IMAGE_PREVIEW_WIDTH,
   MediaEmptyGlyph,
   MediaPreviewCard,
+  MediaStageLoading,
+  cssAspectRatio,
 } from './MediaPreviewCard';
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
@@ -23,6 +27,8 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   );
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '画面节点');
+  const [showPreview, setShowPreview] = useState(false);
+  const hasMedia = Boolean(data.url);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -61,32 +67,82 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     removeNode(id);
   };
 
+  const handleDownload = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!data.url) return;
+    const link = document.createElement('a');
+    link.href = mediaUrl(data.url);
+    link.download = `image_${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    message.success('下载成功');
+  }, [data.url]);
+
   return (
-    <MediaPreviewCard
-      selected={selected}
-      label={data.label || '画面节点'}
-      icon={<ImageIcon />}
-      width={IMAGE_PREVIEW_WIDTH}
-      aspectRatio={IMAGE_EMPTY_ASPECT}
-      isEditingLabel={isEditingLabel}
-      editLabel={editLabel}
-      onLabelDoubleClick={handleLabelDoubleClick}
-      onLabelChange={handleLabelChange}
-      onLabelBlur={handleLabelBlur}
-      onLabelKeyDown={handleLabelKeyDown}
-      handles={
-        <>
-          <PlusHandle type="target" position={Position.Left} />
-          <PlusHandle type="source" position={Position.Right} />
-        </>
-      }
-      actions={[
-        { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
-        { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
-      ]}
-    >
-      <MediaEmptyGlyph kind="image" />
-    </MediaPreviewCard>
+    <>
+      <MediaPreviewCard
+        selected={selected}
+        filled={hasMedia && !data.loading}
+        label={data.label || '画面节点'}
+        icon={<ImageIcon />}
+        width={IMAGE_PREVIEW_WIDTH}
+        aspectRatio={
+          hasMedia
+            ? cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, IMAGE_EMPTY_ASPECT)
+            : IMAGE_EMPTY_ASPECT
+        }
+        isEditingLabel={isEditingLabel}
+        editLabel={editLabel}
+        onLabelDoubleClick={handleLabelDoubleClick}
+        onLabelChange={handleLabelChange}
+        onLabelBlur={handleLabelBlur}
+        onLabelKeyDown={handleLabelKeyDown}
+        handles={
+          <>
+            <PlusHandle type="target" position={Position.Left} />
+            <PlusHandle type="source" position={Position.Right} />
+          </>
+        }
+        actions={[
+          { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !hasMedia },
+          { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
+          { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
+        ]}
+      >
+        {data.loading ? (
+          <MediaStageLoading kind="image" />
+        ) : data.url ? (
+          <img
+            src={mediaUrl(data.url)}
+            alt={data.label}
+            className="h-full w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+            onClick={() => setShowPreview(true)}
+          />
+        ) : (
+          <MediaEmptyGlyph kind="image" />
+        )}
+        {data.error ? (
+          <div className="absolute inset-x-0 bottom-0 bg-[#b42318]/80 px-3 py-1.5 text-[11px] text-white">
+            {data.error}
+          </div>
+        ) : null}
+      </MediaPreviewCard>
+
+      <PreviewModal
+        visible={showPreview}
+        onClose={() => setShowPreview(false)}
+        type="image"
+        url={mediaUrl(data.url)}
+        title={data.label || '图片预览'}
+        params={{
+          prompt: data.prompt,
+          model: data.model,
+          ratio: data.ratio,
+          size: data.size,
+        }}
+      />
+    </>
   );
 };
 
