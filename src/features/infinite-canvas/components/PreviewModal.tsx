@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Modal } from 'antd';
-import { CloseOutlined, DownloadOutlined } from '@ant-design/icons';
+import { CloseOutlined, DownloadOutlined, StarOutlined } from '@ant-design/icons';
 import { mediaUrl } from '@/lib/mediaUrl';
+import SaveToMaterialsModal from './SaveToMaterialsModal';
 
 interface PreviewParams {
   prompt?: string;
@@ -20,7 +21,24 @@ interface PreviewModalProps {
   title?: string;
   onDownload?: () => void;
   params?: PreviewParams;
+  nodeId?: string;
+  initialCategory?: string;
 }
+
+const defaultCollectName = (
+  type: 'image' | 'video',
+  title?: string,
+  prompt?: string,
+) => {
+  const snippet = prompt?.trim();
+  if (snippet) {
+    return snippet.length > 32 ? `${snippet.slice(0, 32)}…` : snippet;
+  }
+  if (title?.trim() && title !== '预览') {
+    return title.trim();
+  }
+  return type === 'video' ? '视频素材' : '图片素材';
+};
 
 const PreviewModal: React.FC<PreviewModalProps> = ({
   visible,
@@ -30,7 +48,21 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
   title = '预览',
   onDownload,
   params,
+  nodeId,
+  initialCategory,
 }) => {
+  const [collectOpen, setCollectOpen] = useState(false);
+  const collectName = useMemo(
+    () => defaultCollectName(type, title, params?.prompt),
+    [params?.prompt, title, type],
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      setCollectOpen(false);
+    }
+  }, [visible]);
+
   const handleDownload = () => {
     if (onDownload) {
       onDownload();
@@ -44,6 +76,11 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
+  const handleCollect = () => {
+    if (!url) return;
+    setCollectOpen(true);
+  };
+
   const hasParams = params && (params.prompt || params.model);
 
   // 阻止右键事件
@@ -53,6 +90,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
   };
 
   return (
+    <>
     <Modal
       open={visible}
       onCancel={onClose}
@@ -72,6 +110,17 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
           <span className="text-white font-medium">{title}</span>
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              onClick={handleCollect}
+              disabled={!url}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+              title="收藏"
+              aria-label="收藏"
+            >
+              <StarOutlined className="text-white" />
+            </button>
+            <button
+              type="button"
               onClick={handleDownload}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer"
               title="下载"
@@ -79,6 +128,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
               <DownloadOutlined className="text-white" />
             </button>
             <button
+              type="button"
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer"
               title="关闭"
@@ -146,6 +196,17 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
         </div>
       </div>
     </Modal>
+    <SaveToMaterialsModal
+      open={collectOpen}
+      onClose={() => setCollectOpen(false)}
+      imageUrl={url || undefined}
+      mediaType={type}
+      initialName={collectName}
+      initialCategory={initialCategory}
+      nodeId={nodeId}
+      confirmLabel="收藏到资产库"
+    />
+    </>
   );
 };
 

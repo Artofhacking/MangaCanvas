@@ -4,18 +4,22 @@ import { useParams } from 'react-router-dom';
 import { persistMedia } from '@/api/aigc/imageService';
 import { projectAssetsApi } from '@/api/projectAssetsApi';
 import { projectApi } from '@/api/projectApi';
+import { mediaUrl } from '@/lib/mediaUrl';
 import { useProjectStore } from '@/store/projectStore';
 
 type MaterialCategory = 'character' | 'scene' | 'object';
 type SaveMode = 'create' | 'existing';
+type MediaType = 'image' | 'video';
 
 interface SaveToMaterialsModalProps {
   open: boolean;
   onClose: () => void;
   imageUrl?: string;
+  mediaType?: MediaType;
   initialName?: string;
   initialCategory?: string;
   nodeId?: string;
+  confirmLabel?: string;
 }
 
 const categoryOptions = [
@@ -35,9 +39,11 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   open,
   onClose,
   imageUrl,
+  mediaType = 'image',
   initialName,
   initialCategory,
   nodeId,
+  confirmLabel,
 }) => {
   const { projectId, workflowId, id } = useParams();
   const numericProjectId = Number(projectId || id);
@@ -52,11 +58,11 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   useEffect(() => {
     if (!open) return;
     setMode('create');
-    setName(initialName || '图片素材');
+    setName(initialName || (mediaType === 'video' ? '视频素材' : '图片素材'));
     setCategory(normalizeCategory(initialCategory));
     setTargetId(undefined);
     setSubmitting(false);
-  }, [open, initialCategory, initialName]);
+  }, [open, initialCategory, initialName, mediaType]);
 
   useEffect(() => {
     if (!open || Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
@@ -84,7 +90,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
 
   const handleSubmit = async () => {
     if (!imageUrl) {
-      message.warning('当前图片节点没有可保存的图片');
+      message.warning(mediaType === 'video' ? '当前视频没有可收藏的内容' : '当前图片节点没有可保存的图片');
       return;
     }
     if (Number.isNaN(numericProjectId) || numericProjectId <= 0) {
@@ -166,10 +172,16 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
         sourceType: 'workflow',
         sourceId: workflowId || nodeId || `node-${Date.now()}`,
         url: persistedUrl,
-        metadata: { category, nodeId },
+        metadata: { category, nodeId, mediaType },
       });
       await loadProjectAssets(numericProjectId, true);
-      message.success(mode === 'create' ? '已保存到项目素材库' : '已更新已有素材');
+      message.success(
+        mode === 'create'
+          ? confirmLabel
+            ? '已收藏到项目资产库'
+            : '已保存到项目素材库'
+          : '已更新已有素材',
+      );
       onClose();
     } catch (error) {
       message.error(error instanceof Error ? error.message : '保存素材失败');
@@ -186,6 +198,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
       destroyOnClose
       width={920}
       title={null}
+      zIndex={1200}
       styles={{
         body: { padding: 0 },
         content: {
@@ -215,7 +228,19 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             <div className="overflow-hidden rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))]">
               <div className="aspect-[3/4] w-full bg-[hsl(var(--surface-container-low))]">
                 {imageUrl ? (
-                  <img src={imageUrl} alt={initialName || '素材封面'} className="h-full w-full object-cover" />
+                  mediaType === 'video' ? (
+                    <video
+                      src={mediaUrl(imageUrl)}
+                      className="h-full w-full bg-black object-cover"
+                      muted
+                      playsInline
+                      autoPlay
+                      loop
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img src={mediaUrl(imageUrl)} alt={initialName || '素材封面'} className="h-full w-full object-cover" />
+                  )
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-[hsl(var(--secondary))]">
                     暂无封面
@@ -229,7 +254,9 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             <div className="mb-6">
               <div className="text-2xl font-bold text-[hsl(var(--on-surface))]">{modalTitle}</div>
               <div className="mt-2 text-sm text-[hsl(var(--secondary))]">
-                将当前图片写回角色、场景或物品库，之后可在素材面板和片段中继续使用。
+                {mediaType === 'video'
+                  ? '将当前视频写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'
+                  : '将当前图片写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'}
               </div>
             </div>
 
@@ -293,7 +320,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
                 取消
               </Button>
               <Button type="primary" onClick={() => void handleSubmit()} loading={submitting} size="large" className="rounded-2xl px-8">
-                {mode === 'create' ? '保存' : '更新'}
+                {mode === 'create' ? confirmLabel || '保存' : '更新'}
               </Button>
             </div>
           </div>

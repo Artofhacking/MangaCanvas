@@ -421,6 +421,8 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         type="image"
         url={mediaUrl(data?.url)}
         title={data.label || '图片预览'}
+        nodeId={id}
+        initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
         params={{
           prompt: data?.prompt,
           model: data?.model,
