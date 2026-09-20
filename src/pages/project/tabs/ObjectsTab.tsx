@@ -20,6 +20,7 @@ interface ObjectsTabProps {
   projectId?: number | null
   objects?: ObjectItem[]
   onAddNew?: () => void
+  onUpload?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
@@ -39,6 +40,7 @@ export default function ObjectsTab({
   projectId,
   objects: objectsProp,
   onAddNew,
+  onUpload,
   onOpenCanvas,
   batchMode = false,
   selectedIds = [],
@@ -89,7 +91,7 @@ export default function ObjectsTab({
       aspectRatio: data.aspectRatio,
       ...(data.referenceImage ? { image: data.referenceImage } : {}),
     })
-    notify.success(data.referenceImage ? "物品已生成" : "物品已保存")
+    notify.success(data.referenceImage ? "物品已生成并加入素材库" : "物品已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -118,6 +120,7 @@ export default function ObjectsTab({
         description="选择创作方式"
         quickHint="快速建物品"
         onQuickCreate={handleAddNew}
+        onUpload={onUpload}
         onOpenCanvas={() => handleOpenCanvas()}
       />
 

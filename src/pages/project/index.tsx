@@ -27,7 +27,13 @@ import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { projectAssetsPath, type WorkflowCanvasEntry } from "@/lib/workspaceRoutes"
 import { useProjectStore } from "@/store/projectStore"
 
-import type { CanvasLaunchSource, WorkflowSourceType } from "@/types"
+import type {
+  CanvasLaunchSource,
+  CharacterCreateData,
+  ObjectCreateData,
+  SceneCreateData,
+  WorkflowSourceType,
+} from "@/types"
 import type { ProjectTab } from "@/types"
 
 // Tabs
@@ -44,8 +50,18 @@ import SceneCreator from "./SceneCreator"
 import EpisodeCreator from "./EpisodeCreator"
 import CharacterCreator from "./CharacterCreator"
 import ObjectCreator from "./ObjectCreator"
-import CharacterBatchUploadDialog from "./CharacterBatchUploadDialog"
+import AssetBatchUploadDialog from "./AssetBatchUploadDialog"
+import type { AssetBatchUploadKind } from "./assetBatchUpload"
 import { CardGridSkeleton } from "@/components/feedback/ListQueryState"
+
+const uploadTabConfig: Record<
+  "characters" | "scenes" | "objects",
+  { kind: AssetBatchUploadKind; label: string }
+> = {
+  characters: { kind: "character", label: "上传角色" },
+  scenes: { kind: "scene", label: "上传场景" },
+  objects: { kind: "object", label: "上传物品" },
+}
 
 const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects", "workflows", "favorites"]
 const defaultProjectTab: ProjectTab = "scenes"
@@ -108,10 +124,20 @@ export default function ProjectDetail() {
   const [sortBy, setSortBy] = useState<SortOption>("recent")
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all")
   const [batchUploadOpen, setBatchUploadOpen] = useState(false)
+  const [batchUploadKind, setBatchUploadKind] = useState<AssetBatchUploadKind>("character")
 
   const routeTab = isProjectTab(tabParam) ? tabParam : undefined
   const activeTab = routeTab ?? storeActiveTab
   const assetsReady = numericProjectId != null && initializedProjectId === numericProjectId && !isLoading
+  const uploadConfig =
+    activeTab === "characters" || activeTab === "scenes" || activeTab === "objects"
+      ? uploadTabConfig[activeTab]
+      : null
+
+  const openBatchUpload = (kind: AssetBatchUploadKind) => {
+    setBatchUploadKind(kind)
+    setBatchUploadOpen(true)
+  }
 
   const assetType = useMemo(() => {
     switch (activeTab) {
@@ -316,6 +342,7 @@ export default function ProjectDetail() {
           <ScenesTab
             scenes={sortedAssets.scenes}
             onAddNew={() => openDrawer('scene')}
+            onUpload={() => openBatchUpload("scene")}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("scene", source)}
             projectId={numericProjectId}
             batchMode={batchMode}
@@ -328,6 +355,7 @@ export default function ProjectDetail() {
           <CharactersTab
             characters={sortedAssets.characters}
             onAddNew={() => openDrawer('character')}
+            onUpload={() => openBatchUpload("character")}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("character", source)}
             projectId={numericProjectId}
             batchMode={batchMode}
@@ -340,6 +368,7 @@ export default function ProjectDetail() {
           <ObjectsTab
             objects={sortedAssets.objects}
             onAddNew={() => openDrawer('object')}
+            onUpload={() => openBatchUpload("object")}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("object", source)}
             projectId={numericProjectId}
             batchMode={batchMode}
@@ -391,14 +420,26 @@ export default function ProjectDetail() {
         }} 
       />
 
-      {/* Character Batch Upload Dialog */}
-      <CharacterBatchUploadDialog
+      <AssetBatchUploadDialog
         open={batchUploadOpen}
         onOpenChange={setBatchUploadOpen}
         projectId={numericProjectId || 0}
+        kind={batchUploadKind}
         onCreate={async (data) => {
-          if (!numericProjectId) return
-          await createCharacter(numericProjectId, data)
+          if (!numericProjectId) throw new Error("缺少项目信息")
+          if (batchUploadKind === "character") {
+            const created = await createCharacter(numericProjectId, data as CharacterCreateData)
+            if (!created) throw new Error("创建角色失败")
+            return created
+          }
+          if (batchUploadKind === "scene") {
+            const created = await createScene(numericProjectId, data as SceneCreateData)
+            if (!created) throw new Error("创建场景失败")
+            return created
+          }
+          const created = await createObject(numericProjectId, data as ObjectCreateData)
+          if (!created) throw new Error("创建物品失败")
+          return created
         }}
       />
 
@@ -490,14 +531,14 @@ export default function ProjectDetail() {
                     取消
                   </Button>
                 )}
-                {activeTab === "characters" && (
+                {uploadConfig && (
                   <Button
-                    onClick={() => setBatchUploadOpen(true)}
+                    onClick={() => openBatchUpload(uploadConfig.kind)}
                     variant="outline"
                     className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold hover:bg-[hsl(var(--surface-container-low))]"
                   >
                     <Upload className="w-4 h-4" />
-                    上传角色
+                    {uploadConfig.label}
                   </Button>
                 )}
                 {showBulkDelete && (

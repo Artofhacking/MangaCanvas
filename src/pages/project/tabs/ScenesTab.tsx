@@ -20,6 +20,7 @@ interface ScenesTabProps {
   projectId?: number | null
   scenes?: Scene[]
   onAddNew?: () => void
+  onUpload?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
@@ -30,6 +31,7 @@ export default function ScenesTab({
   projectId,
   scenes: scenesProp,
   onAddNew,
+  onUpload,
   onOpenCanvas,
   batchMode = false,
   selectedIds = [],
@@ -97,6 +99,7 @@ export default function ScenesTab({
       image: data.referenceImage,
       status: data.status,
     })
+    notify.success(data.referenceImage ? "场景已生成并加入素材库" : "场景已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -136,6 +139,7 @@ export default function ScenesTab({
         description="选择创作方式。"
         quickHint="快速建场景"
         onQuickCreate={handleAddNew}
+        onUpload={onUpload}
         onOpenCanvas={() => handleOpenCanvas()}
       />
 

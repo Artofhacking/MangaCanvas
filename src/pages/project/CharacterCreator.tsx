@@ -136,7 +136,9 @@ export default function CharacterCreator({
         style: values.style,
       },
     }).then((result) => {
-      if (result === "ok") notify.success("角色已生成")
+      if (result === "ok") {
+        notify.success(initialData ? "角色已重新生成并保存" : "角色已生成并加入素材库")
+      }
     }).catch((error) => {
       notify.error(error instanceof Error ? error.message : "生成失败")
     })

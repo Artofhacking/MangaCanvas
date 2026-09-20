@@ -20,6 +20,7 @@ interface CharactersTabProps {
   projectId?: number | null
   characters?: Character[]
   onAddNew?: () => void
+  onUpload?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
   selectedIds?: number[]
@@ -30,6 +31,7 @@ export default function CharactersTab({
   projectId,
   characters: charactersProp,
   onAddNew,
+  onUpload,
   onOpenCanvas,
   batchMode = false,
   selectedIds = [],
@@ -80,7 +82,7 @@ export default function CharactersTab({
   const handleCreate = async (data: CharacterCreateData) => {
     if (!projectId) return
     await createCharacter(projectId, data)
-    notify.success("角色创建成功")
+    notify.success("角色已加入素材库")
   }
 
   const handleUpdate = async (data: CharacterEditData) => {
@@ -97,7 +99,7 @@ export default function CharactersTab({
       role: data.role ? roleMap[data.role] : undefined,
       ...(data.referenceImage ? { image: data.referenceImage, hasImage: true } : {}),
     })
-    notify.success(data.referenceImage ? "角色已生成" : "角色已保存")
+    notify.success(data.referenceImage ? "角色已生成并加入素材库" : "角色已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -127,6 +129,7 @@ export default function CharactersTab({
           description="选择创作方式。"
           quickHint="快速建角色"
           onQuickCreate={handleAddNew}
+          onUpload={onUpload}
           onOpenCanvas={() => handleOpenCanvas()}
         />
 

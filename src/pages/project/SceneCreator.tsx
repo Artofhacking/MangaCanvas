@@ -194,7 +194,9 @@ export default function SceneCreator({
         zoom,
       },
     }).then((result) => {
-      if (result === "ok") notify.success("场景已生成")
+      if (result === "ok") {
+        notify.success(initialData ? "场景已重新生成并保存" : "场景已生成并加入素材库")
+      }
     }).catch((error) => {
       refetch()
       notify.error(error instanceof Error ? error.message : "生成失败")

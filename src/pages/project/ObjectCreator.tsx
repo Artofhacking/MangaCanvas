@@ -152,7 +152,9 @@ export default function ObjectCreator({
       aspectRatio: generationConfig.aspectRatio,
       referenceImages: generationConfig.referenceImages,
     }).then((result) => {
-      if (result === "ok") notify.success("物品已生成")
+      if (result === "ok") {
+        notify.success(initialData ? "物品已重新生成并保存" : "物品已生成并加入素材库")
+      }
     }).catch((error) => {
       notify.error(error instanceof Error ? error.message : "生成失败")
     })
@@ -195,7 +197,7 @@ export default function ObjectCreator({
                 className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
               />
             </div>
-            <ImageGenerationForm value={generationConfig} onChange={setGenerationConfig} />
+            <ImageGenerationForm directory="objects" value={generationConfig} onChange={setGenerationConfig} />
           </div>
           {panelOpen ? (
             <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
