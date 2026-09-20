@@ -575,9 +575,11 @@ const NodeGenerateBar: React.FC = () => {
                 ))
               )}
             </div>
-            <span className="shrink-0 rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
-              {slots.length > 0 ? `${slots.length} 个参考` : '待连线'}
-            </span>
+            {slots.length > 0 ? (
+              <span className="shrink-0 rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
+                {`${slots.length} 个参考`}
+              </span>
+            ) : null}
           </div>
 
           <MentionPromptInput
