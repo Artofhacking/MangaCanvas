@@ -35,6 +35,7 @@ code {
    ============================================ */
 .react-flow__node {
   cursor: default;
+  overflow: visible;
 }
 
 .react-flow__edge-path {
@@ -59,11 +60,22 @@ code {
 }
 
 .react-flow__handle {
-  width: 10px;
-  height: 10px;
+  /* RF11 pins left/right to the handle box edge (no X translate). */
+  --canvas-handle-size: 10px;
+  --canvas-handle-outset: 6px;
+  width: var(--canvas-handle-size);
+  height: var(--canvas-handle-size);
   border-radius: 50%;
   background: var(--ic-surface-container-lowest);
   border: 2px solid var(--ic-primary);
+}
+
+.react-flow__handle.react-flow__handle-left {
+  left: calc(-1 * (var(--canvas-handle-size) + var(--canvas-handle-outset)));
+}
+
+.react-flow__handle.react-flow__handle-right {
+  right: calc(-1 * (var(--canvas-handle-size) + var(--canvas-handle-outset)));
 }
 
 /* Image / video preview cards: warm-paper empty stage; filled media keeps a dark well */
@@ -71,6 +83,7 @@ code {
   --media-stage: var(--surface-container-low);
   --media-stage-fg: var(--on-surface-variant);
   --media-stage-muted: var(--secondary);
+  overflow: visible;
 }
 
 .media-preview-card__stage--filled {
@@ -78,6 +91,7 @@ code {
 }
 
 .react-flow__handle.media-plus-handle {
+  --canvas-handle-size: 22px;
   width: 22px !important;
   height: 22px !important;
   min-width: 22px !important;
@@ -89,14 +103,6 @@ code {
   display: flex !important;
   align-items: center;
   justify-content: center;
-}
-
-.react-flow__handle.media-plus-handle.react-flow__handle-left {
-  left: -11px;
-}
-
-.react-flow__handle.media-plus-handle.react-flow__handle-right {
-  right: -11px;
 }
 
 .react-flow__handle.media-plus-handle .media-plus-handle__mark {
