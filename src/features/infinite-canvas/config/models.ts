@@ -1,4 +1,5 @@
 import type { ModelConfig, SizeOption } from '../types';
+import { labeledSizes } from '../utils/aspectRatio';
 
 export const IMAGE_MODELS: ModelConfig[] = [
   {
@@ -15,13 +16,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'medium',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1024x1024)', key: '1024x1024' },
-        { label: '3:4 (1024x1536)', key: '1024x1536' },
-        { label: '4:3 (1536x1024)', key: '1536x1024' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
   },
   {
     key: 'gpt-image-2.5-flare',
@@ -37,13 +32,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'medium',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1024x1024)', key: '1024x1024' },
-        { label: '3:4 (1024x1536)', key: '1024x1536' },
-        { label: '4:3 (1536x1024)', key: '1536x1024' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
   },
   {
     key: 'gpt-image-2.5-sunburst',
@@ -59,13 +48,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'medium',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1024x1024)', key: '1024x1024' },
-        { label: '3:4 (1024x1536)', key: '1024x1536' },
-        { label: '4:3 (1536x1024)', key: '1536x1024' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
   },
   {
     key: 'wan2.7-image',
@@ -79,15 +62,8 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1280*1280',
       quality: 'standard',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1280*1280)', key: '1280*1280' },
-        { label: '3:4 (1104*1472)', key: '1104*1472' },
-        { label: '4:3 (1472*1104)', key: '1472*1104' },
-        { label: '9:16 (960*1696)', key: '960*1696' },
-        { label: '16:9 (1696*960)', key: '1696*960' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] =>
+      labeledSizes(['1280*1280', '1104*1472', '1472*1104', '960*1696', '1696*960']),
   },
   {
     key: 'wan2.7-image-pro',
@@ -101,15 +77,8 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1280*1280',
       quality: 'standard',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1280*1280)', key: '1280*1280' },
-        { label: '3:4 (1104*1472)', key: '1104*1472' },
-        { label: '4:3 (1472*1104)', key: '1472*1104' },
-        { label: '9:16 (960*1696)', key: '960*1696' },
-        { label: '16:9 (1696*960)', key: '1696*960' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] =>
+      labeledSizes(['1280*1280', '1104*1472', '1472*1104', '960*1696', '1696*960']),
   },
   {
     key: 'qwen-image-2.0',
@@ -123,13 +92,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'standard',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1024x1024)', key: '1024x1024' },
-        { label: '3:4 (1024x1536)', key: '1024x1536' },
-        { label: '4:3 (1536x1024)', key: '1536x1024' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
   },
   {
     key: 'qwen-image-2.0-pro',
@@ -143,13 +106,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'standard',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1024x1024)', key: '1024x1024' },
-        { label: '3:4 (1024x1536)', key: '1024x1536' },
-        { label: '4:3 (1536x1024)', key: '1536x1024' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
   },
   {
     key: 'wan2.6-t2i',
@@ -163,16 +120,8 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1280*1280',
       quality: 'standard',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1280*1280)', key: '1280*1280' },
-        { label: '3:4 (1104*1472)', key: '1104*1472' },
-        { label: '4:3 (1472*1104)', key: '1472*1104' },
-        { label: '9:16 (960*1696)', key: '960*1696' },
-        { label: '16:9 (1696*960)', key: '1696*960' },
-        { label: '1:1 (1440*1440)', key: '1440*1440' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] =>
+      labeledSizes(['1280*1280', '1104*1472', '1472*1104', '960*1696', '1696*960', '1440*1440']),
   },
   {
     key: 'wan2.6-image',
@@ -186,19 +135,18 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1280*1280',
       quality: 'standard',
     },
-    getSizesByQuality: (): SizeOption[] => {
-      return [
-        { label: '1:1 (1280*1280)', key: '1280*1280' },
-        { label: '1:1 (1024*1024)', key: '1024*1024' },
-        { label: '2:3 (800*1200)', key: '800*1200' },
-        { label: '3:2 (1200*800)', key: '1200*800' },
-        { label: '3:4 (960*1280)', key: '960*1280' },
-        { label: '4:3 (1280*960)', key: '1280*960' },
-        { label: '9:16 (720*1280)', key: '720*1280' },
-        { label: '16:9 (1280*720)', key: '1280*720' },
-        { label: '21:9 (1344*576)', key: '1344*576' },
-      ];
-    },
+    getSizesByQuality: (): SizeOption[] =>
+      labeledSizes([
+        '1280*1280',
+        '1024*1024',
+        '800*1200',
+        '1200*800',
+        '960*1280',
+        '1280*960',
+        '720*1280',
+        '1280*720',
+        '1344*576',
+      ]),
   },
 ];
 

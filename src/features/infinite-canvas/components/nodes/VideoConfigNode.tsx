@@ -17,6 +17,7 @@ import {
   VIDEO_PREVIEW_WIDTH,
   cssAspectRatio,
 } from './MediaPreviewCard';
+import { nodeAspectRatio } from '../../utils/aspectRatio';
 
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -103,7 +104,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         label={data.label || '视频节点'}
         icon={<Video />}
         width={VIDEO_PREVIEW_WIDTH}
-        aspectRatio={cssAspectRatio(typeof data.ratio === 'string' ? data.ratio : undefined, '16 / 9')}
+        aspectRatio={cssAspectRatio(nodeAspectRatio(data), '16 / 9')}
         isEditingLabel={isEditingLabel}
         editLabel={editLabel}
         onLabelDoubleClick={handleLabelDoubleClick}
@@ -210,6 +211,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         params={{
           prompt: typeof data.prompt === 'string' ? data.prompt : undefined,
           model: typeof data.model === 'string' ? data.model : undefined,
+          ratio: nodeAspectRatio(data),
           resolution: typeof data.resolution === 'string' ? data.resolution : undefined,
           duration: typeof data.duration === 'number' ? data.duration : undefined,
         }}
