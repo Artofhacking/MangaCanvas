@@ -14,6 +14,7 @@ const buildCharacterPayload = (data: CharacterCreateData) => ({
   avatar: data.referenceImage,
   referenceImages: data.referenceImage ? [data.referenceImage] : [],
   modelId: data.model,
+  aspectRatio: data.aspectRatio,
   seed: data.seed,
   creationMode: data.creationMode || 'quick',
   sourceWorkflowId: data.sourceWorkflowId,
@@ -77,6 +78,7 @@ export const charactersApi = {
           gender: data.gender,
           ageGroup: data.ageGroup,
           modelId: data.model,
+          ...(data.aspectRatio ? { aspectRatio: data.aspectRatio } : {}),
           ...(data.image ? { avatar: data.image } : {}),
         },
       },
@@ -99,24 +101,5 @@ export const charactersApi = {
     ).then((response) =>
       response.success ? successResponse(true) : errorResponse(response.message || '删除角色失败', false)
     )
-  },
-
-  async duplicate(projectId: number, id: number): Promise<ApiResponse<Character | null>> {
-    const characterResponse = await this.getById(projectId, id)
-    if (!characterResponse.success || !characterResponse.data) {
-      return errorResponse(characterResponse.message || '复制角色失败', null)
-    }
-
-    return this.create(projectId, {
-      name: `${characterResponse.data.name} (复制)`,
-      gender: characterResponse.data.gender || 'other',
-      ageGroup: characterResponse.data.ageGroup || 'young',
-      role: characterResponse.data.role === '主角' ? 'main' : 'support',
-      genMethod: characterResponse.data.genMethod || 'model',
-      model: characterResponse.data.model || '',
-      style: characterResponse.data.style,
-      description: characterResponse.data.description || '',
-      referenceImage: characterResponse.data.image,
-    }).then((response) => (response.success ? successResponse(response.data) : errorResponse(response.message || '复制角色失败', null)))
   },
 }

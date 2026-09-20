@@ -100,6 +100,7 @@ export const mapScene = (scene: SceneDTO): Scene => ({
   genMethod: scene.genMethod || undefined,
   model: scene.modelId || undefined,
   description: scene.description || undefined,
+  aspectRatio: scene.aspectRatio || undefined,
 })
 
 export const mapCharacter = (character: CharacterDTO): Character => ({
@@ -115,6 +116,7 @@ export const mapCharacter = (character: CharacterDTO): Character => ({
   genMethod: character.creationMode || undefined,
   model: character.modelId || undefined,
   description: character.description || undefined,
+  aspectRatio: character.aspectRatio || undefined,
 })
 
 const objectTypeMap: Record<ObjectDTO['type'], ObjectItem['type']> = {
@@ -135,6 +137,7 @@ export const mapObject = (object: ObjectDTO): ObjectItem => ({
   modified: relativeTime(object.updatedAt),
   description: object.description || undefined,
   genMethod: object.genMethod || undefined,
+  aspectRatio: object.aspectRatio || undefined,
 })
 
 export const mapMember = (member: ProjectMemberDTO) => ({

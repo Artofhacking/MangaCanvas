@@ -72,6 +72,7 @@ export interface Scene {
   genMethod?: string
   model?: string
   description?: string
+  aspectRatio?: string
 }
 
 export interface SceneCreateData {
@@ -104,6 +105,7 @@ export interface Character {
   genMethod?: string
   model?: string
   description?: string
+  aspectRatio?: string
   seed?: string
   seedMode?: 'random' | 'fixed'
 }
@@ -117,6 +119,7 @@ export interface CharacterCreateData {
   model: string
   style?: string
   description: string
+  aspectRatio?: string
   referenceImage?: string
   seed?: string
   seedMode?: 'random' | 'fixed'
@@ -144,6 +147,7 @@ export interface ObjectItem {
   description?: string
   genMethod?: string
   model?: string
+  aspectRatio?: string
 }
 
 export interface ObjectCreateData {

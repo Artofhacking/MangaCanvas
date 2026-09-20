@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, Trash2, Copy, Check } from "lucide-react"
+import { MoreHorizontal, Trash2, Check, Clock, Hash, Settings } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import { useAssetGenerationStore } from "@/store/assetGenerationStore"
 import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
 import SceneCreator from "../SceneCreator"
+import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
 import AssetQuickCreateCard from "./AssetQuickCreateCard"
 
 interface ScenesTabProps {
@@ -35,12 +36,14 @@ export default function ScenesTab({
   onToggleSelect,
 }: ScenesTabProps) {
   const scenes = useProjectStore((state) => scenesProp ?? state.assets.scenes)
-  const { deleteScene, duplicateScene, updateScene } = useProjectStore()
+  const { deleteScene, updateScene } = useProjectStore()
   const generationTasks = useAssetGenerationStore((state) => state.tasks)
   const { confirm, notify } = useFeedback()
   
   const [editScene, setEditScene] = useState<Scene | null>(null)
   const [creatorOpen, setCreatorOpen] = useState(false)
+  const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const handleDelete = async (id: number) => {
     const confirmed = await confirm({
@@ -55,11 +58,6 @@ export default function ScenesTab({
       await deleteScene(projectId, id)
       notify.success("场景已删除")
     }
-  }
-
-  const handleDuplicate = (scene: Scene) => {
-    if (!projectId) return
-    void duplicateScene(projectId, scene.id)
   }
 
   const handleAddNew = () => {
@@ -110,6 +108,26 @@ export default function ScenesTab({
     notify.info("无限画布创作模式正在接入场景工作流")
   }
 
+  const handleCardClick = (scene: Scene) => {
+    if (batchMode) {
+      onToggleSelect?.(scene.id)
+      return
+    }
+    setSelectedScene(scene)
+    setDetailOpen(true)
+  }
+
+  const sceneStatusLabel = (scene: Scene) => {
+    if (sceneTask(scene.id)?.status === "running") return "生成中"
+    if (scene.hasImage || scene.status === "in-use") return "使用中"
+    return "草稿"
+  }
+
+  const sceneStatusClass = (scene: Scene) =>
+    sceneTask(scene.id)?.status === "running" || scene.hasImage || scene.status === "in-use"
+      ? "bg-[hsl(var(--primary))] text-white"
+      : "bg-[hsl(var(--surface-container-highest))] text-[hsl(var(--on-secondary-fixed-variant))]"
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
       <AssetQuickCreateCard
@@ -125,8 +143,8 @@ export default function ScenesTab({
       {scenes.map((scene) => (
         <div 
           key={scene.id}
-          onClick={batchMode ? () => onToggleSelect?.(scene.id) : undefined}
-          className={`group relative rounded-xl overflow-hidden bg-[hsl(var(--surface-container-lowest))] transition-all hover:shadow-xl hover:shadow-[hsl(var(--on-surface))]/5 hover:-translate-y-1 ${batchMode ? "cursor-pointer ring-2 ring-transparent" : ""} ${selectedIds.includes(scene.id) ? "ring-[hsl(var(--primary))]" : ""}`}
+          onClick={() => handleCardClick(scene)}
+          className={`group relative rounded-xl overflow-hidden bg-[hsl(var(--surface-container-lowest))] transition-all hover:shadow-xl hover:shadow-[hsl(var(--on-surface))]/5 hover:-translate-y-1 cursor-pointer ${batchMode ? "ring-2 ring-transparent" : ""} ${selectedIds.includes(scene.id) ? "ring-[hsl(var(--primary))]" : ""}`}
         >
           <div className="aspect-[4/3] w-full relative overflow-hidden">
             <img 
@@ -199,18 +217,18 @@ export default function ScenesTab({
                     <Button 
                       variant="secondary"
                       size="icon"
+                      onClick={(event) => event.stopPropagation()}
                       className="w-10 bg-white/20 backdrop-blur-md text-white py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                     >
                       <MoreHorizontal className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => handleDuplicate(scene)}>
-                      <Copy className="w-4 h-4 mr-2" />
-                      复制
-                    </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => handleDelete(scene.id)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleDelete(scene.id)
+                      }}
                       className="text-red-600 focus:text-red-600"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
@@ -232,6 +250,59 @@ export default function ScenesTab({
           </div>
         </div>
       ))}
+
+      <AssetDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        image={selectedScene?.image}
+        name={selectedScene?.name ?? ""}
+        badge={
+          selectedScene ? (
+            <AssetDetailBadge className={sceneStatusClass(selectedScene)}>
+              {sceneStatusLabel(selectedScene)}
+            </AssetDetailBadge>
+          ) : undefined
+        }
+        metas={
+          selectedScene
+            ? [
+                {
+                  icon: <Clock className="w-4 h-4" />,
+                  label: "最近修改",
+                  value: selectedScene.modified,
+                },
+                {
+                  icon: <Hash className="w-4 h-4" />,
+                  label: "场景编号",
+                  value: selectedScene.code,
+                },
+                ...(selectedScene.model
+                  ? [
+                      {
+                        icon: <Settings className="w-4 h-4" />,
+                        label: "生成模型",
+                        value: selectedScene.model,
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
+        aspectRatio={selectedScene?.aspectRatio}
+        prompt={selectedScene?.description}
+        assetId={selectedScene?.id}
+        onOpenCanvas={
+          selectedScene
+            ? () =>
+                handleOpenCanvas({
+                  id: selectedScene.id,
+                  name: selectedScene.name,
+                  image: selectedScene.image,
+                  description: selectedScene.description,
+                })
+            : undefined
+        }
+      />
 
       {/* Scene Creator / Editor */}
       <SceneCreator
