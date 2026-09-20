@@ -31,8 +31,9 @@ const CanvasFlowEdge: React.FC<EdgeProps<CustomEdge['data']>> = ({
   const isAdjacentSelected = useStore(
     useCallback(
       (state) =>
-        state.nodes.some(
-          (node) => node.selected && (node.id === source || node.id === target)
+        Boolean(
+          state.nodeInternals.get(source)?.selected ||
+            state.nodeInternals.get(target)?.selected
         ),
       [source, target]
     )
