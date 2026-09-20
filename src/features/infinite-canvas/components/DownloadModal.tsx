@@ -12,15 +12,23 @@ interface DownloadModalProps {
   nodes: CustomNode[];
 }
 
+function isImageMediaNode(type?: string) {
+  return type === 'image' || type === 'imageConfig'
+}
+
+function isVideoMediaNode(type?: string) {
+  return type === 'video' || type === 'videoConfig'
+}
+
 const DownloadModal: React.FC<DownloadModalProps> = ({ visible, onClose, nodes }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [downloading, setDownloading] = useState(false);
 
-  // Filter nodes with content (images and videos)
+  // Filter nodes with content (images and videos, including filled generate cards)
   const downloadableNodes = useMemo(() => {
     return nodes.filter((node) => {
-      if (node.type === 'image' && node.data.url) return true;
-      if (node.type === 'video' && node.data.url) return true;
+      if (isImageMediaNode(node.type) && node.data.url) return true;
+      if (isVideoMediaNode(node.type) && node.data.url) return true;
       return false;
     });
   }, [nodes]);
@@ -41,7 +49,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ visible, onClose, nodes }
 
         const link = document.createElement('a');
         link.href = node.data.url;
-        link.download = `${node.type}_${Date.now()}.${node.type === 'video' ? 'mp4' : 'png'}`;
+        link.download = `${node.type}_${Date.now()}.${isVideoMediaNode(node.type) ? 'mp4' : 'png'}`;
         link.click();
         message.success('下载成功');
       } else {
@@ -55,7 +63,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ visible, onClose, nodes }
           try {
             const response = await fetch(node.data.url);
             const blob = await response.blob();
-            const ext = node.type === 'video' ? 'mp4' : 'png';
+            const ext = isVideoMediaNode(node.type) ? 'mp4' : 'png';
             zip.file(`${node.type}_${node.id}.${ext}`, blob);
           } catch (error) {
             console.error(`Failed to download ${node.id}:`, error);
@@ -121,7 +129,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ visible, onClose, nodes }
                     }
                   }}
                 />
-                {node.type === 'image' ? (
+                {isImageMediaNode(node.type) ? (
                   <img
                     src={mediaUrl(node.data.url)}
                     alt={node.data.label}
@@ -136,7 +144,7 @@ const DownloadModal: React.FC<DownloadModalProps> = ({ visible, onClose, nodes }
                 <div className="flex-1">
                   <div className="text-sm font-medium">{node.data.label}</div>
                   <div className="text-xs text-gray-500">
-                    {node.type === 'image' ? '图片' : '视频'}
+                    {isImageMediaNode(node.type) ? '图片' : '视频'}
                   </div>
                 </div>
               </div>

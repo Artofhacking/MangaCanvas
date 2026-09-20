@@ -107,7 +107,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
 
     incomingEdges.forEach((edge) => {
       const sourceNode = nodes.find((n) => n.id === edge.source);
-      if (sourceNode?.type === 'image') {
+      if (sourceNode?.type === 'image' || sourceNode?.type === 'imageConfig') {
         imageUrl = sourceNode.data.url || sourceNode.data.base64 || '';
       }
     });

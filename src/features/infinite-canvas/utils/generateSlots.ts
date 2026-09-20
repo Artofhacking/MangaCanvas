@@ -182,7 +182,8 @@ export function collectGenerateInputs(
       const mediaUrl = sourceThumb(sourceNode, slot.kind)
       if (!mediaUrl) return
 
-      if (sourceNode.type === 'image') {
+      // Filled 画面节点 is a result card: treat it like an image source for wiring.
+      if (sourceNode.type === 'image' || sourceNode.type === 'imageConfig') {
         if (slot.role === 'first_frame_image' || slot.role === 'first-frame') {
           firstFrameImage = firstFrameImage || mediaUrl
         } else if (slot.role === 'last_frame_image' || slot.role === 'last-frame') {
