@@ -194,7 +194,7 @@ const CanvasInner: React.FC = () => {
 
   const backTarget = useMemo(() => {
     if (!projectId) {
-      return { label: '返回项目', action: () => navigate('/projects') };
+      return { label: '返回项目', action: () => navigate('/dashboard') };
     }
 
     if (currentWorkflow?.sourceType === 'episode' && currentWorkflow.sourceAssetId) {

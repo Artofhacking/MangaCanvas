@@ -20,7 +20,7 @@ import Login from "./pages/auth/Login"
 import EpisodeDetail from "./pages/project/EpisodeDetail"
 
 // 非核心页面懒加载
-const ProjectsList = lazy(() => import("./pages/ProjectsList"))
+const AppHomeRedirect = lazy(() => import("./pages/AppHomeRedirect"))
 const ProjectPermissions = lazy(() => import("./pages/ProjectPermissions"))
 const Members = lazy(() => import("./pages/Members"))
 const ProjectDetail = lazy(() => import("./pages/project"))
@@ -38,12 +38,12 @@ import {
   getStoredIdentity,
   getAuthToken,
   getActiveProjectId,
+  getIdentityHomePath,
   type IdentityOption,
 } from "@/lib/session"
 import {
   isAssetTab,
   projectAssetsPath,
-  projectDashboardPath,
   projectSettingsPath,
 } from "@/lib/workspaceRoutes"
 
@@ -95,19 +95,17 @@ function IdentityRouteGuard() {
       // 显示过渡动画
       setIsTransitioning(true)
       
-      // 延迟后跳转：有权限的跳转到看板，无权限的跳转到项目列表
+      // 延迟后跳转：统一走应用首页解析器（有项目进工作台，无项目进空状态）
       const timer = setTimeout(() => {
-        if (canAccessProjectRoutes(currentIdentity)) {
-          navigate("/projects", { replace: true })
-        } else {
-          navigate("/projects", {
-            replace: true,
-            state: {
-              redirectedByIdentity: currentIdentity,
-              from: location.pathname,
-            },
-          })
-        }
+        navigate(getIdentityHomePath(), {
+          replace: true,
+          state: canAccessProjectRoutes(currentIdentity)
+            ? undefined
+            : {
+                redirectedByIdentity: currentIdentity,
+                from: location.pathname,
+              },
+        })
         setIsTransitioning(false)
         prevIdentityRef.current = currentIdentity
       }, 1500)
@@ -394,20 +392,12 @@ function RouteLoading() {
   )
 }
 
-function RedirectToLastProject() {
-  const projectId = getActiveProjectId()
-  if (projectId) {
-    return <Navigate to={projectDashboardPath(projectId)} replace />
-  }
-  return <Navigate to="/projects" replace />
-}
-
 function RedirectGlobalAssets() {
   const projectId = getActiveProjectId()
   if (projectId) {
     return <Navigate to={projectAssetsPath(projectId)} replace />
   }
-  return <Navigate to="/projects" replace />
+  return <Navigate to={getIdentityHomePath()} replace />
 }
 
 function RedirectProjectRoot() {
@@ -418,7 +408,7 @@ function RedirectProjectRoot() {
 function RedirectLegacyAssetTab() {
   const { id, tab } = useParams()
   if (!id) {
-    return <Navigate to="/projects" replace />
+    return <Navigate to={getIdentityHomePath()} replace />
   }
   if (isAssetTab(tab)) {
     return <Navigate to={projectAssetsPath(id, tab)} replace />
@@ -447,9 +437,9 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/workflow" element={<Workflow />} />
 
-          <Route path="/projects" element={<RequireAuth><ProjectsList /></RequireAuth>} />
+          <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
           <Route path="/members" element={<RequireAuth><Members /></RequireAuth>} />
-          <Route path="/dashboard" element={<RequireAuth><RedirectToLastProject /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
           <Route path="/assets" element={<RequireAuth><RedirectGlobalAssets /></RequireAuth>} />
 
           <Route path="/project/:id/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />

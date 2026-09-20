@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { authApi } from "@/api"
-import { clearUnauthorizedRedirectFlag, getAuthToken, saveSession } from "@/lib/session"
+import { clearUnauthorizedRedirectFlag, getAuthToken, getIdentityHomePath, saveSession } from "@/lib/session"
 
 function FeishuMark() {
   return (
@@ -54,7 +54,7 @@ export default function Login() {
             user: { ...payload.user },
           })
           notify.success("飞书登录成功")
-          navigate("/projects", { replace: true })
+          navigate(getIdentityHomePath(), { replace: true })
         } catch (error) {
           ticketHandled.current = false
           notify.error(error instanceof Error ? error.message : "飞书登录失败")
@@ -67,7 +67,7 @@ export default function Login() {
     }
 
     if (getAuthToken()) {
-      navigate("/projects", { replace: true })
+      navigate(getIdentityHomePath(), { replace: true })
     }
   }, [navigate, notify, searchParams])
 
@@ -109,7 +109,7 @@ export default function Login() {
       })
 
       notify.success("登录成功")
-      navigate("/projects")
+      navigate(getIdentityHomePath())
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "登录失败")
     } finally {

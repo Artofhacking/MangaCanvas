@@ -7,8 +7,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { 
   LayoutGrid, 
-  FolderOpen,
-  Users,
   Settings,
   ChevronDown,
   ChevronLeft,
@@ -27,20 +25,17 @@ import {
   getActiveProjectId,
   setActiveProjectId,
   getCurrentUser,
-  IDENTITY_CHANGE_EVENT,
-  getStoredIdentity,
-  type IdentityOption,
 } from "@/lib/session"
 import { useProjectsStore, refreshProjects } from "@/store/projectsStore"
 import { projectsApi } from "@/api"
 import {
-  isOrgShellPath,
   projectAssetsPath,
   projectDashboardPath,
   projectScriptPath,
   projectSettingsPath,
   switchProjectPath,
 } from "@/lib/workspaceRoutes"
+import { APP_HOME_PATH } from "@/lib/appHome"
 
 const getProjectIdFromPath = (pathname: string) => {
   const matched = pathname.match(/^\/project\/(\d+)/)
@@ -51,15 +46,13 @@ export default function Sidebar() {
   const [currentProject, setCurrentProject] = useState<{ id: number; name: string } | null>(null)
   const [isSwitching, setIsSwitching] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [currentIdentity, setCurrentIdentity] = useState<IdentityOption>(getStoredIdentity)
   const [isProjectCreatorOpen, setIsProjectCreatorOpen] = useState(false)
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const routeProjectId = getProjectIdFromPath(location.pathname)
   const inProjectShell = Boolean(routeProjectId)
   const activeProjectId = routeProjectId ?? currentProject?.id ?? getActiveProjectId() ?? undefined
-  const canManageOrg = currentIdentity === "admin" || currentIdentity === "superadmin"
-
   const { projects: allProjects, isLoaded, fetchProjects } = useProjectsStore()
   const projects = allProjects.map((project) => ({ id: project.id, name: project.name }))
 
@@ -84,26 +77,6 @@ export default function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeProjectId, isLoaded, allProjects])
 
-  useEffect(() => {
-    const syncIdentity = () => setCurrentIdentity(getStoredIdentity())
-    const handleIdentityChange = (event: Event) => {
-      const nextIdentity = (event as CustomEvent<IdentityOption>).detail
-      if (nextIdentity) {
-        setCurrentIdentity(nextIdentity)
-        return
-      }
-      syncIdentity()
-    }
-
-    window.addEventListener(IDENTITY_CHANGE_EVENT, handleIdentityChange as EventListener)
-    window.addEventListener("storage", syncIdentity)
-
-    return () => {
-      window.removeEventListener(IDENTITY_CHANGE_EVENT, handleIdentityChange as EventListener)
-      window.removeEventListener("storage", syncIdentity)
-    }
-  }, [])
-
   const switchToProject = (project: { id: number; name: string }) => {
     if (project.id === currentProject?.id) return
     setIsSwitching(true)
@@ -125,11 +98,6 @@ export default function Sidebar() {
         { icon: Box, label: "资产", href: projectAssetsPath(activeProjectId) },
       ]
     : []
-
-  const orgNav = [
-    { icon: FolderOpen, label: "项目", href: "/projects" },
-    ...(canManageOrg ? [{ icon: Users, label: "成员", href: "/members" }] : []),
-  ]
 
   const isWorkbenchPath =
     /^\/project\/\d+\/dashboard$/.test(location.pathname) ||
@@ -161,14 +129,15 @@ export default function Sidebar() {
       <aside className="h-screen w-64 fixed left-0 top-0 bg-[hsl(var(--surface-container-low))] flex flex-col p-5 gap-y-3 z-50">
         {inProjectShell ? (
           <div className="mb-2">
-            <Link
-              to="/projects"
+            <button
+              type="button"
+              onClick={() => setProjectMenuOpen(true)}
               className="mb-3 flex items-center gap-1 px-2 text-xs font-medium text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               全部项目
-            </Link>
-            <DropdownMenu>
+            </button>
+            <DropdownMenu open={projectMenuOpen} onOpenChange={setProjectMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button className="w-full text-left p-3 rounded-xl hover:bg-[hsl(var(--surface-container-high))] transition-colors group">
                   <div className="flex items-center justify-between">
@@ -187,20 +156,26 @@ export default function Sidebar() {
                   切换项目
                 </div>
                 <DropdownMenuSeparator />
-                {projects.map((project) => (
-                  <DropdownMenuItem
-                    key={project.id}
-                    onClick={() => switchToProject(project)}
-                    className="flex items-center justify-between cursor-pointer"
-                  >
-                    <span className={project.id === currentProject?.id ? "font-medium" : ""}>
-                      {project.name}
-                    </span>
-                    {project.id === currentProject?.id && (
-                      <Check className="w-4 h-4 text-[hsl(var(--primary))]" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
+                {projects.length === 0 ? (
+                  <div className="px-2 py-2 text-xs text-[hsl(var(--secondary))]">
+                    暂无其他项目
+                  </div>
+                ) : (
+                  projects.map((project) => (
+                    <DropdownMenuItem
+                      key={project.id}
+                      onClick={() => switchToProject(project)}
+                      className="flex items-center justify-between cursor-pointer"
+                    >
+                      <span className={project.id === currentProject?.id ? "font-medium" : ""}>
+                        {project.name}
+                      </span>
+                      {project.id === currentProject?.id && (
+                        <Check className="w-4 h-4 text-[hsl(var(--primary))]" />
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer"
@@ -248,18 +223,23 @@ export default function Sidebar() {
               ) : null}
             </>
           ) : (
-            orgNav.map((item) => {
-              const isActive =
-                item.href === "/projects"
-                  ? isOrgShellPath(location.pathname) && location.pathname !== "/members"
-                  : location.pathname === item.href
-              return (
-                <Link key={item.label} to={item.href} className={navClass(isActive)}>
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </Link>
-              )
-            })
+            <>
+              <Link
+                to={APP_HOME_PATH}
+                className={navClass(location.pathname === APP_HOME_PATH)}
+              >
+                <LayoutGrid className="w-5 h-5" />
+                <span>工作台</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIsProjectCreatorOpen(true)}
+                className={`${navClass(false)} w-full text-left`}
+              >
+                <Plus className="w-5 h-5" />
+                <span>新建项目</span>
+              </button>
+            </>
           )}
         </nav>
 

@@ -20,8 +20,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Mail, UserX, MoreHorizontal, Search, Trash2, Loader2, UserPlus, Building2 } from "lucide-react"
+import { Plus, Mail, UserX, MoreHorizontal, Search, Trash2, Loader2, UserPlus, Building2, ChevronLeft } from "lucide-react"
+import { Link } from "react-router-dom"
 import Sidebar from "@/components/layout/Sidebar"
+import UserProfileMenu from "@/components/layout/UserProfileMenu"
+import { APP_HOME_PATH } from "@/lib/appHome"
 import { useEffect, useState, useMemo, useRef } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { organizationApi } from "@/api"
@@ -190,20 +193,33 @@ export default function Members() {
       <main className="relative ml-64 flex h-screen flex-col overflow-hidden">
         {/* Header */}
         <header className="flex h-16 items-center justify-between border-b border-[hsl(var(--outline-variant))]/15 px-8">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-5 w-5 text-[hsl(var(--secondary))]" />
-            <div>
-              <h1 className="text-lg font-black text-[hsl(var(--on-surface))]">成员管理</h1>
-              <p className="text-xs text-[hsl(var(--secondary))]">{organizationName}</p>
+          <div className="flex items-center gap-4">
+            <Link
+              to={APP_HOME_PATH}
+              className="flex items-center gap-1 text-xs font-medium text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              返回工作台
+            </Link>
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-[hsl(var(--secondary))]" />
+              <div>
+                <h1 className="text-lg font-black text-[hsl(var(--on-surface))]">成员管理</h1>
+                <p className="text-xs text-[hsl(var(--secondary))]">{organizationName}</p>
+              </div>
             </div>
           </div>
-          <Button 
-            className="bg-[hsl(var(--primary))] text-white hover:opacity-90"
-            onClick={() => setInviteDialogOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            邀请成员
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button 
+              className="bg-[hsl(var(--primary))] text-white hover:opacity-90"
+              onClick={() => setInviteDialogOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              邀请成员
+            </Button>
+            <div className="h-4 w-px bg-[hsl(var(--outline-variant))]" />
+            <UserProfileMenu />
+          </div>
         </header>
 
         {/* Content */}

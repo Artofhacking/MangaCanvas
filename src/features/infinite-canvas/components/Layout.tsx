@@ -32,7 +32,7 @@ const Layout: React.FC<LayoutProps> = ({
 
   const navItems = [
     { path: '/', label: '首页' },
-    { path: '/projects', label: '项目' },
+    { path: '/dashboard', label: '工作台' },
     { path: '/billing', label: '账单' },
   ];
 
@@ -77,7 +77,7 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Start Creating Button - Only show on homepage */}
             {location.pathname === '/' && (
               <button 
-                onClick={() => navigate('/projects')}
+                onClick={() => navigate('/dashboard')}
                 className="hidden sm:block bg-[#3755c3] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#2848b7] active:scale-95 transition-all shadow-lg shadow-[#3755c3]/20"
               >
                 开始使用

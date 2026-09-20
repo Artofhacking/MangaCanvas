@@ -97,7 +97,7 @@ export default function ScriptStudio() {
 
   useEffect(() => {
     if (!projectId) {
-      navigate("/projects", { replace: true })
+      navigate("/dashboard", { replace: true })
     }
   }, [projectId, navigate])
 
