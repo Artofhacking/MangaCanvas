@@ -163,3 +163,28 @@ Update `src/components/layout/WorkspaceLayout.tsx` so workspace pages lock body 
 
 - `src/components/layout/WorkspaceLayout.tsx`
 - `src/index.css`
+
+## Case 007: Generate settings stay out of the prompt-box flow
+
+### Symptom
+
+Asset generate editors used to put ratio and quantity pills inside the prompt chrome. Expanding that into a full Lib-style settings panel (quality, clarity, ratios, quantity) would push the prompt footer and nearby drawer chrome if the panel stayed in-flow.
+
+### Root cause
+
+An in-flow settings panel participates in the prompt box height. Combined with creator drawers that already own their own scroll container, growing the chrome would reflow the form and the task panel split.
+
+### Fix
+
+Keep a one-line summary capsule in the prompt footer and open the settings as a `DropdownMenu` (`modal={false}`, portaled, `side="top"`). Tile clicks use regular buttons with `onPointerDown` preventDefault so choosing 画质 / 比例 does not dismiss the menu or lock body scroll.
+
+### Why that fix fit this project
+
+- The project already prefers `DropdownMenu` over heavier `Select` / `Dialog` primitives inside drawers (see Case 001).
+- The prompt area should stay compact after PR #26 densified ratio/qty into the chrome.
+- Portaling the panel avoids competing with the creator sheet’s internal scroll.
+
+### Implementation reference
+
+- `src/components/forms/GenerateSettingsPopover.tsx`
+- `src/components/forms/ImageGenerationForm.tsx`

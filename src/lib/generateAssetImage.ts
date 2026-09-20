@@ -1,29 +1,36 @@
-import { imageService, isI2IModel } from '@/api/aigc'
+import { imageService } from '@/api/aigc'
+import {
+  buildImageGenerateOptions,
+  DEFAULT_GENERATE_SETTINGS,
+  type GenerateSettings,
+} from '@/lib/generateSettings'
 
-export const aspectToSize = {
-  '1:1': '1024x1024',
-  '16:9': '1536x1024',
-  '9:16': '1024x1536',
-  '4:3': '1536x1024',
-} as const
+export { aspectToSize } from '@/lib/generateSettings'
 
 export async function generateAssetImage(params: {
   model: string
   prompt: string
-  aspectRatio?: keyof typeof aspectToSize
+  aspectRatio?: string
+  quality?: GenerateSettings['quality']
+  clarity?: GenerateSettings['clarity']
   referenceImages?: string[]
   n?: number
-}) {
-  const size = aspectToSize[params.aspectRatio || '1:1']
-  const urls = await imageService.generate({
+}): Promise<string[]> {
+  const options = buildImageGenerateOptions({
     model: params.model,
     prompt: params.prompt,
-    size,
-    quality: 'medium',
-    n: params.n ?? 1,
-    images: isI2IModel(params.model) ? params.referenceImages : undefined,
+    settings: {
+      ...DEFAULT_GENERATE_SETTINGS,
+      aspectRatio: params.aspectRatio || DEFAULT_GENERATE_SETTINGS.aspectRatio,
+      quality: params.quality || DEFAULT_GENERATE_SETTINGS.quality,
+      clarity: params.clarity || DEFAULT_GENERATE_SETTINGS.clarity,
+      quantity: params.n ?? 1,
+    },
+    referenceImages: params.referenceImages,
   })
-  const url = urls?.[0]
-  if (!url) throw new Error('未返回生成结果')
-  return url
+  if ('error' in options) throw new Error(options.error)
+
+  const urls = await imageService.generate(options)
+  if (!urls?.length) throw new Error('未返回生成结果')
+  return urls
 }

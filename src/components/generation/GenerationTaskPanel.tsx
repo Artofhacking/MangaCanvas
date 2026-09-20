@@ -1,5 +1,6 @@
 import { Loader2, Image as ImageIcon, LayoutList } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import type { AssetGenTask } from "@/store/assetGenerationStore"
 import type { RefObject } from "react"
 
@@ -7,9 +8,32 @@ interface GenerationTaskPanelProps {
   tasks: AssetGenTask[]
   highlight?: boolean
   panelRef?: RefObject<HTMLDivElement>
+  onSetCover?: (task: AssetGenTask, imageUrl: string) => Promise<void> | void
 }
 
-export default function GenerationTaskPanel({ tasks, highlight = false, panelRef }: GenerationTaskPanelProps) {
+function candidateUrls(task: AssetGenTask): string[] {
+  if (task.imageUrls?.length) return task.imageUrls
+  return task.imageUrl ? [task.imageUrl] : []
+}
+
+export default function GenerationTaskPanel({
+  tasks,
+  highlight = false,
+  panelRef,
+  onSetCover,
+}: GenerationTaskPanelProps) {
+  const { notify } = useFeedback()
+
+  const handleSetCover = async (task: AssetGenTask, imageUrl: string) => {
+    if (!onSetCover || task.imageUrl === imageUrl) return
+    try {
+      await onSetCover(task, imageUrl)
+      notify.success("已设为封面")
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "设置封面失败")
+    }
+  }
+
   return (
     <div
       ref={panelRef}
@@ -38,11 +62,40 @@ export default function GenerationTaskPanel({ tasks, highlight = false, panelRef
               key={task.id}
               className="overflow-hidden rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-lowest))] shadow-sm"
             >
-              <div className="aspect-[3/2] bg-[hsl(var(--surface-container-low))]">
-                {task.imageUrl ? (
-                  <img src={task.imageUrl} alt={task.name} className="h-full w-full object-cover" />
+              <div className="bg-[hsl(var(--surface-container-low))]">
+                {candidateUrls(task).length > 1 ? (
+                  <div className="grid grid-cols-2 gap-1 p-1">
+                    {candidateUrls(task).map((url, index) => {
+                      const isCover = url === task.imageUrl
+                      return (
+                        <button
+                          key={`${task.id}-${url}-${index}`}
+                          type="button"
+                          onClick={() => void handleSetCover(task, url)}
+                          className={`group relative overflow-hidden rounded-xl ${
+                            isCover ? "ring-2 ring-[hsl(var(--primary))]" : ""
+                          }`}
+                        >
+                          <img src={url} alt={`${task.name} 候选 ${index + 1}`} className="aspect-square w-full object-cover" />
+                          <span
+                            className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              isCover
+                                ? "signature-gradient text-white"
+                                : "bg-black/45 text-white opacity-0 group-hover:opacity-100"
+                            }`}
+                          >
+                            {isCover ? "封面" : "设为封面"}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : task.imageUrl ? (
+                  <div className="aspect-[3/2]">
+                    <img src={task.imageUrl} alt={task.name} className="h-full w-full object-cover" />
+                  </div>
                 ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-3 text-[hsl(var(--secondary))]">
+                  <div className="flex aspect-[3/2] flex-col items-center justify-center gap-3 text-[hsl(var(--secondary))]">
                     {task.status === "running" ? (
                       <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--primary))]" />
                     ) : (

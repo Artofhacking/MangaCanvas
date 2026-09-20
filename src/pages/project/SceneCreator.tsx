@@ -19,6 +19,8 @@ import {
 } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
+import { GenerateSettingsPopover } from "@/components/forms/GenerateSettingsPopover"
+import { DEFAULT_GENERATE_SETTINGS, type GenerateSettings } from "@/lib/generateSettings"
 import { useImageModels } from "@/features/infinite-canvas/hooks"
 import GenerationTaskPanel, {
   AssetEditorActions,
@@ -86,6 +88,7 @@ export default function SceneCreator({
   const runningKey = projectId ? assetTaskKey("scene", Number(projectId), initialData?.id) : ""
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
+  const setCover = useAssetGenerationStore((state) => state.setCover)
   const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
     useCollapsibleTaskPanel(open)
 
@@ -93,6 +96,10 @@ export default function SceneCreator({
   const [zoom, setZoom] = useState(0.6)
   const [sceneName, setSceneName] = useState("")
   const [description, setDescription] = useState("")
+  const [generateSettings, setGenerateSettings] = useState<GenerateSettings>({
+    ...DEFAULT_GENERATE_SETTINGS,
+    aspectRatio: "16:9",
+  })
   // 用于防止 useEffect 重复执行的 ref
   const initializedRef = useRef(false)
   const prevOpenRef = useRef(open)
@@ -113,6 +120,7 @@ export default function SceneCreator({
     setSelectedModel(availableModels[0]?.id || "")
     setDistance([8.0])
     setZoom(0.6)
+    setGenerateSettings({ ...DEFAULT_GENERATE_SETTINGS, aspectRatio: "16:9" })
   }
 
   // 编辑模式下回填数据 / 关闭时重置表单
@@ -135,6 +143,10 @@ export default function SceneCreator({
       setSceneName(initialData.name)
       setSelectedModel(initialData.model || imageModels[0]?.id || "")
       setDescription(initialData.description || "")
+      setGenerateSettings({
+        ...DEFAULT_GENERATE_SETTINGS,
+        aspectRatio: initialData.aspectRatio || "16:9",
+      })
     } else {
       resetForm()
     }
@@ -191,7 +203,10 @@ export default function SceneCreator({
       name: sceneName.trim(),
       prompt: description.trim(),
       model: modelId,
-      size: "1536x1024",
+      aspectRatio: generateSettings.aspectRatio,
+      quality: generateSettings.quality,
+      clarity: generateSettings.clarity,
+      n: generateSettings.quantity,
       extras: {
         description: description.trim(),
         distance: distance[0],
@@ -309,12 +324,21 @@ export default function SceneCreator({
                     <span className="text-red-500">*</span> 提示词
                     <HelpCircle className="w-4 h-4 text-[hsl(var(--secondary))]" />
                   </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="输入文字，描述你想生成的场景，包括空间构成、时间氛围、光线、材质、镜头语言等。"
-                    className="min-h-[110px] w-full resize-none rounded-2xl border border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] p-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none"
-                  />
+                  <div className="rounded-2xl border border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))]">
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="输入文字，描述你想生成的场景，包括空间构成、时间氛围、光线、材质、镜头语言等。"
+                      className="min-h-[110px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none"
+                    />
+                    <div className="flex justify-end border-t border-[hsl(var(--outline-variant))]/20 px-3 py-2">
+                      <GenerateSettingsPopover
+                        model={selectedModel}
+                        value={generateSettings}
+                        onChange={setGenerateSettings}
+                      />
+                    </div>
+                  </div>
                   <p className="text-xs text-[hsl(var(--secondary))]">
                     详细的描述可帮助场景在构图、氛围和材质上更贴近目标方向。
                   </p>
@@ -323,7 +347,12 @@ export default function SceneCreator({
           </div>
 
           {panelOpen ? (
-            <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+            <GenerationTaskPanel
+              tasks={tasks}
+              highlight={highlightTasks}
+              panelRef={taskPanelRef}
+              onSetCover={(task, url) => setCover(task.id, url)}
+            />
           ) : null}
         </div>
 

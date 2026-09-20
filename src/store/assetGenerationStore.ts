@@ -1,6 +1,10 @@
 import { create } from 'zustand'
-import { imageService, isI2IModel } from '@/api/aigc'
-import { aspectToSize } from '@/lib/generateAssetImage'
+import { imageService } from '@/api/aigc'
+import {
+  buildImageGenerateOptions,
+  DEFAULT_GENERATE_SETTINGS,
+  type GenerateSettings,
+} from '@/lib/generateSettings'
 import { useProjectStore } from '@/store/projectStore'
 
 export type AssetKind = 'scene' | 'character' | 'object' | 'episode'
@@ -16,6 +20,7 @@ export type AssetGenTask = {
   status: 'running' | 'succeeded' | 'failed'
   progress: string
   imageUrl?: string
+  imageUrls?: string[]
   error?: string
   createdAt: number
 }
@@ -57,8 +62,11 @@ export type StartAssetGenerationInput = {
   name: string
   prompt: string
   model: string
-  aspectRatio?: keyof typeof aspectToSize
+  aspectRatio?: string
+  quality?: GenerateSettings['quality']
+  clarity?: GenerateSettings['clarity']
   size?: string
+  n?: number
   referenceImages?: string[]
   extras?: {
     description?: string
@@ -75,6 +83,7 @@ interface AssetGenerationState {
   tasks: AssetGenTask[]
   runningKeys: Record<string, boolean>
   start: (input: StartAssetGenerationInput) => Promise<'ok' | 'busy'>
+  setCover: (taskId: string, imageUrl: string) => Promise<void>
 }
 
 function normalizeTask(task: Partial<AssetGenTask> & { sceneId?: number }): AssetGenTask | null {
@@ -91,6 +100,7 @@ function normalizeTask(task: Partial<AssetGenTask> & { sceneId?: number }): Asse
     status: status === 'succeeded' || status === 'failed' ? status : 'failed',
     progress: task.status === 'running' ? '已中断，请重新提交' : task.progress || '',
     imageUrl: task.imageUrl,
+    imageUrls: Array.isArray(task.imageUrls) ? task.imageUrls.filter(Boolean) : task.imageUrl ? [task.imageUrl] : undefined,
     error: task.status === 'running' ? '离开或刷新后任务中断' : task.error,
     createdAt: task.createdAt || 0,
   }
@@ -136,7 +146,7 @@ function requirePersisted<T>(value: T | null | undefined, kind: AssetKind, actio
   throw new Error(storeError || (action === 'create' ? `${noun}未能加入素材库` : `${noun}未能保存到素材库`))
 }
 
-async function persistGenerated(input: StartAssetGenerationInput, imageUrl: string) {
+async function persistGenerated(input: StartAssetGenerationInput, imageUrl: string): Promise<number | undefined> {
   const store = useProjectStore.getState()
   const extras = input.extras || {}
   if (input.kind === 'scene') {
@@ -152,9 +162,9 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
         'scene',
         'update',
       )
-      return
+      return input.assetId
     }
-    requirePersisted(
+    const created = requirePersisted(
       await store.createScene(input.projectId, {
         name: input.name,
         genMethod: 'model',
@@ -168,7 +178,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
       'scene',
       'create',
     )
-    return
+    return created.id
   }
   if (input.kind === 'character') {
     if (input.assetId) {
@@ -187,9 +197,9 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
         'character',
         'update',
       )
-      return
+      return input.assetId
     }
-    requirePersisted(
+    const created = requirePersisted(
       await store.createCharacter(input.projectId, {
         name: input.name,
         gender: extras.gender || 'other',
@@ -204,7 +214,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
       'character',
       'create',
     )
-    return
+    return created.id
   }
   if (input.kind === 'object') {
     if (input.assetId) {
@@ -218,9 +228,9 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
         'object',
         'update',
       )
-      return
+      return input.assetId
     }
-    requirePersisted(
+    const created = requirePersisted(
       await store.createObject(input.projectId, {
         name: input.name,
         genMethod: 'model',
@@ -232,6 +242,28 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
       'object',
       'create',
     )
+    return created.id
+  }
+  return input.assetId
+}
+
+async function persistCover(task: AssetGenTask, imageUrl: string) {
+  const store = useProjectStore.getState()
+  if (!task.assetId) return
+  if (task.kind === 'scene') {
+    requirePersisted(await store.updateScene(task.projectId, task.assetId, { image: imageUrl }), 'scene', 'update')
+    return
+  }
+  if (task.kind === 'character') {
+    requirePersisted(
+      await store.updateCharacter(task.projectId, task.assetId, { image: imageUrl, hasImage: true }),
+      'character',
+      'update',
+    )
+    return
+  }
+  if (task.kind === 'object') {
+    requirePersisted(await store.updateObject(task.projectId, task.assetId, { image: imageUrl }), 'object', 'update')
   }
 }
 
@@ -266,6 +298,7 @@ export function withExistingAssetResult(
       status: 'succeeded',
       progress: '已完成',
       imageUrl: existing.imageUrl,
+      imageUrls: [existing.imageUrl],
       createdAt: 0,
     },
     ...tasks,
@@ -307,26 +340,46 @@ export const useAssetGenerationStore = create<AssetGenerationState>((set, get) =
     await Promise.resolve()
 
     try {
-      const size = input.size || aspectToSize[input.aspectRatio || (input.kind === 'scene' || input.kind === 'episode' ? '16:9' : '1:1')]
-      const urls = await imageService.generate({
+      const settings: GenerateSettings = {
+        ...DEFAULT_GENERATE_SETTINGS,
+        aspectRatio:
+          input.aspectRatio ||
+          (input.kind === 'scene' || input.kind === 'episode' ? '16:9' : DEFAULT_GENERATE_SETTINGS.aspectRatio),
+        quality: input.quality || DEFAULT_GENERATE_SETTINGS.quality,
+        clarity: input.clarity || DEFAULT_GENERATE_SETTINGS.clarity,
+        quantity: input.n ?? 1,
+      }
+      const options = buildImageGenerateOptions({
         model: input.model,
         prompt: input.prompt,
-        size,
-        quality: 'medium',
-        n: 1,
-        images: isI2IModel(input.model) ? input.referenceImages : undefined,
+        settings,
+        referenceImages: input.referenceImages,
+      })
+      if ('error' in options) throw new Error(options.error)
+      const urls = await imageService.generate({
+        ...options,
+        size: input.size || options.size,
         onProgress: (progress) => {
           const label = STATUS_LABEL[progress.status] ?? progress.status
           set((state) => ({ tasks: patchTask(state.tasks, id, { progress: label }) }))
         },
       })
-      const imageUrl = urls?.[0]
+      const imageUrls = (urls || []).filter(Boolean)
+      const imageUrl = imageUrls[0]
       if (!imageUrl) throw new Error('未返回生成结果')
 
       set((state) => ({
-        tasks: patchTask(state.tasks, id, { status: 'succeeded', progress: '生成完成', imageUrl }),
+        tasks: patchTask(state.tasks, id, {
+          status: 'succeeded',
+          progress: imageUrls.length > 1 ? `生成完成，共 ${imageUrls.length} 张` : '生成完成',
+          imageUrl,
+          imageUrls,
+        }),
       }))
-      await persistGenerated({ ...input, projectId }, imageUrl)
+      const assetId = await persistGenerated({ ...input, projectId }, imageUrl)
+      set((state) => ({
+        tasks: patchTask(state.tasks, id, { assetId: assetId ?? input.assetId }),
+      }))
       return 'ok'
     } catch (error) {
       const messageText = error instanceof Error ? error.message : '生成失败'
@@ -341,5 +394,17 @@ export const useAssetGenerationStore = create<AssetGenerationState>((set, get) =
         return { runningKeys }
       })
     }
+  },
+
+  setCover: async (taskId, imageUrl) => {
+    const task = get().tasks.find((item) => item.id === taskId)
+    if (!task) throw new Error('找不到生成任务')
+    const imageUrls = task.imageUrls?.includes(imageUrl)
+      ? task.imageUrls
+      : [imageUrl, ...(task.imageUrls || (task.imageUrl ? [task.imageUrl] : []))]
+    set((state) => ({
+      tasks: patchTask(state.tasks, taskId, { imageUrl, imageUrls }),
+    }))
+    await persistCover({ ...task, imageUrl, imageUrls }, imageUrl)
   },
 }))

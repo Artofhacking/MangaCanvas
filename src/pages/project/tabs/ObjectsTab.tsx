@@ -83,7 +83,7 @@ export default function ObjectsTab({
     }
   }
 
-  const handleUpdate = async (data: { id: number; name: string; genMethod: "model" | "upload"; model?: string; prompt?: string; aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3"; referenceImage?: string; referenceImages?: string[] }) => {
+  const handleUpdate = async (data: { id: number; name: string; genMethod: "model" | "upload"; model?: string; prompt?: string; aspectRatio?: string; referenceImage?: string; referenceImages?: string[] }) => {
     if (!projectId) return
     await updateObject(projectId, data.id, {
       name: data.name,
