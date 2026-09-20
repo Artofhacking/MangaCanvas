@@ -1,23 +1,18 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
-import { Trash2, Check, User, Sparkles, Image, Settings, Copy, MoreHorizontal } from "lucide-react"
+import { Trash2, Check, Sparkles, Image, Settings, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
 import CharacterCreator from "../CharacterCreator"
+import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
 import AssetQuickCreateCard from "./AssetQuickCreateCard"
 
 
@@ -41,7 +36,7 @@ export default function CharactersTab({
   onToggleSelect,
 }: CharactersTabProps) {
   const characters = useProjectStore((state) => charactersProp ?? state.assets.characters)
-  const { deleteCharacter, updateCharacter, createCharacter, duplicateCharacter } = useProjectStore()
+  const { deleteCharacter, updateCharacter, createCharacter } = useProjectStore()
   const { confirm, notify } = useFeedback()
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -82,12 +77,6 @@ export default function CharactersTab({
     setDetailOpen(false)
   }
 
-  const handleDuplicate = (character: Character, e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    if (!projectId) return
-    void duplicateCharacter(projectId, character.id)
-  }
-
   const handleCreate = async (data: CharacterCreateData) => {
     if (!projectId) return
     await createCharacter(projectId, data)
@@ -104,6 +93,7 @@ export default function CharactersTab({
       style: data.style,
       description: data.description,
       model: data.model,
+      aspectRatio: data.aspectRatio,
       role: data.role ? roleMap[data.role] : undefined,
       ...(data.referenceImage ? { image: data.referenceImage, hasImage: true } : {}),
     })
@@ -214,10 +204,6 @@ export default function CharactersTab({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={(event) => handleDuplicate(character, event)}>
-                      <Copy className="w-4 h-4 mr-2" />
-                      复制
-                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(event) => {
                         event.stopPropagation()
@@ -245,111 +231,64 @@ export default function CharactersTab({
 
       </div>
 
-      {/* Character Detail Dialog */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden">
-          {selectedCharacter && (
-            <div className="flex flex-col md:flex-row">
-              {/* Image Section */}
-              <div className="w-full md:w-1/2 aspect-square md:aspect-auto">
-                <img
-                  src={selectedCharacter.image}
-                  alt={selectedCharacter.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              
-              {/* Info Section */}
-              <div className="w-full md:w-1/2 p-6 flex flex-col">
-                <DialogHeader className="mb-4">
-                  <div className="flex items-center gap-3">
-                    <DialogTitle className="text-xl font-bold">{selectedCharacter.name}</DialogTitle>
-                    <Badge 
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border-0 ${
-                        selectedCharacter.role === "主角" 
-                          ? "bg-[hsl(var(--primary))] text-white" 
-                          : "bg-[hsl(var(--secondary))] text-white"
-                      }`}
-                    >
-                      {selectedCharacter.role}
-                    </Badge>
-                  </div>
-                </DialogHeader>
-
-                <div className="space-y-4 flex-1">
-                  {/* Style */}
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="w-4 h-4 text-[hsl(var(--secondary))] mt-0.5" />
-                    <div>
-                      <p className="text-xs text-[hsl(var(--secondary))]">风格</p>
-                      <p className="text-sm font-medium text-[hsl(var(--on-surface))]">{selectedCharacter.style}</p>
-                    </div>
-                  </div>
-
-                  {/* Scenes */}
-                  <div className="flex items-start gap-3">
-                    <Image className="w-4 h-4 text-[hsl(var(--secondary))] mt-0.5" />
-                    <div>
-                      <p className="text-xs text-[hsl(var(--secondary))]">关联场景</p>
-                      <p className="text-sm font-medium text-[hsl(var(--on-surface))]">{selectedCharacter.scenes} 个场景</p>
-                    </div>
-                  </div>
-
-                  {/* Gender & Age */}
-                  <div className="flex items-start gap-3">
-                    <User className="w-4 h-4 text-[hsl(var(--secondary))] mt-0.5" />
-                    <div>
-                      <p className="text-xs text-[hsl(var(--secondary))]">基本信息</p>
-                      <p className="text-sm font-medium text-[hsl(var(--on-surface))]">
-                        {selectedCharacter.gender || "未知性别"} · {selectedCharacter.ageGroup || "未知年龄"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Model */}
-                  {selectedCharacter.model && (
-                    <div className="flex items-start gap-3">
-                      <Settings className="w-4 h-4 text-[hsl(var(--secondary))] mt-0.5" />
-                      <div>
-                        <p className="text-xs text-[hsl(var(--secondary))]">生成模型</p>
-                        <p className="text-sm font-medium text-[hsl(var(--on-surface))]">{selectedCharacter.model}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Description / Prompt */}
-                  {selectedCharacter.description && (
-                    <div className="pt-4 border-t border-[hsl(var(--outline-variant))]/30">
-                      <p className="text-xs text-[hsl(var(--secondary))] mb-2">提示词</p>
-                      <p className="text-sm text-[hsl(var(--on-surface))] leading-relaxed bg-[hsl(var(--surface-container-low))] p-3 rounded-lg">
-                        {selectedCharacter.description}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-[hsl(var(--outline-variant))]/30 flex items-center justify-between gap-3 text-xs text-[hsl(var(--secondary))]">
-                  <span>ID: {selectedCharacter.id}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleOpenCanvas({
-                        id: selectedCharacter.id,
-                        name: selectedCharacter.name,
-                        image: selectedCharacter.image,
-                        description: selectedCharacter.description,
-                      })
-                    }
-                    className="rounded-xl bg-[hsl(var(--primary))] px-3 py-2 text-xs font-bold text-white"
-                  >
-                    打开画布
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AssetDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        image={selectedCharacter?.image}
+        name={selectedCharacter?.name ?? ""}
+        badge={
+          selectedCharacter ? (
+            <AssetDetailBadge
+              className={
+                selectedCharacter.role === "主角"
+                  ? "bg-[hsl(var(--primary))] text-white"
+                  : "bg-[hsl(var(--secondary))] text-white"
+              }
+            >
+              {selectedCharacter.role}
+            </AssetDetailBadge>
+          ) : undefined
+        }
+        metas={
+          selectedCharacter
+            ? [
+                {
+                  icon: <Sparkles className="w-4 h-4" />,
+                  label: "风格",
+                  value: selectedCharacter.style,
+                },
+                {
+                  icon: <Image className="w-4 h-4" />,
+                  label: "关联场景",
+                  value: `${selectedCharacter.scenes} 个场景`,
+                },
+                ...(selectedCharacter.model
+                  ? [
+                      {
+                        icon: <Settings className="w-4 h-4" />,
+                        label: "生成模型",
+                        value: selectedCharacter.model,
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
+        aspectRatio={selectedCharacter?.aspectRatio}
+        prompt={selectedCharacter?.description}
+        assetId={selectedCharacter?.id}
+        onOpenCanvas={
+          selectedCharacter
+            ? () =>
+                handleOpenCanvas({
+                  id: selectedCharacter.id,
+                  name: selectedCharacter.name,
+                  image: selectedCharacter.image,
+                  description: selectedCharacter.description,
+                })
+            : undefined
+        }
+      />
 
       {/* Character Creator / Editor */}
       <CharacterCreator

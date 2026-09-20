@@ -123,6 +123,7 @@ export interface CharacterDTO {
   sourceWorkflowId?: string | null
   sourceNodeId?: string | null
   usageCount?: number
+  aspectRatio?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -145,6 +146,7 @@ export interface SceneDTO {
   sourceWorkflowId?: string | null
   sourceNodeId?: string | null
   usageCount?: number
+  aspectRatio?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -164,6 +166,7 @@ export interface ObjectDTO {
   creationMode?: 'quick' | 'workflow'
   sourceWorkflowId?: string | null
   sourceNodeId?: string | null
+  aspectRatio?: string | null
   createdAt?: string
   updatedAt?: string
 }

@@ -132,6 +132,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
         description: extras.description ?? input.prompt,
         image: imageUrl,
         status: 'in-use',
+        aspectRatio: input.aspectRatio,
       })
       return
     }
@@ -158,6 +159,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
         ageGroup: extras.ageGroup,
         style: extras.style,
         hasImage: true,
+        aspectRatio: input.aspectRatio,
       })
       return
     }
@@ -169,6 +171,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
       model: input.model,
       style: extras.style,
       description: input.prompt,
+      aspectRatio: input.aspectRatio,
       referenceImage: imageUrl,
     })
     return
@@ -179,6 +182,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
         name: input.name,
         description: input.prompt,
         image: imageUrl,
+        aspectRatio: input.aspectRatio,
       })
       return
     }
@@ -187,6 +191,7 @@ async function persistGenerated(input: StartAssetGenerationInput, imageUrl: stri
       genMethod: 'model',
       model: input.model,
       prompt: input.prompt,
+      aspectRatio: input.aspectRatio,
       referenceImage: imageUrl,
     })
   }

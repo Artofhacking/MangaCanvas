@@ -98,6 +98,7 @@ export default function ObjectCreator({
       setGenerationConfig((prev) => ({
         ...prev,
         prompt: initialData.description || "",
+        aspectRatio: (initialData.aspectRatio as ImageGenerationConfig["aspectRatio"]) || prev.aspectRatio,
         referenceImages: initialData.hasImage && initialData.image ? [initialData.image] : [],
       }))
     } else {

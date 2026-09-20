@@ -6,13 +6,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Check, Trash2, Copy, MoreHorizontal } from "lucide-react"
+import { Check, Trash2, MoreHorizontal, MapPin, Clock, Settings } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, ObjectItem, ObjectType } from "@/types"
 import { useState } from "react"
 import ObjectCreator from "../ObjectCreator"
+import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
 import AssetQuickCreateCard from "./AssetQuickCreateCard"
 
 interface ObjectsTabProps {
@@ -44,11 +45,13 @@ export default function ObjectsTab({
   onToggleSelect,
 }: ObjectsTabProps) {
   const objects = useProjectStore((state) => objectsProp ?? state.assets.objects)
-  const { updateObject, deleteObject, duplicateObject } = useProjectStore()
+  const { updateObject, deleteObject } = useProjectStore()
   const { confirm, notify } = useFeedback()
   
   const [editObject, setEditObject] = useState<ObjectItem | null>(null)
   const [creatorOpen, setCreatorOpen] = useState(false)
+  const [selectedObject, setSelectedObject] = useState<ObjectItem | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const handleAddNew = () => {
     if (onAddNew) {
@@ -78,17 +81,12 @@ export default function ObjectsTab({
     }
   }
 
-  const handleDuplicate = async (object: ObjectItem) => {
-    if (!projectId) return
-    await duplicateObject(projectId, object.id)
-    notify.success("物品已复制")
-  }
-
   const handleUpdate = async (data: { id: number; name: string; genMethod: "model" | "upload"; model?: string; prompt?: string; aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3"; referenceImage?: string; referenceImages?: string[] }) => {
     if (!projectId) return
     await updateObject(projectId, data.id, {
       name: data.name,
       description: data.prompt,
+      aspectRatio: data.aspectRatio,
       ...(data.referenceImage ? { image: data.referenceImage } : {}),
     })
     notify.success(data.referenceImage ? "物品已生成" : "物品已保存")
@@ -101,6 +99,15 @@ export default function ObjectsTab({
     }
 
     notify.info("无限画布创作模式正在接入物品工作流")
+  }
+
+  const handleCardClick = (object: ObjectItem) => {
+    if (batchMode) {
+      onToggleSelect?.(object.id)
+      return
+    }
+    setSelectedObject(object)
+    setDetailOpen(true)
   }
 
   return (
@@ -118,8 +125,8 @@ export default function ObjectsTab({
       {objects.map((object) => (
         <div 
           key={object.id}
-          onClick={batchMode ? () => onToggleSelect?.(object.id) : undefined}
-          className={`group relative rounded-xl overflow-hidden bg-[hsl(var(--surface-container-lowest))] transition-all hover:shadow-xl hover:shadow-[hsl(var(--on-surface))]/5 hover:-translate-y-1 ${batchMode ? "cursor-pointer ring-2 ring-transparent" : ""} ${selectedIds.includes(object.id) ? "ring-[hsl(var(--primary))]" : ""}`}
+          onClick={() => handleCardClick(object)}
+          className={`group relative rounded-xl overflow-hidden bg-[hsl(var(--surface-container-lowest))] transition-all hover:shadow-xl hover:shadow-[hsl(var(--on-surface))]/5 hover:-translate-y-1 cursor-pointer ${batchMode ? "ring-2 ring-transparent" : ""} ${selectedIds.includes(object.id) ? "ring-[hsl(var(--primary))]" : ""}`}
         >
           <div className="aspect-square w-full relative overflow-hidden">
             <img 
@@ -156,14 +163,15 @@ export default function ObjectsTab({
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() =>
+                    onClick={(event) => {
+                      event.stopPropagation()
                       handleOpenCanvas({
                         id: object.id,
                         name: object.name,
                         image: object.image,
                         description: object.description,
                       })
-                    }
+                    }}
                     className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                   >
                     打开画布
@@ -171,7 +179,10 @@ export default function ObjectsTab({
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => handleEdit(object)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleEdit(object)
+                    }}
                     className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                   >
                     {object.hasImage ? "编辑" : "生成"}
@@ -181,18 +192,18 @@ export default function ObjectsTab({
                       <Button
                         variant="secondary"
                         size="icon"
+                        onClick={(event) => event.stopPropagation()}
                         className="w-10 bg-white/20 backdrop-blur-md text-white py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                       >
                         <MoreHorizontal className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-40">
-                      <DropdownMenuItem onClick={() => void handleDuplicate(object)}>
-                        <Copy className="w-4 h-4 mr-2" />
-                        复制
-                      </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => void handleDelete(object.id)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void handleDelete(object.id)
+                        }}
                         className="text-red-600 focus:text-red-600"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
@@ -214,6 +225,64 @@ export default function ObjectsTab({
           </div>
         </div>
       ))}
+
+      <AssetDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        image={selectedObject?.image}
+        name={selectedObject?.name ?? ""}
+        badge={
+          selectedObject ? (
+            <span className="flex items-center gap-1.5">
+              <AssetDetailBadge className={`${typeColors[selectedObject.type]} text-white`}>
+                {selectedObject.type}
+              </AssetDetailBadge>
+              {selectedObject.status === "in-use" ? (
+                <AssetDetailBadge className="bg-[hsl(var(--primary))] text-white">使用中</AssetDetailBadge>
+              ) : null}
+            </span>
+          ) : undefined
+        }
+        metas={
+          selectedObject
+            ? [
+                {
+                  icon: <MapPin className="w-4 h-4" />,
+                  label: "关联场景",
+                  value: selectedObject.scene,
+                },
+                {
+                  icon: <Clock className="w-4 h-4" />,
+                  label: "最近修改",
+                  value: selectedObject.modified,
+                },
+                ...(selectedObject.model
+                  ? [
+                      {
+                        icon: <Settings className="w-4 h-4" />,
+                        label: "生成模型",
+                        value: selectedObject.model,
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
+        aspectRatio={selectedObject?.aspectRatio}
+        prompt={selectedObject?.description}
+        assetId={selectedObject?.id}
+        onOpenCanvas={
+          selectedObject
+            ? () =>
+                handleOpenCanvas({
+                  id: selectedObject.id,
+                  name: selectedObject.name,
+                  image: selectedObject.image,
+                  description: selectedObject.description,
+                })
+            : undefined
+        }
+      />
 
       {/* Object Creator / Editor */}
       <ObjectCreator

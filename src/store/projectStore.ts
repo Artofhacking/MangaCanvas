@@ -58,15 +58,12 @@ interface ProjectActions {
   createScene: (projectId: number, data: SceneCreateData) => Promise<Scene | null>
   updateScene: (projectId: number, id: number, data: Partial<Scene>) => Promise<Scene | null>
   deleteScene: (projectId: number, id: number) => Promise<boolean>
-  duplicateScene: (projectId: number, id: number) => Promise<Scene | null>
   createCharacter: (projectId: number, data: CharacterCreateData) => Promise<Character | null>
   updateCharacter: (projectId: number, id: number, data: Partial<Character>) => Promise<Character | null>
   deleteCharacter: (projectId: number, id: number) => Promise<boolean>
-  duplicateCharacter: (projectId: number, id: number) => Promise<Character | null>
   createObject: (projectId: number, data: ObjectCreateData) => Promise<ObjectItem | null>
   updateObject: (projectId: number, id: number, data: Partial<ObjectItem>) => Promise<ObjectItem | null>
   deleteObject: (projectId: number, id: number) => Promise<boolean>
-  duplicateObject: (projectId: number, id: number) => Promise<ObjectItem | null>
   bulkDelete: (projectId: number, type: keyof ProjectState['assets'], ids: number[]) => Promise<void>
   reset: () => void
 }
@@ -355,23 +352,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     return true
   },
 
-  duplicateScene: async (projectId, id) => {
-    const response = await projectApi.scenes.duplicate(projectId, id)
-    if (!response.success || !response.data) {
-      set({ error: response.message || '复制场景失败' })
-      return null
-    }
-    const duplicatedScene = response.data
-
-    set((state) => ({
-      assets: {
-        ...state.assets,
-        scenes: [duplicatedScene, ...state.assets.scenes],
-      },
-    }))
-    return duplicatedScene
-  },
-
   createCharacter: async (projectId, data) => {
     const response = await projectApi.characters.create(projectId, data)
     if (!response.success) {
@@ -421,23 +401,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     return true
   },
 
-  duplicateCharacter: async (projectId, id) => {
-    const response = await projectApi.characters.duplicate(projectId, id)
-    if (!response.success || !response.data) {
-      set({ error: response.message || '复制角色失败' })
-      return null
-    }
-    const duplicatedCharacter = response.data
-
-    set((state) => ({
-      assets: {
-        ...state.assets,
-        characters: [duplicatedCharacter, ...state.assets.characters],
-      },
-    }))
-    return duplicatedCharacter
-  },
-
   createObject: async (projectId, data) => {
     const response = await projectApi.objects.create(projectId, data)
     if (!response.success) {
@@ -485,23 +448,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       },
     }))
     return true
-  },
-
-  duplicateObject: async (projectId, id) => {
-    const response = await projectApi.objects.duplicate(projectId, id)
-    if (!response.success || !response.data) {
-      set({ error: response.message || '复制物品失败' })
-      return null
-    }
-    const duplicatedObject = response.data
-
-    set((state) => ({
-      assets: {
-        ...state.assets,
-        objects: [duplicatedObject, ...state.assets.objects],
-      },
-    }))
-    return duplicatedObject
   },
 
   bulkDelete: async (projectId, type, ids) => {

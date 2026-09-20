@@ -21,6 +21,7 @@ const buildObjectPayload = (data: ObjectCreateData) => ({
   creationMode: data.creationMode || 'quick',
   sourceWorkflowId: data.sourceWorkflowId,
   sourceNodeId: data.sourceNodeId,
+  aspectRatio: data.aspectRatio,
 })
 
 export const objectsApi = {
@@ -78,6 +79,7 @@ export const objectsApi = {
           description: data.description,
           image: data.image,
           status: data.status,
+          ...(data.aspectRatio ? { aspectRatio: data.aspectRatio } : {}),
         },
       },
       null,
@@ -99,18 +101,5 @@ export const objectsApi = {
     ).then((response) =>
       response.success ? successResponse(true) : errorResponse(response.message || '删除物品失败', false)
     )
-  },
-
-  async duplicate(projectId: number, id: number): Promise<ApiResponse<ObjectItem | null>> {
-    const objectResponse = await this.getById(projectId, id)
-    if (!objectResponse.success || !objectResponse.data) {
-      return errorResponse(objectResponse.message || '复制物品失败', null)
-    }
-
-    return this.create(projectId, {
-      name: `${objectResponse.data.name} (复制)`,
-      genMethod: 'upload',
-      referenceImage: objectResponse.data.image,
-    }).then((response) => (response.success ? successResponse(response.data) : errorResponse(response.message || '复制物品失败', null)))
   },
 }

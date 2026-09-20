@@ -89,6 +89,7 @@ export default function CharacterCreator({
       model: values.model,
       style: values.style,
       description: values.prompt,
+      aspectRatio: values.aspectRatio,
     })
     notify.success("角色已保存")
   }

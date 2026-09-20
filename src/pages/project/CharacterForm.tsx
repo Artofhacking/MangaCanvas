@@ -84,7 +84,7 @@ export default function CharacterForm({
       setGenerationConfig({
         model: initialData.model || "",
         prompt: initialData.description || "",
-        aspectRatio: "1:1",
+        aspectRatio: (initialData.aspectRatio as ImageGenerationConfig["aspectRatio"]) || "1:1",
         quantity: 1,
         referenceImages: initialData.image ? [initialData.image] : [],
       })

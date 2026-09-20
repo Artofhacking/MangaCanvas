@@ -77,6 +77,7 @@ export const scenesApi = {
           description: data.description,
           image: data.image,
           status: data.status,
+          ...(data.aspectRatio ? { aspectRatio: data.aspectRatio } : {}),
         },
       },
       null,
@@ -98,22 +99,5 @@ export const scenesApi = {
     ).then((response) =>
       response.success ? successResponse(true) : errorResponse(response.message || '删除场景失败', false)
     )
-  },
-
-  async duplicate(projectId: number, id: number): Promise<ApiResponse<Scene | null>> {
-    const sceneResponse = await this.getById(projectId, id)
-    if (!sceneResponse.success || !sceneResponse.data) {
-      return errorResponse(sceneResponse.message || '复制场景失败', null)
-    }
-
-    return this.create(projectId, {
-      name: `${sceneResponse.data.name} (复制)`,
-      genMethod: sceneResponse.data.genMethod || 'model',
-      model: sceneResponse.data.model || '',
-      description: sceneResponse.data.description || '',
-      distance: 8,
-      zoom: 0.6,
-      status: 'draft',
-    }).then((response) => (response.success ? successResponse(response.data) : errorResponse(response.message || '复制场景失败', null)))
   },
 }
