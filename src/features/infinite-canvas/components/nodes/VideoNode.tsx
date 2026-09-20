@@ -160,6 +160,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     <div className="relative">
       <MediaPreviewCard
         selected={selected}
+        filled={Boolean(data.url) && !data.loading}
         label={data.label || '视频节点'}
         icon={<Video />}
         width={VIDEO_PREVIEW_WIDTH}

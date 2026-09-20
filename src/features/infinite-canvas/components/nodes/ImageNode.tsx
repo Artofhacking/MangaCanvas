@@ -352,6 +352,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       <MediaPreviewCard
         selected={selected}
         dropActive={isDropActive}
+        filled={Boolean(data?.url) && !data?.loading}
         label={data.label || '图片节点'}
         icon={<ImageIcon />}
         width={IMAGE_PREVIEW_WIDTH}
