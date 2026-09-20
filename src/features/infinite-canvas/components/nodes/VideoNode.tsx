@@ -7,6 +7,7 @@ import PreviewModal from '../PreviewModal';
 import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { PlusHandle } from './PlusHandle';
+import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
 import {
   MediaEmptyGlyph,
   MediaPreviewCard,
@@ -161,6 +162,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       <MediaPreviewCard
         selected={selected}
         filled={Boolean(data.url) && !data.loading}
+        generating={Boolean(data.loading)}
         label={data.label || '视频节点'}
         icon={<Video />}
         width={VIDEO_PREVIEW_WIDTH}
@@ -199,7 +201,11 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         ]}
       >
         {data.loading ? (
-          <MediaStageLoading kind="video" />
+          <MediaStageLoading
+            kind="video"
+            progress={readNodeProgress(data)}
+            onCancel={bindNodeGenerationCancel(id, updateNode)}
+          />
         ) : data.url ? (
           <div className="relative h-full w-full">
             <video

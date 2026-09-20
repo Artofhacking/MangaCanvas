@@ -11,6 +11,7 @@ import type { CanvasMaterialItem, CustomNode } from '../../types';
 import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { PlusHandle } from './PlusHandle';
+import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
 import {
   IMAGE_EMPTY_ASPECT,
   IMAGE_PREVIEW_WIDTH,
@@ -353,6 +354,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         selected={selected}
         dropActive={isDropActive}
         filled={Boolean(data?.url) && !data?.loading}
+        generating={Boolean(data?.loading)}
         label={data.label || '图片节点'}
         icon={<ImageIcon />}
         width={IMAGE_PREVIEW_WIDTH}
@@ -380,7 +382,11 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         ]}
       >
         {data?.loading ? (
-          <MediaStageLoading kind="image" />
+          <MediaStageLoading
+            kind="image"
+            progress={readNodeProgress(data)}
+            onCancel={bindNodeGenerationCancel(id, updateNode)}
+          />
         ) : data?.url ? (
           <img
             src={mediaUrl(data.url)}

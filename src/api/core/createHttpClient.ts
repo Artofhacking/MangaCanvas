@@ -6,7 +6,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios'
 import type { HttpError } from './error'
-import { normalizeHttpError } from './error'
+import { isCanceledError, normalizeHttpError } from './error'
 
 export interface CreateHttpClientOptions {
   baseURL: string
@@ -58,11 +58,14 @@ export function createHttpClient(options: CreateHttpClientOptions): AxiosInstanc
       return response
     },
     (error: AxiosError) => {
-      const normalizedError = normalizeHttpError(error, '请求失败', (context) =>
-        options.mapErrorMessage?.(context.rawMessage, context.error) || context.rawMessage
+      const normalizedError = normalizeHttpError(
+        error,
+        isCanceledError(error) ? '已取消' : '请求失败',
+        (context) =>
+          options.mapErrorMessage?.(context.rawMessage, context.error) || context.rawMessage
       )
 
-      if (options.showErrorMessage !== false) {
+      if (options.showErrorMessage !== false && !isCanceledError(error) && !isCanceledError(normalizedError)) {
         options.onError?.(normalizedError)
       }
 

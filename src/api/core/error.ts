@@ -37,6 +37,25 @@ export function extractErrorMessage(error: unknown, fallbackMessage = '请求失
   return fallbackMessage
 }
 
+export function isCanceledError(error: unknown): boolean {
+  if (!error) return false
+  if (axios.isCancel(error)) return true
+
+  if (typeof error === 'object' && error !== null) {
+    const code = 'code' in error ? String((error as { code?: unknown }).code || '') : ''
+    const name = 'name' in error ? String((error as { name?: unknown }).name || '') : ''
+    if (code === 'ERR_CANCELED' || name === 'CanceledError' || name === 'AbortError') {
+      return true
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message === 'canceled' || error.message === '已取消'
+  }
+
+  return false
+}
+
 export function normalizeHttpError(
   error: unknown,
   fallbackMessage = '请求失败',

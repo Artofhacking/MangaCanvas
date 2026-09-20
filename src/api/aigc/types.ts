@@ -9,6 +9,8 @@ export type TaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'UNKNO
 export interface TaskProgress {
   status: TaskStatus
   taskId?: string
+  /** Real 0–100 progress when the upstream task reports it. Never invent this. */
+  percent?: number
 }
 
 // ==================== 图像生成 ====================
@@ -22,6 +24,7 @@ export interface ImageGenerateOptions {
   images?: string[]
   n?: number
   negativePrompt?: string
+  signal?: AbortSignal
   onProgress?: (progress: TaskProgress) => void
 }
 
@@ -40,6 +43,7 @@ export interface VideoGenerateOptions {
   duration?: number
   /** 视频特效模板 ID */
   template?: string
+  signal?: AbortSignal
   onProgress?: (progress: TaskProgress) => void
 }
 

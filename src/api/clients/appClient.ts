@@ -1,5 +1,5 @@
 import { message } from 'antd'
-import { createHttpClient } from '@/api/core'
+import { createHttpClient, isCanceledError } from '@/api/core'
 import { DEFAULT_APP_API_BASE_URL, getAppApiConfig } from '@/api/core'
 import { redirectToLogin } from '@/lib/session'
 
@@ -22,6 +22,8 @@ export const appClient = createHttpClient({
     }
   },
   onError: (error) => {
+    if (isCanceledError(error)) return
+
     if (error.status === 401) {
       redirectToLogin('expired')
       return

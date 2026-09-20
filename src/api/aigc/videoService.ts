@@ -22,11 +22,12 @@ export const videoService = {
     })
     options.onProgress?.({ status: 'RUNNING' })
     try {
-      const result = await requestData<{ url: string }>(appClient, {
-        url: '/ai/videos/generations',
-        method: 'POST',
-        timeout: 600000,
-        data: {
+    const result = await requestData<{ url: string }>(appClient, {
+      url: '/ai/videos/generations',
+      method: 'POST',
+      timeout: 600000,
+      signal: options.signal,
+      data: {
           model: options.model,
           prompt: options.prompt,
           firstFrameImage: options.firstFrameImage || options.images?.[0],

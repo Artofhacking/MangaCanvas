@@ -7,6 +7,8 @@ export interface NodeData {
   url?: string;
   base64?: string;
   loading?: boolean;
+  /** Real 0–100 generation percent when the pipeline reports one. */
+  progress?: number;
   error?: string;
   model?: string;
   size?: string;
@@ -120,6 +122,7 @@ export interface ImageGenerationParams {
   image?: string;
   images?: string[];  // For image-to-image model
   n?: number;
+  signal?: AbortSignal;
 }
 
 // DashScope API types (for wan2.6-t2i)
@@ -192,6 +195,7 @@ export interface VideoGenerationParams {
   seconds?: number;
   resolution?: string;
   template?: string;  // 视频特效模板
+  signal?: AbortSignal;
 }
 
 export interface ChatMessage {

@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { formatGeneratingLabel } from '../../utils/generationJobs'
 
 export const IMAGE_PREVIEW_WIDTH = 448
 export const VIDEO_PREVIEW_WIDTH = 448
@@ -58,6 +59,8 @@ interface MediaPreviewCardProps {
   className?: string
   /** True when the card shows generated/uploaded media (keeps a dark well behind it). */
   filled?: boolean
+  /** Darker preview well while a generation job is in flight. */
+  generating?: boolean
   children: React.ReactNode
 }
 
@@ -90,11 +93,41 @@ export function MediaEmptyGlyph({ kind }: { kind: 'image' | 'video' }) {
   )
 }
 
-export function MediaStageLoading({ kind }: { kind: 'image' | 'video' }) {
+export function MediaStageLoading({
+  kind,
+  progress,
+  onCancel,
+}: {
+  kind: 'image' | 'video'
+  progress?: number
+  onCancel?: () => void
+}) {
+  const label = formatGeneratingLabel(progress)
+
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-[hsl(var(--primary)/0.08)] to-transparent" />
-      <MediaEmptyGlyph kind={kind} />
+    <div
+      className="relative flex h-full w-full items-center justify-center overflow-hidden"
+      role="status"
+      aria-live="polite"
+      aria-label={kind === 'video' ? '视频生成中' : '图片生成中'}
+    >
+      <div className="media-generating-chip nodrag nopan nowheel pointer-events-auto flex items-center gap-2.5 whitespace-nowrap rounded-full px-4 py-[9px] text-[13px] font-medium leading-none tracking-wide">
+        <span>{label}</span>
+        {onCancel ? (
+          <button
+            type="button"
+            className="nodrag nopan nowheel cursor-pointer text-[13px] font-medium text-white transition-colors hover:text-[hsl(var(--primary))]"
+            onClick={(event) => {
+              event.stopPropagation()
+              event.preventDefault()
+              onCancel()
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            取消
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -116,6 +149,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
   onLabelKeyDown,
   className,
   filled,
+  generating,
   children,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -207,11 +241,14 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
           className={cn(
             'relative h-full w-full overflow-hidden rounded-[20px] border transition-[border-color,box-shadow] duration-200',
             filled && 'media-preview-card__stage--filled',
+            generating && 'media-preview-card__stage--generating',
             dropActive
               ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
               : selected
                 ? 'border-[hsl(var(--primary))] shadow-[0_0_0_2px_hsl(var(--primary)/0.28)]'
-                : 'border-[hsl(var(--outline-variant)/0.7)]'
+                : generating
+                  ? 'border-white/20'
+                  : 'border-[hsl(var(--outline-variant)/0.7)]'
           )}
           style={{ backgroundColor: 'hsl(var(--media-stage))' }}
         >

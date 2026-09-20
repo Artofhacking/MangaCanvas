@@ -31,10 +31,11 @@ export const imageService = {
     })
     options.onProgress?.({ status: 'RUNNING' })
     try {
-      const resp = await requestData<BackendImageResponse>(appClient, {
-        url: '/ai/images/generations',
-        method: 'POST',
-        data: {
+    const resp = await requestData<BackendImageResponse>(appClient, {
+      url: '/ai/images/generations',
+      method: 'POST',
+      signal: options.signal,
+      data: {
           model: options.model,
           prompt: options.prompt,
           n: options.n ?? 1,
