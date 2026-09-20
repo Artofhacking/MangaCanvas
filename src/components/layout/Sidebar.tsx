@@ -16,6 +16,7 @@ import {
   Box,
   ScrollText,
   Shield,
+  Star,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
@@ -108,6 +109,7 @@ export default function Sidebar() {
     /\/project\/\d+\/assets(?:\/|$)/.test(location.pathname) ||
     /\/project\/\d+\/episode\/\d+(?:\/|$)/.test(location.pathname)
   const isSettingsPath = /\/project\/\d+\/(settings|permissions)(?:\/|$)/.test(location.pathname)
+  const isFavoritesPath = /\/project\/\d+\/assets\/favorites(?:\/|$)/.test(location.pathname)
 
   const navClass = (active: boolean) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
@@ -203,10 +205,21 @@ export default function Sidebar() {
                   (item.label === "剧本" && isScriptPath) ||
                   (item.label === "资产" && isAssetsPath && !isWorkbenchPath && !isScriptPath)
                 return (
-                  <Link key={item.label} to={item.href} className={navClass(isActive)}>
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </Link>
+                  <div key={item.label}>
+                    <Link to={item.href} className={navClass(isActive && !isFavoritesPath)}>
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.label}</span>
+                    </Link>
+                    {item.label === "资产" && activeProjectId ? (
+                      <Link
+                        to={projectAssetsPath(activeProjectId, "favorites")}
+                        className={`${navClass(isFavoritesPath)} mt-1 pl-11`}
+                      >
+                        <Star className="h-4 w-4" />
+                        <span>我的收藏</span>
+                      </Link>
+                    ) : null}
+                  </div>
                 )
               })}
               {activeProjectId ? (

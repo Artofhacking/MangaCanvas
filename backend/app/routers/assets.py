@@ -6,6 +6,7 @@ from .. import models, serialize
 from ..db import get_db
 from ..deps import current_user, require_project_access
 from ..errors import fail, ok
+from ..favorites import is_collected_metadata
 from ..util import now, paginate
 
 router = APIRouter(prefix="/projects/{project_id}/assets")
@@ -32,6 +33,7 @@ def list_assets(
     page: int = 1,
     size: int = 20,
     sourceType: str | None = None,
+    collected: bool | None = None,
     user: models.User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -40,6 +42,8 @@ def list_assets(
     if sourceType:
         q = q.filter_by(source_type=sourceType)
     items = [serialize.asset(r) for r in q.order_by(models.ProjectAsset.id.desc()).all()]
+    if collected is True:
+        items = [item for item in items if is_collected_metadata(item.get("metadata"))]
     sliced, pagination = paginate(items, page, size)
     return ok({"list": sliced, "pagination": pagination})
 

@@ -205,6 +205,8 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
       initialCategory={initialCategory}
       nodeId={nodeId}
       confirmLabel="收藏到资产库"
+      asFavorite
+      prompt={params?.prompt}
     />
     </>
   );

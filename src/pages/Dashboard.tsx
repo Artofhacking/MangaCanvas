@@ -14,6 +14,7 @@ import {
   Image,
   Video,
   Wand2,
+  Star,
 } from "lucide-react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
@@ -413,6 +414,16 @@ export default function Dashboard() {
               </div>
               <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">工作流编排</h4>
               <p className="text-[13px] text-[hsl(var(--secondary))]">无限画布创作</p>
+            </Card>
+            <Card
+              onClick={() => navigate(projectAssetsPath(projectId || "", "favorites"))}
+              className="group bg-[hsl(var(--surface-container-lowest))] rounded-xl p-4 transition-all duration-300 hover:bg-[hsl(var(--surface-container-highest))] border-0 shadow-none cursor-pointer hover:shadow-md"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Star className="w-5 h-5 text-[hsl(var(--primary))]" />
+              </div>
+              <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">我的收藏</h4>
+              <p className="text-[13px] text-[hsl(var(--secondary))]">回看星标生成结果</p>
             </Card>
           </div>
         </section>

@@ -5,7 +5,12 @@ import type { ListData, ProjectAssetDTO } from './types'
 export const projectAssetsApi = {
   list(
     projectId: number,
-    params?: { page?: number; size?: number; sourceType?: ProjectAssetDTO['sourceType'] }
+    params?: {
+      page?: number
+      size?: number
+      sourceType?: ProjectAssetDTO['sourceType']
+      collected?: boolean
+    }
   ) {
     return requestData<ListData<ProjectAssetDTO>>(appClient, {
       url: `/projects/${projectId}/assets`,
