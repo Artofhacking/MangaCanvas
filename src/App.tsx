@@ -32,7 +32,9 @@ const Privacy = lazy(() => import("./pages/Privacy"))
 const Contact = lazy(() => import("./pages/Contact"))
 const Workflow = lazy(() => import("./pages/Workflow"))
 const ScriptStudio = lazy(() => import("./pages/ScriptStudio"))
-const GenerateSettingsPreview = lazy(() => import("./pages/dev/GenerateSettingsPreview"))
+const GenerateSettingsPreview = import.meta.env.DEV
+  ? lazy(() => import("./pages/dev/GenerateSettingsPreview"))
+  : null
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
@@ -437,7 +439,7 @@ function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/workflow" element={<Workflow />} />
-          {import.meta.env.DEV ? (
+          {import.meta.env.DEV && GenerateSettingsPreview ? (
             <Route path="/dev/generate-settings" element={<GenerateSettingsPreview />} />
           ) : null}
 
