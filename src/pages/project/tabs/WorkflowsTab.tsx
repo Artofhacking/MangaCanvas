@@ -97,6 +97,7 @@ export default function WorkflowsTab() {
       sourceType: "blank",
       successMessage: "已创建空白工作流",
       returnTo: workflowsReturnTo,
+      from: "workflows",
     })
   }
 
@@ -107,7 +108,7 @@ export default function WorkflowsTab() {
     }
 
     navigate(`/project/${projectId}/workflows/${workflowId}`, {
-      state: workflowCanvasNavState(workflowsReturnTo),
+      state: workflowCanvasNavState(workflowsReturnTo, "workflows"),
     })
   }
 

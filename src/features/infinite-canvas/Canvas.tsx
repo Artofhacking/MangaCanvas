@@ -51,9 +51,10 @@ import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, type
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
 import {
+  persistWorkflowCanvasNavState,
   projectAssetsPath,
   projectEpisodePath,
-  readWorkflowCanvasReturnTo,
+  readWorkflowCanvasNavState,
   resolveWorkflowCanvasReturnTo,
   workflowCanvasNavState,
 } from '@/lib/workspaceRoutes';
@@ -242,10 +243,16 @@ const CanvasInner: React.FC = () => {
     };
   }, [currentWorkflow?.sourceAssetId, currentWorkflow?.sourceType, navigate, projectId]);
 
+  const canvasNavState = useMemo(() => readWorkflowCanvasNavState(location.state), [location.state]);
+
   const canvasReturnTo = useMemo(
-    () => resolveWorkflowCanvasReturnTo(projectId, readWorkflowCanvasReturnTo(location.state)),
-    [location.state, projectId]
+    () => resolveWorkflowCanvasReturnTo(projectId, location.state, canvasDocumentId || workflowId),
+    [canvasDocumentId, location.state, projectId, workflowId]
   );
+
+  useEffect(() => {
+    persistWorkflowCanvasNavState(projectId, canvasDocumentId || workflowId, canvasNavState);
+  }, [canvasDocumentId, canvasNavState, projectId, workflowId]);
 
   const cleanupCanvasTransientUi = useCallback(() => {
     setShowApiSettings(false);
@@ -654,8 +661,8 @@ const CanvasInner: React.FC = () => {
         navigate(`/project/${projectId}/workflows/${result.id}`, {
           replace: true,
           state:
-            workflowCanvasNavState(readWorkflowCanvasReturnTo(location.state)) ||
-            workflowCanvasNavState(projectEpisodePath(projectId, episodeId)),
+            readWorkflowCanvasNavState(location.state) ||
+            workflowCanvasNavState(projectEpisodePath(projectId, episodeId), 'episode'),
         });
       }
     })();

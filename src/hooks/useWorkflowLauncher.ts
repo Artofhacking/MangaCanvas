@@ -8,7 +8,7 @@ import {
   openOrCreateWorkflow,
   type OpenWorkflowOptions,
 } from '@/lib/workflows'
-import { workflowCanvasNavState } from '@/lib/workspaceRoutes'
+import { workflowCanvasNavState, type WorkflowCanvasEntry } from '@/lib/workspaceRoutes'
 
 export const useWorkflowLauncher = () => {
   const navigate = useNavigate()
@@ -16,7 +16,11 @@ export const useWorkflowLauncher = () => {
   const { createWorkflowDocument } = useCanvasDocumentsStore()
 
   return useCallback(
-    async (options: OpenWorkflowOptions & { successMessage?: string; returnTo?: string }) => {
+    async (options: OpenWorkflowOptions & {
+      successMessage?: string
+      returnTo?: string
+      from?: WorkflowCanvasEntry
+    }) => {
       const result = await openOrCreateWorkflow(options)
       if (!result) {
         notify.error('打开工作流失败')
@@ -33,7 +37,7 @@ export const useWorkflowLauncher = () => {
       })
 
       navigate(createWorkflowPath(options.projectId, result.id), {
-        state: workflowCanvasNavState(options.returnTo),
+        state: workflowCanvasNavState(options.returnTo, options.from),
       })
       notify.success(
         options.successMessage || (result.created ? '已创建新的工作流画布' : '已打开工作流')

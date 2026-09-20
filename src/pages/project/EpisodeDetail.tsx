@@ -94,6 +94,7 @@ export default function EpisodeDetail() {
       sourceAssetId: Number(episodeId),
       seedPrompt: episode.description,
       returnTo: episodeReturnTo,
+      from: "episode",
       relatedAssets: [
         ...relatedCharacters.map((item) => ({
           id: item.id,
@@ -362,6 +363,7 @@ export default function EpisodeDetail() {
                           sourceAssetId: char.id,
                           seedImage: char.image,
                           returnTo: episodeReturnTo,
+                          from: "episode",
                         })
                       }
                       className="flex w-full items-center gap-3 rounded-2xl bg-[hsl(var(--surface-container-high))] p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
@@ -398,6 +400,7 @@ export default function EpisodeDetail() {
                           sourceAssetId: scene.id,
                           seedImage: scene.image,
                           returnTo: episodeReturnTo,
+                          from: "episode",
                         })
                       }
                       className="block w-full overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-high))] text-left"
@@ -433,6 +436,7 @@ export default function EpisodeDetail() {
                           sourceAssetId: obj.id,
                           seedImage: obj.image,
                           returnTo: episodeReturnTo,
+                          from: "episode",
                         })
                       }
                       className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-2 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"

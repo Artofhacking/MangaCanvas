@@ -186,7 +186,7 @@ export default function Dashboard() {
     const list = await workflowsApi.getAll(pid, { page: 1, size: 1 })
     if (list.success && list.data.list[0]) {
       navigate(`/project/${pid}/workflows/${list.data.list[0].id}`, {
-        state: workflowCanvasNavState(returnTo),
+        state: workflowCanvasNavState(returnTo, "dashboard"),
       })
       return
     }
@@ -195,6 +195,7 @@ export default function Dashboard() {
       sourceType: "blank",
       successMessage: "已创建空白工作流",
       returnTo,
+      from: "dashboard",
     })
   }
 

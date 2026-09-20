@@ -24,7 +24,7 @@ import Sidebar from "@/components/layout/Sidebar"
 import ProjectHeader from "@/components/layout/ProjectHeader"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
-import { projectAssetsPath } from "@/lib/workspaceRoutes"
+import { projectAssetsPath, type WorkflowCanvasEntry } from "@/lib/workspaceRoutes"
 import { useProjectStore } from "@/store/projectStore"
 
 import type { CanvasLaunchSource, WorkflowSourceType } from "@/types"
@@ -289,6 +289,7 @@ export default function ProjectDetail() {
         : undefined,
       forceNew: !source?.id,
       returnTo: projectAssetsPath(projectId, activeTab),
+      from: activeTab as WorkflowCanvasEntry,
     })
   }
 
