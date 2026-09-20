@@ -208,9 +208,10 @@ const CanvasInner: React.FC = () => {
     }
 
     if (currentWorkflow?.sourceType === 'episode' && currentWorkflow.sourceAssetId) {
+      const episodeAssetId = currentWorkflow.sourceAssetId
       return {
         label: '返回片段',
-        action: () => navigate(projectEpisodePath(projectId, currentWorkflow.sourceAssetId)),
+        action: () => navigate(projectEpisodePath(projectId, episodeAssetId)),
       };
     }
 
