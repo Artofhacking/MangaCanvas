@@ -27,12 +27,12 @@ export const episodesApi = {
         params: status ? { status } : undefined,
       },
       { list: [] },
-      '获取片段列表失败',
+      '获取剧集列表失败',
       (data) => ({ ...data, list: data.list.map(mapEpisode) as unknown as EpisodeDTO[] })
     ).then((response) =>
       response.success
         ? successResponse((response.data.list as unknown as Episode[]) || [])
-        : errorResponse(response.message || '获取片段列表失败', [])
+        : errorResponse(response.message || '获取剧集列表失败', [])
     )
   },
 
@@ -43,12 +43,12 @@ export const episodesApi = {
         method: 'GET',
       },
       null,
-      '获取片段详情失败',
+      '获取剧集详情失败',
       (data) => (data ? (mapEpisode(data) as unknown as EpisodeDTO) : null)
     ).then((response) =>
       response.success
         ? successResponse((response.data as unknown as Episode | null) ?? null)
-        : errorResponse(response.message || '获取片段详情失败', null)
+        : errorResponse(response.message || '获取剧集详情失败', null)
     )
   },
 
@@ -60,12 +60,12 @@ export const episodesApi = {
         data: buildEpisodeCreatePayload(data),
       },
       {} as EpisodeDTO,
-      '创建片段失败',
+      '创建剧集失败',
       (result) => mapEpisode(result) as unknown as EpisodeDTO
     ).then((response) =>
       response.success
         ? successResponse(response.data as unknown as Episode)
-        : errorResponse(response.message || '创建片段失败', {} as Episode)
+        : errorResponse(response.message || '创建剧集失败', {} as Episode)
     )
   },
 
@@ -83,12 +83,12 @@ export const episodesApi = {
         },
       },
       null,
-      '更新片段失败',
+      '更新剧集失败',
       (result) => (result ? (mapEpisode(result) as unknown as EpisodeDTO) : null)
     ).then((response) =>
       response.success
         ? successResponse((response.data as unknown as Episode | null) ?? null)
-        : errorResponse(response.message || '更新片段失败', null)
+        : errorResponse(response.message || '更新剧集失败', null)
     )
   },
 
@@ -99,9 +99,9 @@ export const episodesApi = {
         method: 'DELETE',
       },
       true,
-      '删除片段失败'
+      '删除剧集失败'
     ).then((response) =>
-      response.success ? successResponse(true) : errorResponse(response.message || '删除片段失败', false)
+      response.success ? successResponse(true) : errorResponse(response.message || '删除剧集失败', false)
     )
   },
 
@@ -117,25 +117,25 @@ export const episodesApi = {
         data,
       },
       null,
-      '更新片段关联失败',
+      '更新剧集关联失败',
       (result) => (result ? (mapEpisode(result) as unknown as EpisodeDTO) : null)
     ).then((response) =>
       response.success
         ? successResponse((response.data as unknown as Episode | null) ?? null)
-        : errorResponse(response.message || '更新片段关联失败', null)
+        : errorResponse(response.message || '更新剧集关联失败', null)
     )
   },
 
   async duplicate(projectId: number, id: number): Promise<ApiResponse<Episode | null>> {
     const episodeResponse = await this.getById(projectId, id)
     if (!episodeResponse.success || !episodeResponse.data) {
-      return errorResponse(episodeResponse.message || '复制片段失败', null)
+      return errorResponse(episodeResponse.message || '复制剧集失败', null)
     }
 
     return this.create(projectId, {
       folderName: `${episodeResponse.data.name} (复制)`,
       episodeCount: String(episodeResponse.data.count),
       description: episodeResponse.data.description || '',
-    }).then((response) => (response.success ? successResponse(response.data) : errorResponse(response.message || '复制片段失败', null)))
+    }).then((response) => (response.success ? successResponse(response.data) : errorResponse(response.message || '复制剧集失败', null)))
   },
 }

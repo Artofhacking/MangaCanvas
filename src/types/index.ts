@@ -16,7 +16,7 @@ export type GenerationMethod = 'ai' | 'upload' | 'mix'
 export type WorkflowSourceType = 'blank' | 'episode' | 'scene' | 'character' | 'object' | string
 export type WorkflowStatus = 'draft' | 'active' | 'archived'
 
-// ==================== 片段 (Episode) ====================
+// ==================== 剧集 (Episode) ====================
 
 export interface EpisodeRelationItem {
   id: number

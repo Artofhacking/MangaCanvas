@@ -220,7 +220,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     try {
       const response = await projectApi.episodes.getAll(projectId, status)
       if (!response.success) {
-        throw new Error(response.message || '加载片段列表失败')
+        throw new Error(response.message || '加载剧集列表失败')
       }
       set((state) => ({
         isLoading: false,
@@ -232,7 +232,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     } catch (error) {
       set({
         isLoading: false,
-        error: error instanceof Error ? error.message : '加载片段列表失败',
+        error: error instanceof Error ? error.message : '加载剧集列表失败',
       })
     }
   },
@@ -240,7 +240,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   createEpisode: async (projectId, data) => {
     const response = await projectApi.episodes.create(projectId, data)
     if (!response.success) {
-      set({ error: response.message || '创建片段失败' })
+      set({ error: response.message || '创建剧集失败' })
       return null
     }
 
@@ -256,7 +256,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   updateEpisode: async (projectId, id, data) => {
     const response = await projectApi.episodes.update(projectId, id, data)
     if (!response.success || !response.data) {
-      set({ error: response.message || '更新片段失败' })
+      set({ error: response.message || '更新剧集失败' })
       return null
     }
     const updatedEpisode = response.data
@@ -273,7 +273,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   deleteEpisode: async (projectId, id) => {
     const response = await projectApi.episodes.delete(projectId, id)
     if (!response.success) {
-      set({ error: response.message || '删除片段失败' })
+      set({ error: response.message || '删除剧集失败' })
       return false
     }
 
@@ -289,7 +289,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   duplicateEpisode: async (projectId, id) => {
     const response = await projectApi.episodes.duplicate(projectId, id)
     if (!response.success || !response.data) {
-      set({ error: response.message || '复制片段失败' })
+      set({ error: response.message || '复制剧集失败' })
       return null
     }
     const duplicatedEpisode = response.data

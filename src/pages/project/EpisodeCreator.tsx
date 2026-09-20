@@ -60,7 +60,7 @@ export default function EpisodeCreator({
 
   const handleSave = () => {
     if (!folderName.trim()) {
-      notify.warning("请输入片段名称")
+      notify.warning("请输入剧集名称")
       return
     }
     if (initialData) {
@@ -70,7 +70,7 @@ export default function EpisodeCreator({
         episodeCount,
         description,
       })
-      notify.success("片段已保存")
+      notify.success("剧集已保存")
       return
     }
     onCreate?.({
@@ -78,7 +78,7 @@ export default function EpisodeCreator({
       episodeCount,
       description,
     })
-    notify.success("片段已创建")
+    notify.success("剧集已创建")
     onOpenChange(false)
   }
 
@@ -103,31 +103,31 @@ export default function EpisodeCreator({
         style={{ maxWidth: "480px" }}
         hideCloseButton
       >
-        <SheetTitle className="sr-only">{initialData ? "编辑片段" : "创建片段"}</SheetTitle>
+        <SheetTitle className="sr-only">{initialData ? "编辑剧集" : "创建剧集"}</SheetTitle>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--outline-variant))]/20">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
               <X className="w-5 h-5" />
             </Button>
-            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{initialData ? "编辑片段" : "创建片段"}</h2>
+            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{initialData ? "编辑剧集" : "创建剧集"}</h2>
           </div>
         </div>
 
         <div className="h-[calc(100vh-150px)] space-y-5 overflow-y-auto px-6 py-5">
           <div className="rounded-2xl bg-[hsl(var(--primary))]/8 p-4">
-            <p className="text-sm font-bold text-[hsl(var(--on-surface))]">片段成片走无限画布</p>
+            <p className="text-sm font-bold text-[hsl(var(--on-surface))]">剧集成片走无限画布</p>
             <p className="mt-1 text-xs leading-5 text-[hsl(var(--secondary))]">
               这里只保存名称和剧情。要把已生成的角色、场景、物品串进这一集并出视频，请进入无限画布编排。
             </p>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
-              <span className="text-red-500 mr-1">*</span>片段名称
+              <span className="text-red-500 mr-1">*</span>剧集名称
             </label>
             <Input
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
-              placeholder="请输入片段名称"
+              placeholder="请输入剧集名称"
               className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm"
             />
           </div>
@@ -176,7 +176,7 @@ export default function EpisodeCreator({
               onClick={handleSave}
               className="w-full h-12 signature-gradient rounded-xl border-0 text-base font-bold text-white"
             >
-              创建片段
+              创建剧集
             </Button>
           )}
         </div>
