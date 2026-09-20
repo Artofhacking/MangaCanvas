@@ -82,21 +82,21 @@ export default function EpisodesTab({
   const handleDelete = async (episode: Episode, e?: React.MouseEvent) => {
     e?.stopPropagation()
     const confirmed = await confirm({
-      title: "删除片段",
-      description: `确定要删除片段 "${episode.name}" 吗？删除后将无法恢复。`,
+      title: "删除剧集",
+      description: `确定要删除剧集 "${episode.name}" 吗？删除后将无法恢复。`,
       confirmText: "删除",
       tone: "danger",
     })
     if (confirmed) {
       await deleteEpisode(projectId ?? Number(routeProjectId), episode.id)
-      notify.success("片段已删除")
+      notify.success("剧集已删除")
     }
   }
 
   const handleDuplicate = async (episode: Episode, e?: React.MouseEvent) => {
     e?.stopPropagation()
     await duplicateEpisode(projectId ?? Number(routeProjectId), episode.id)
-    notify.success("片段已复制")
+    notify.success("剧集已复制")
   }
 
   const handleUpdate = async (data: { id: number; folderName: string; episodeCount: string; description: string }) => {
@@ -104,7 +104,7 @@ export default function EpisodesTab({
       name: data.folderName,
       description: data.description,
     })
-    notify.success("片段已保存")
+    notify.success("剧集已保存")
   }
 
   return (
@@ -116,12 +116,12 @@ export default function EpisodesTab({
         <div className="w-12 h-12 rounded-full bg-[hsl(var(--surface-container-high))] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
           <Plus className="w-6 h-6 text-[hsl(var(--primary))]" />
         </div>
-        <span className="text-sm font-bold text-[hsl(var(--on-surface-variant))]">添加新片段</span>
+        <span className="text-sm font-bold text-[hsl(var(--on-surface-variant))]">添加新剧集</span>
         <span className="text-[13px] text-[hsl(var(--secondary))] mt-1">组织故事章节</span>
       </div>
 
       {episodes.map((episode, index) => {
-        // 为每个片段分配一个主题图片
+        // 为每个剧集分配一个主题图片
         const episodeImages = [
           "https://images.unsplash.com/photo-1614726365723-49cfae927846?w=600&h=400&fit=crop",
           "https://images.unsplash.com/photo-1542640244-7e672d6cef4e?w=600&h=400&fit=crop",

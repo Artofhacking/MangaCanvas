@@ -67,7 +67,7 @@ const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects"
 const defaultProjectTab: ProjectTab = "scenes"
 
 const secondaryTabs: { id: ProjectTab; label: string }[] = [
-  { id: "episodes", label: "片段管理" },
+  { id: "episodes", label: "剧集管理" },
   { id: "characters", label: "角色管理" },
   { id: "scenes", label: "场景管理" },
   { id: "objects", label: "物品管理" },

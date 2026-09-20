@@ -49,7 +49,7 @@ export default function EpisodeDetail() {
       projectApi.objects.getAll(Number(projectId)),
     ])
     if (!episodeResponse.success || !episodeResponse.data) {
-      notify.error(episodeResponse.message || "片段不存在")
+      notify.error(episodeResponse.message || "剧集不存在")
       navigate(`/project/${projectId}/assets/episodes`, { replace: true })
       return
     }
@@ -127,7 +127,7 @@ export default function EpisodeDetail() {
     }
     setEpisode(response.data)
     setEditing(false)
-    notify.success("片段关联已更新")
+    notify.success("剧集关联已更新")
   }
 
   const toggleId = (key: "characterIds" | "sceneIds" | "objectIds", id: number) => {
@@ -152,7 +152,7 @@ export default function EpisodeDetail() {
       <div className="min-h-screen bg-[hsl(var(--surface))]">
         <Sidebar />
         <main className="ml-64 min-h-screen">
-          <QuerySpinner label="正在加载片段..." />
+          <QuerySpinner label="正在加载剧集..." />
         </main>
       </div>
     )
@@ -172,12 +172,12 @@ export default function EpisodeDetail() {
               className="mb-5 gap-2 text-[hsl(var(--secondary))]"
             >
               <ChevronLeft className="h-4 w-4" />
-              返回片段列表
+              返回剧集列表
             </Button>
 
             <div className="flex flex-wrap items-center gap-3">
               <Badge className="border-0 bg-[hsl(var(--surface-container-high))] px-3 py-1 text-[hsl(var(--secondary))]">
-                片段
+                剧集
               </Badge>
               <Badge className="signature-gradient border-0 px-3 py-1 text-white">
                 {episode.status === "completed" ? "已完成" : episode.status === "draft" ? "草稿" : "进行中"}
@@ -237,7 +237,7 @@ export default function EpisodeDetail() {
                 <div className="text-xs uppercase tracking-[0.24em] text-white/60">Workspace Overview</div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-white/10 p-4">
-                    <div className="text-xs text-white/60">当前片段</div>
+                    <div className="text-xs text-white/60">当前剧集</div>
                     <div className="mt-2 text-2xl font-black">{episode.code}</div>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-4">
@@ -275,7 +275,7 @@ export default function EpisodeDetail() {
               </div>
             ) : (
               <p className="mt-4 text-sm text-[hsl(var(--secondary))]">
-                还没有剧情。从剧本创作写入，或在编辑片段时补上本集场次和对白。
+                还没有剧情。从剧本创作写入，或在编辑剧集时补上本集场次和对白。
               </p>
             )}
           </section>

@@ -26,7 +26,9 @@ import {
   type ScriptPropDraft,
   type ScriptSceneDraft,
 } from "@/features/project/api/scripts"
+import { formatScriptImportToast } from "@/features/project/scriptImport"
 import { getActiveProjectId } from "@/lib/session"
+import { projectAssetsPath } from "@/lib/workspaceRoutes"
 
 const ACCEPT_EXT = [".txt", ".md"]
 const MAX_FILE_BYTES = 2 * 1024 * 1024
@@ -144,34 +146,6 @@ export default function ScriptStudio() {
     if (file) await applyFile(file)
   }
 
-  const handleParse = async () => {
-    if (!projectId) return
-    if (!sourceText.trim()) {
-      notify.warning("请先上传或粘贴剧本")
-      return
-    }
-    setParsing(true)
-    setExcluded(new Set())
-    try {
-      const response = await scriptsApi.parse(projectId, {
-        text: sourceText,
-        title: title.trim() || undefined,
-        filename: filename || undefined,
-      })
-      if (!response.success || !response.data) {
-        notify.error(response.message || "剧本解析失败")
-        return
-      }
-      setDocument(response.data)
-      setTitle(response.data.title || title)
-      setResultTab("plot")
-      const agentNote = response.data.agent?.note
-      notify.success(agentNote || "剧本已拆解完成")
-    } finally {
-      setParsing(false)
-    }
-  }
-
   const toggleExcluded = (key: string) => {
     setExcluded((current) => {
       const next = new Set(current)
@@ -206,44 +180,123 @@ export default function ScriptStudio() {
     [document, excluded]
   )
 
+  const importDocument = useCallback(
+    async (
+      doc: ScriptDocument,
+      payload: {
+        characters: ScriptCharacterDraft[]
+        scenes: ScriptSceneDraft[]
+        props: ScriptPropDraft[]
+        episodes: ScriptEpisodeDraft[]
+      },
+      options?: { auto?: boolean }
+    ) => {
+      if (
+        payload.characters.length +
+          payload.scenes.length +
+          payload.props.length +
+          payload.episodes.length ===
+        0
+      ) {
+        notify.warning("请至少保留一项再写入项目")
+        return false
+      }
+      setImporting(true)
+      try {
+        const response = await scriptsApi.importToProject(projectId, doc.id, {
+          characters: payload.characters,
+          scenes: payload.scenes,
+          props: payload.props,
+          episodes: payload.episodes,
+          skipExisting: true,
+        })
+        if (!response.success || !response.data) {
+          notify.error(
+            response.message ||
+              (options?.auto ? "自动写入项目失败，请核对后手动重试" : "写入失败，请核对后手动重试")
+          )
+          return false
+        }
+        setDocument({ ...doc, ...(response.data.script || {}), status: "imported" })
+        notify.show({
+          title: options?.auto ? "已拆解并写入项目" : "已写入项目",
+          description: formatScriptImportToast(response.data.created, response.data.skipped),
+          variant: "success",
+          duration: 4800,
+        })
+        return true
+      } catch (error) {
+        notify.error(
+          error instanceof Error
+            ? error.message
+            : options?.auto
+              ? "自动写入项目失败，请核对后手动重试"
+              : "写入失败，请核对后手动重试"
+        )
+        return false
+      } finally {
+        setImporting(false)
+      }
+    },
+    [notify, projectId]
+  )
+
   const handleImport = async () => {
-    if (!projectId || !document) return
-    if (
-      selectedCharacters.length + selectedScenes.length + selectedProps.length + selectedEpisodes.length ===
-      0
-    ) {
-      notify.warning("请至少保留一项再写入项目")
+    if (!document) return
+    await importDocument(document, {
+      characters: selectedCharacters,
+      scenes: selectedScenes,
+      props: selectedProps,
+      episodes: selectedEpisodes,
+    })
+  }
+
+  const handleParse = async () => {
+    if (!projectId) return
+    if (!sourceText.trim()) {
+      notify.warning("请先上传或粘贴剧本")
       return
     }
-    setImporting(true)
+    setParsing(true)
+    setExcluded(new Set())
+    let parsed: ScriptDocument | null = null
     try {
-      const response = await scriptsApi.importToProject(projectId, document.id, {
-        characters: selectedCharacters,
-        scenes: selectedScenes,
-        props: selectedProps,
-        episodes: selectedEpisodes,
-        skipExisting: true,
+      const response = await scriptsApi.parse(projectId, {
+        text: sourceText,
+        title: title.trim() || undefined,
+        filename: filename || undefined,
       })
       if (!response.success || !response.data) {
-        notify.error(response.message || "写入失败")
+        notify.error(response.message || "剧本解析失败")
         return
       }
-      const { created, skipped } = response.data
-      setDocument({ ...document, status: "imported" })
-      const createdTotal =
-        created.episodes + created.scenes + created.objects + created.characters
-      const skippedTotal =
-        skipped.episodes + skipped.scenes + skipped.objects + skipped.characters
-      if (createdTotal === 0 && skippedTotal > 0) {
-        notify.success("这些条目已在项目资产中，未重复创建")
-      } else {
-        notify.success(
-          `已写入 ${created.episodes} 集、${created.scenes} 个场景、${created.objects} 件道具、${created.characters} 个人物`
-        )
-      }
+      parsed = response.data
+      setDocument(parsed)
+      setTitle(parsed.title || title)
+      setResultTab("plot")
     } finally {
-      setImporting(false)
+      setParsing(false)
     }
+
+    if (!parsed) return
+
+    const autoPayload = {
+      characters: parsed.characters || [],
+      scenes: parsed.scenes || [],
+      props: parsed.props || [],
+      episodes: parsed.episodes || [],
+    }
+    const hasItems =
+      autoPayload.characters.length +
+      autoPayload.scenes.length +
+      autoPayload.props.length +
+      autoPayload.episodes.length
+    if (hasItems === 0) {
+      notify.success(parsed.agent?.note || "剧本已拆解完成")
+      return
+    }
+
+    await importDocument(parsed, autoPayload, { auto: true })
   }
 
   const counts = {
@@ -258,7 +311,7 @@ export default function ScriptStudio() {
       header={
         <WorkspaceHeader
           title="剧本创作"
-          subtitle="上传剧本，一键拆成可制作的剧情、分集与资产"
+          subtitle="上传剧本，一键拆成剧情、分集与资产，并自动写入剧集管理"
           searchPlaceholder="搜索剧本..."
           actions={
             document ? (
@@ -268,7 +321,7 @@ export default function ScriptStudio() {
                 className="signature-gradient rounded-xl border-0 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
               >
                 {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                写入项目资产
+                {document.status === "imported" ? "再次写入项目" : "写入项目资产"}
               </Button>
             ) : null
           }
@@ -383,7 +436,7 @@ export default function ScriptStudio() {
                     <h2 className="text-xl font-black text-[hsl(var(--on-surface))]">{document.title}</h2>
                     <p className="mt-1 text-xs text-[hsl(var(--secondary))]">
                       {document.agent?.model ? `由 ${document.agent.model} 拆解` : "已完成拆解"}
-                      {document.status === "imported" ? " · 已写入项目" : ""}
+                      {document.status === "imported" ? " · 已写入剧集管理" : importing ? " · 正在写入项目…" : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -452,7 +505,14 @@ export default function ScriptStudio() {
                   className="h-11 px-6 signature-gradient text-white rounded-xl font-bold border-0"
                 >
                   {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                  写入项目资产
+                  {document.status === "imported" ? "再次写入项目" : "写入项目资产"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(projectAssetsPath(projectId, "episodes"))}
+                  className="h-11 px-6 rounded-xl border-[hsl(var(--outline-variant))] font-bold"
+                >
+                  查看剧集管理
                 </Button>
                 <Button
                   variant="outline"
@@ -473,7 +533,7 @@ export default function ScriptStudio() {
                 把一篇故事变成一套制作清单
               </h2>
               <p className="text-[hsl(var(--secondary))] max-w-lg mb-8 leading-relaxed">
-                上传 txt 或 md，剧本 Agent 会一次性拆出剧情主线、分集、场景、道具和人物，确认后即可写入当前项目。
+                上传 txt 或 md，剧本 Agent 会一次性拆出剧情主线、分集、场景、道具和人物。解析完成后会自动写入当前项目，也可再核对后手动补写。
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <GhostHint icon={FileText} title="剧情" desc="一句话故事 + 梗概" />

@@ -338,7 +338,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-4 shadow-none hover:bg-[hsl(var(--surface-container-high))] transition-colors cursor-pointer group" onClick={() => navigate(projectAssetsPath(projectId || "", "episodes"))}>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">片段</p>
+                <p className="text-[13px] font-bold text-[hsl(var(--secondary))]">剧集</p>
                 <Box className="w-4 h-4 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--primary))] transition-colors" />
               </div>
               <p className="text-3xl font-black text-[hsl(var(--on-surface))]">{projectStats.episodeCount}</p>
@@ -382,7 +382,7 @@ export default function Dashboard() {
               <div className="w-10 h-10 rounded-xl bg-[hsl(var(--primary))]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                 <Box className="w-5 h-5 text-[hsl(var(--primary))]" />
               </div>
-              <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">片段管理</h4>
+              <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">剧集管理</h4>
               <p className="text-[13px] text-[hsl(var(--secondary))]">故事章节管理</p>
             </Card>
             <Card 
