@@ -21,6 +21,30 @@ export const projectAssetsPath = (projectId: number | string, tab?: string) =>
 
 export const projectSettingsPath = (projectId: number | string) => `/project/${projectId}/settings`
 
+export const projectEpisodePath = (projectId: number | string, episodeId: number | string) =>
+  `/project/${projectId}/episode/${episodeId}`
+
+export type WorkflowCanvasNavState = {
+  returnTo?: string
+}
+
+export const workflowCanvasNavState = (returnTo?: string): WorkflowCanvasNavState | undefined =>
+  returnTo ? { returnTo } : undefined
+
+export const readWorkflowCanvasReturnTo = (state: unknown): string | undefined => {
+  if (!state || typeof state !== "object") return undefined
+  const returnTo = (state as WorkflowCanvasNavState).returnTo
+  return typeof returnTo === "string" && returnTo.startsWith("/") ? returnTo : undefined
+}
+
+export const resolveWorkflowCanvasReturnTo = (projectId: string | undefined, returnTo: unknown) => {
+  if (!projectId) return "/projects"
+  if (typeof returnTo === "string" && returnTo.startsWith(`/project/${projectId}/`)) {
+    return returnTo
+  }
+  return projectAssetsPath(projectId, "workflows")
+}
+
 export const switchProjectPath = (pathname: string, nextProjectId: number | string) => {
   const matched = pathname.match(PROJECT_PATH)
   if (!matched) {

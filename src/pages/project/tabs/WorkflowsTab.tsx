@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { useCanvasDocumentsStore } from "@/features/infinite-canvas/stores/projectsStore"
+import { projectAssetsPath, workflowCanvasNavState } from "@/lib/workspaceRoutes"
 import type { WorkflowSourceType } from "@/types"
 import { QuerySpinner } from "@/components/feedback/ListQueryState"
 
@@ -86,6 +87,8 @@ export default function WorkflowsTab() {
     [projectId, projects]
   )
 
+  const workflowsReturnTo = projectId ? projectAssetsPath(projectId, "workflows") : undefined
+
   const handleCreateBlankWorkflow = () => {
     if (!projectId) return
 
@@ -93,6 +96,7 @@ export default function WorkflowsTab() {
       projectId,
       sourceType: "blank",
       successMessage: "已创建空白工作流",
+      returnTo: workflowsReturnTo,
     })
   }
 
@@ -102,7 +106,9 @@ export default function WorkflowsTab() {
       return
     }
 
-    navigate(`/project/${projectId}/workflows/${workflowId}`)
+    navigate(`/project/${projectId}/workflows/${workflowId}`, {
+      state: workflowCanvasNavState(workflowsReturnTo),
+    })
   }
 
   return (

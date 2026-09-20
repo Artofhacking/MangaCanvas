@@ -26,7 +26,7 @@ import { mapProjectCard, mapProjectStats } from "@/lib/projectMappers"
 import { refreshProjects, useProjectsStore } from "@/store/projectsStore"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { workflowsApi } from "@/features/project/api/workflows"
-import { projectAssetsPath, projectDashboardPath, projectScriptPath } from "@/lib/workspaceRoutes"
+import { projectAssetsPath, projectDashboardPath, projectScriptPath, workflowCanvasNavState } from "@/lib/workspaceRoutes"
 import { QuerySpinner } from "@/components/feedback/ListQueryState"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
@@ -182,15 +182,19 @@ export default function Dashboard() {
   const handleEnterCanvas = async () => {
     const pid = currentProject?.id || Number(projectId)
     if (!pid) return
+    const returnTo = projectDashboardPath(pid)
     const list = await workflowsApi.getAll(pid, { page: 1, size: 1 })
     if (list.success && list.data.list[0]) {
-      navigate(`/project/${pid}/workflows/${list.data.list[0].id}`)
+      navigate(`/project/${pid}/workflows/${list.data.list[0].id}`, {
+        state: workflowCanvasNavState(returnTo),
+      })
       return
     }
     await launchWorkflow({
       projectId: String(pid),
       sourceType: "blank",
       successMessage: "已创建空白工作流",
+      returnTo,
     })
   }
 
