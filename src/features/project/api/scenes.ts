@@ -8,6 +8,7 @@ const buildScenePayload = (data: SceneCreateData) => ({
   name: data.name,
   description: data.description,
   image: data.referenceImage,
+  status: data.status,
   genMethod: data.genMethod,
   modelId: data.model,
   camera: {

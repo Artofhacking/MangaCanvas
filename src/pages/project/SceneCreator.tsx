@@ -33,6 +33,10 @@ import {
 } from "@/store/assetGenerationStore"
 import type { Scene } from "@/types"
 
+const fallbackSceneModels = [
+  { id: "jimeng-3", name: "即梦 3.0", description: "中文语义强，适合场景氛围" },
+]
+
 export interface SceneCreateData {
   name: string
   genMethod: string
@@ -93,21 +97,20 @@ export default function SceneCreator({
   const initializedRef = useRef(false)
   const prevOpenRef = useRef(open)
 
+  const availableModels = imageModels.length > 0 ? imageModels : fallbackSceneModels
+
   useEffect(() => {
-    if (!imageModels.length) {
-      if (!modelsLoading) setSelectedModel("")
-      return
+    if (modelsLoading && imageModels.length === 0) return
+    if (!selectedModel || !availableModels.some((model) => model.id === selectedModel)) {
+      setSelectedModel(availableModels[0]?.id || "")
     }
-    if (!selectedModel || !imageModels.some((model) => model.id === selectedModel)) {
-      setSelectedModel(imageModels[0].id)
-    }
-  }, [imageModels, modelsLoading, selectedModel])
+  }, [availableModels, imageModels.length, modelsLoading, selectedModel])
 
   // 重置表单的函数
   const resetForm = () => {
     setSceneName("")
     setDescription("")
-    setSelectedModel(imageModels[0]?.id || "")
+    setSelectedModel(availableModels[0]?.id || "")
     setDistance([8.0])
     setZoom(0.6)
   }
@@ -169,7 +172,8 @@ export default function SceneCreator({
       return
     }
 
-    if (!selectedModel) {
+    const modelId = selectedModel || availableModels[0]?.id
+    if (!modelId) {
       notify.warning("暂无可用生图模型")
       return
     }
@@ -186,7 +190,7 @@ export default function SceneCreator({
       assetId: initialData?.id,
       name: sceneName.trim(),
       prompt: description.trim(),
-      model: selectedModel,
+      model: modelId,
       size: "1536x1024",
       extras: {
         description: description.trim(),
@@ -255,9 +259,9 @@ export default function SceneCreator({
                         className="h-12 w-full justify-between rounded-xl bg-[hsl(var(--surface-container-low))] px-4 text-left text-sm font-normal text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-high))]"
                       >
                         <span>
-                          {modelsLoading 
-                            ? "加载中..." 
-                            : (imageModels.find((model) => model.id === selectedModel)?.name ?? "选择场景模型")
+                          {modelsLoading && imageModels.length === 0
+                            ? "加载中..."
+                            : (availableModels.find((model) => model.id === selectedModel)?.name ?? "选择场景模型")
                           }
                         </span>
                         <ChevronDown className="h-4 w-4 text-[hsl(var(--secondary))]" />
@@ -268,23 +272,12 @@ export default function SceneCreator({
                       sideOffset={10}
                       className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-2 shadow-xl"
                     >
-                      {modelsLoading ? (
+                      {modelsLoading && imageModels.length === 0 ? (
                         <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
                           加载模型列表...
                         </DropdownMenuItem>
-                      ) : modelsError ? (
-                        <DropdownMenuItem 
-                          onClick={() => refetch()} 
-                          className="text-red-500 cursor-pointer"
-                        >
-                          加载失败: {modelsError} (点击重试)
-                        </DropdownMenuItem>
-                      ) : imageModels.length === 0 ? (
-                        <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
-                          暂无可用模型
-                        </DropdownMenuItem>
                       ) : (
-                        imageModels.map((model) => (
+                        availableModels.map((model) => (
                           <DropdownMenuItem
                             key={model.id}
                             onClick={() => setSelectedModel(model.id)}
@@ -306,7 +299,8 @@ export default function SceneCreator({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <p className="text-xs text-[hsl(var(--secondary))]">
-                    {imageModels.find((model) => model.id === selectedModel)?.description}
+                    {availableModels.find((model) => model.id === selectedModel)?.description}
+                    {modelsError ? `（模型列表加载失败：${modelsError}，可先用默认模型生成）` : ""}
                   </p>
                 </div>
 
