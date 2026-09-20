@@ -128,9 +128,9 @@ curl -sI "http://47.104.138.144:18999/project/6$js" | grep -i content-type
 | `/terms` | Terms |
 | `/privacy` | Privacy |
 | `/contact` | Contact |
-| `/dashboard` | Dashboard |
+| `/dashboard` | AppHomeRedirect → 最近项目工作台，或无项目空状态 |
 | `/project/:id/dashboard` | Dashboard |
-| `/projects` | ProjectsList |
+| `/projects` | AppHomeRedirect（旧项目画廊入口，不再展示卡片墙） |
 | `/project/:id` | ProjectDetail |
 | `/project/:id/:tab` | ProjectDetail |
 | `/project/:projectId/episode/:episodeId` | EpisodeDetail |
@@ -143,7 +143,7 @@ curl -sI "http://47.104.138.144:18999/project/6$js" | grep -i content-type
 补充说明：
 
 - `IdentityRouteGuard` 已启用。
-- 当前身份如果没有项目权限，例如“新成员”，访问 `/dashboard` 或 `/project/*` 会被重定向到 `/projects`。
+- 登录后与 `/projects`、`/dashboard` 一律走应用首页解析器：有项目则进入最近打开（或最近更新）的项目工作台，没有项目则显示空状态，不再落地工作区项目卡片墙。
 
 ## 当前功能概览
 

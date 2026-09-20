@@ -215,7 +215,7 @@ export const getIdentityMeta = (identity: IdentityOption) => {
 }
 
 export const getIdentityHomePath = (): string => {
-  return '/projects'
+  return '/dashboard'
 }
 
 export const canAccessProjectRoutes = (identity: IdentityOption): boolean => {

@@ -15,8 +15,9 @@ import {
   getUserRoleId,
   type IdentityOption,
 } from "@/lib/session"
+import { useProjectsStore } from "@/store/projectsStore"
 import { cn } from "@/lib/utils"
-import { ChevronDown, Check, LogOut, Shield, User } from "lucide-react"
+import { ChevronDown, Check, LogOut, Shield, User, Users } from "lucide-react"
 
 interface UserProfileMenuProps {
   userName?: string
@@ -138,6 +139,16 @@ export default function UserProfileMenu({
           <span>我的主页</span>
         </button>
 
+        {currentIdentity === "admin" || currentIdentity === "superadmin" ? (
+          <button
+            onClick={() => navigate("/members")}
+            className="mt-2 flex w-full items-center gap-2.5 rounded-[14px] px-3 py-2 text-left text-[13px] font-medium text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-high))]"
+          >
+            <Users className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+            <span>成员管理</span>
+          </button>
+        ) : null}
+
         <div
           className="relative mt-2"
           onMouseEnter={openIdentityPanel}
@@ -192,6 +203,7 @@ export default function UserProfileMenu({
           onClick={() => {
             clearSession()
             clearActiveProjectId()
+            useProjectsStore.getState().clearCache()
             navigate("/login")
             notify.success("已退出登录")
           }}

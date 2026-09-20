@@ -23,11 +23,12 @@ import WorkspaceLayout from "@/components/layout/WorkspaceLayout"
 import { projectsApi } from "@/api"
 import { getCurrentUser, setActiveProjectId } from "@/lib/session"
 import { mapProjectCard, mapProjectStats } from "@/lib/projectMappers"
-import { useProjectsStore } from "@/store/projectsStore"
+import { refreshProjects, useProjectsStore } from "@/store/projectsStore"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
 import { workflowsApi } from "@/features/project/api/workflows"
-import { projectAssetsPath, projectScriptPath } from "@/lib/workspaceRoutes"
+import { projectAssetsPath, projectDashboardPath, projectScriptPath } from "@/lib/workspaceRoutes"
 import { QuerySpinner } from "@/components/feedback/ListQueryState"
+import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
 const activities = [
   {
@@ -68,15 +69,15 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       <h2 className="text-2xl font-black text-[hsl(var(--on-surface))] mb-3">
         还没有项目
       </h2>
-      <p className="text-[hsl(var(--secondary))] max-w-md mb-8">
-        创建你的第一个项目，开始漫画创作之旅。你可以管理片段、场景、角色和工作流。
+      <p className="text-[hsl(var(--secondary))] max-w-md mb-8 leading-relaxed">
+        你可以新建项目开始创作，或等待管理员将自己拉进某个项目。
       </p>
       <Button
         onClick={onCreate}
         className="signature-gradient rounded-xl border-0 px-8 py-4 text-base font-bold text-white shadow-lg hover:opacity-90 hover:scale-105 transition-all"
       >
         <Plus className="mr-2 h-5 w-5" />
-        创建第一个项目
+        新建项目
       </Button>
       
       <div className="mt-12 grid grid-cols-3 gap-6 max-w-2xl">
@@ -108,6 +109,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { notify } = useFeedback()
   const { id: projectId } = useParams<{ id: string }>()
   const [createdProjects, setCreatedProjects] = useState<Array<{ id: number; name: string; image: string; status: string; updated: string }>>([])
   const [projectStats, setProjectStats] = useState({ episodeCount: 0, sceneCount: 0, characterCount: 0, objectCount: 0 })
@@ -153,17 +155,28 @@ export default function Dashboard() {
     scriptFile?: File | null
   }) => {
     const organizationId = getCurrentUser()?.organizationIds?.[0]
-    if (!organizationId) return
+    if (!organizationId) {
+      notify.error("当前账号缺少组织信息，无法创建项目")
+      return
+    }
 
-    const project = await projectsApi.create({
-      organizationId,
-      name: data.name,
-      description: data.description,
-      coverImage: null,
-      isPublic: false,
-    })
-    const mapped = mapProjectCard(project)
-    setCreatedProjects((prev) => [{ id: mapped.id, name: mapped.name, image: mapped.image, status: mapped.status, updated: mapped.modified }, ...prev])
+    try {
+      const project = await projectsApi.create({
+        organizationId,
+        name: data.name,
+        description: data.description,
+        coverImage: null,
+        isPublic: false,
+      })
+      const mapped = mapProjectCard(project)
+      setCreatedProjects((prev) => [{ id: mapped.id, name: mapped.name, image: mapped.image, status: mapped.status, updated: mapped.modified }, ...prev])
+      setActiveProjectId(project.id)
+      await refreshProjects()
+      setIsProjectDialogOpen(false)
+      navigate(projectDashboardPath(project.id))
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "创建项目失败")
+    }
   }
 
   const handleEnterCanvas = async () => {
