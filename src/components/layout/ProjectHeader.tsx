@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import NotificationDrawer, { demoNotifications } from "@/components/layout/NotificationDrawer"
 import UserProfileMenu from "@/components/layout/UserProfileMenu"
-import { Search, Bell } from "lucide-react"
+import { Search, Bell, Star } from "lucide-react"
 
 import type { ProjectTab } from "@/types"
 
@@ -28,12 +28,13 @@ export default function ProjectHeader({
     setNotificationList((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
   }
 
-  const topTabs: { id: ProjectTab; label: string }[] = [
+  const topTabs: { id: ProjectTab; label: string; icon?: typeof Star }[] = [
     { id: "episodes", label: "片段管理" },
     { id: "characters", label: "角色管理" },
     { id: "scenes", label: "场景管理" },
     { id: "objects", label: "物品管理" },
     { id: "workflows", label: "工作流" },
+    { id: "favorites", label: "我的收藏", icon: Star },
   ]
 
   return (
@@ -48,12 +49,13 @@ export default function ProjectHeader({
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             aria-current={activeTab === tab.id ? "page" : undefined}
-            className={`px-5 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? "signature-gradient text-white shadow-md"
                 : "text-[hsl(var(--on-secondary-fixed-variant))] hover:text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-high))]"
             }`}
           >
+            {tab.icon ? <tab.icon className="h-3.5 w-3.5" /> : null}
             {tab.label}
           </button>
         ))}

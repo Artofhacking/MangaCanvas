@@ -165,7 +165,7 @@ export interface ObjectCreateData {
 
 // ==================== 项目工作台状态 ====================
 
-export type ProjectTab = 'episodes' | 'scenes' | 'characters' | 'objects' | 'workflows'
+export type ProjectTab = 'episodes' | 'scenes' | 'characters' | 'objects' | 'workflows' | 'favorites'
 
 export interface Workflow {
   id: string

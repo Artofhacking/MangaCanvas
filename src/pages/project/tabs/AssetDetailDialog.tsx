@@ -23,6 +23,7 @@ interface AssetDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   image?: string
+  mediaType?: "image" | "video"
   name: string
   badge?: ReactNode
   metas?: AssetDetailMeta[]
@@ -36,6 +37,7 @@ export default function AssetDetailDialog({
   open,
   onOpenChange,
   image,
+  mediaType = "image",
   name,
   badge,
   metas = [],
@@ -50,7 +52,17 @@ export default function AssetDetailDialog({
         <div className="flex flex-col md:flex-row">
           <div className="w-full md:w-1/2 aspect-square md:aspect-auto md:min-h-[360px] bg-[hsl(var(--surface-container-low))]">
             {image ? (
-              <img src={image} alt={name} className="w-full h-full object-cover" />
+              mediaType === "video" ? (
+                <video
+                  src={image}
+                  className="h-full w-full bg-black object-contain"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                <img src={image} alt={name} className="w-full h-full object-cover" />
+              )
             ) : (
               <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-[hsl(var(--secondary))]">
                 暂无预览

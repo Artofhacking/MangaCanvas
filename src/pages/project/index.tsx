@@ -37,6 +37,7 @@ import EpisodesTab from "./tabs/EpisodesTab"
 import ObjectsTab from "./tabs/ObjectsTab"
 import PlaceholderTab from "./tabs/PlaceholderTab"
 import WorkflowsTab from "./tabs/WorkflowsTab"
+import FavoritesTab from "./tabs/FavoritesTab"
 
 // Creators
 import SceneCreator from "./SceneCreator"
@@ -46,7 +47,7 @@ import ObjectCreator from "./ObjectCreator"
 import CharacterBatchUploadDialog from "./CharacterBatchUploadDialog"
 import { CardGridSkeleton } from "@/components/feedback/ListQueryState"
 
-const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects", "workflows"]
+const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects", "workflows", "favorites"]
 const defaultProjectTab: ProjectTab = "scenes"
 
 const secondaryTabs: { id: ProjectTab; label: string }[] = [
@@ -55,6 +56,7 @@ const secondaryTabs: { id: ProjectTab; label: string }[] = [
   { id: "scenes", label: "场景管理" },
   { id: "objects", label: "物品管理" },
   { id: "workflows", label: "工作流" },
+  { id: "favorites", label: "我的收藏" },
 ]
 
 const sortOptions = [
@@ -122,6 +124,7 @@ export default function ProjectDetail() {
       case "objects":
         return "objects" as const
       case "workflows":
+      case "favorites":
         return null
       default:
         return "scenes" as const
@@ -346,6 +349,8 @@ export default function ProjectDetail() {
         )
       case "workflows":
         return <WorkflowsTab />
+      case "favorites":
+        return <FavoritesTab projectId={numericProjectId} sortBy={sortBy} />
       default:
         return <PlaceholderTab label={secondaryTabs.find(t => t.id === activeTab)?.label || ""} />
     }
@@ -510,7 +515,7 @@ export default function ProjectDetail() {
 
             <div className="flex flex-1 flex-col">
               <div className="flex-1">
-                {!assetsReady && activeTab !== "workflows" ? (
+                {!assetsReady && activeTab !== "workflows" && activeTab !== "favorites" ? (
                   <CardGridSkeleton count={8} />
                 ) : (
                   renderTabContent()

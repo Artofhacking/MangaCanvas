@@ -1,4 +1,4 @@
-export const ASSET_TABS = ["episodes", "characters", "scenes", "objects", "workflows"] as const
+export const ASSET_TABS = ["episodes", "characters", "scenes", "objects", "workflows", "favorites"] as const
 
 export type AssetTab = (typeof ASSET_TABS)[number]
 

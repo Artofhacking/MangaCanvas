@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { persistMedia } from '@/api/aigc/imageService';
 import { projectAssetsApi } from '@/api/projectAssetsApi';
 import { projectApi } from '@/api/projectApi';
+import { buildCollectMetadata } from '@/lib/favorites';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { useProjectStore } from '@/store/projectStore';
 
@@ -20,6 +21,8 @@ interface SaveToMaterialsModalProps {
   initialCategory?: string;
   nodeId?: string;
   confirmLabel?: string;
+  asFavorite?: boolean;
+  prompt?: string;
 }
 
 const categoryOptions = [
@@ -44,6 +47,8 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   initialCategory,
   nodeId,
   confirmLabel,
+  asFavorite = false,
+  prompt,
 }) => {
   const { projectId, workflowId, id } = useParams();
   const numericProjectId = Number(projectId || id);
@@ -172,7 +177,8 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
         sourceType: 'workflow',
         sourceId: workflowId || nodeId || `node-${Date.now()}`,
         url: persistedUrl,
-        metadata: { category, nodeId, mediaType },
+        prompt: prompt?.trim() || undefined,
+        metadata: buildCollectMetadata({ category, nodeId, mediaType }, asFavorite),
       });
       await loadProjectAssets(numericProjectId, true);
       message.success(
@@ -254,9 +260,13 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             <div className="mb-6">
               <div className="text-2xl font-bold text-[hsl(var(--on-surface))]">{modalTitle}</div>
               <div className="mt-2 text-sm text-[hsl(var(--secondary))]">
-                {mediaType === 'video'
-                  ? '将当前视频写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'
-                  : '将当前图片写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'}
+                {asFavorite
+                  ? mediaType === 'video'
+                    ? '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这段视频。'
+                    : '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这张图。'
+                  : mediaType === 'video'
+                    ? '将当前视频写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'
+                    : '将当前图片写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'}
               </div>
             </div>
 
