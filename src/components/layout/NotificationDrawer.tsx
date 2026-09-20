@@ -1,6 +1,16 @@
+import { useEffect, useState } from "react"
+import { Bell, Check, Trash2, X } from "lucide-react"
+
+import GenerationHistoryList from "@/components/layout/GenerationHistoryList"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
-import { Bell, Check, Trash2, X } from "lucide-react"
+
+type DrawerTab = "messages" | "history"
+
+const DRAWER_TABS: { id: DrawerTab; label: string }[] = [
+  { id: "messages", label: "消息列表" },
+  { id: "history", label: "生成历史" },
+]
 
 export interface NotificationItem {
   id: number
@@ -65,6 +75,12 @@ export default function NotificationDrawer({
   onClearAll,
 }: NotificationDrawerProps) {
   const unreadCount = notifications.filter((item) => !item.read).length
+  const [activeTab, setActiveTab] = useState<DrawerTab>("messages")
+  const isMessagesTab = activeTab === "messages"
+
+  useEffect(() => {
+    if (open) setActiveTab("messages")
+  }, [open])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -79,20 +95,22 @@ export default function NotificationDrawer({
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-bold text-[hsl(var(--on-surface))]">消息通知</h2>
-                {unreadCount > 0 && (
+                {isMessagesTab && unreadCount > 0 && (
                   <span className="text-xs text-[hsl(var(--primary))]">{unreadCount} 条未读</span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onMarkAllAsRead}
-                  className="h-8 px-2 text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
-                >
-                  <Check className="mr-1 h-3.5 w-3.5" />
-                  全部已读
-                </Button>
+                {isMessagesTab ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onMarkAllAsRead}
+                    className="h-8 px-2 text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
+                  >
+                    <Check className="mr-1 h-3.5 w-3.5" />
+                    全部已读
+                  </Button>
+                ) : null}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -103,74 +121,101 @@ export default function NotificationDrawer({
                 </Button>
               </div>
             </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-3 py-2">
-            {notifications.length === 0 ? (
-              <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center text-[hsl(var(--secondary))]">
-                <Bell className="mb-3 h-10 w-10 opacity-30" />
-                <p className="text-sm">暂无通知</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {notifications.map((notification) => (
+            <div className="mt-3 flex gap-2" role="tablist" aria-label="消息通知分类">
+              {DRAWER_TABS.map((tab) => {
+                const selected = activeTab === tab.id
+                return (
                   <button
-                    key={notification.id}
+                    key={tab.id}
                     type="button"
-                    onClick={() => onMarkAsRead(notification.id)}
-                    className={`w-full rounded-xl border p-3 text-left transition-colors ${
-                      notification.read
-                        ? "border-transparent bg-[hsl(var(--surface-container-low))] hover:bg-[hsl(var(--surface-container-high))]"
-                        : "border-[hsl(var(--primary))]/18 bg-[hsl(var(--primary))]/5 hover:bg-[hsl(var(--primary))]/8"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
+                      selected
+                        ? "signature-gradient text-white shadow-sm"
+                        : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3
-                            className={`text-sm font-bold truncate ${
-                              notification.read
-                                ? "text-[hsl(var(--on-surface))]"
-                                : "text-[hsl(var(--primary))]"
-                            }`}
-                          >
-                            {notification.title}
-                          </h3>
-                          {!notification.read && (
-                            <span className="h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--primary))]" />
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-xs text-[hsl(var(--on-surface-variant))] line-clamp-2">
-                          {notification.message}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-[10px] text-[hsl(var(--secondary))]">{notification.time}</p>
+                    {tab.label}
                   </button>
-                ))}
-              </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className={`relative min-h-0 flex-1 px-3 py-2 ${isMessagesTab ? "overflow-y-auto" : "overflow-hidden"}`}>
+            {isMessagesTab ? (
+              notifications.length === 0 ? (
+                <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center text-[hsl(var(--secondary))]">
+                  <Bell className="mb-3 h-10 w-10 opacity-30" />
+                  <p className="text-sm">暂无通知</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {notifications.map((notification) => (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      onClick={() => onMarkAsRead(notification.id)}
+                      className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                        notification.read
+                          ? "border-transparent bg-[hsl(var(--surface-container-low))] hover:bg-[hsl(var(--surface-container-high))]"
+                          : "border-[hsl(var(--primary))]/18 bg-[hsl(var(--primary))]/5 hover:bg-[hsl(var(--primary))]/8"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3
+                              className={`truncate text-sm font-bold ${
+                                notification.read
+                                  ? "text-[hsl(var(--on-surface))]"
+                                  : "text-[hsl(var(--primary))]"
+                              }`}
+                            >
+                              {notification.title}
+                            </h3>
+                            {!notification.read && (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--primary))]" />
+                            )}
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-[hsl(var(--on-surface-variant))]">
+                            {notification.message}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[10px] text-[hsl(var(--secondary))]">{notification.time}</p>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              <GenerationHistoryList />
             )}
           </div>
 
-          <div className="border-t border-[hsl(var(--outline-variant))]/15 px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                variant="ghost"
-                className="h-9 flex-1 rounded-lg text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
-                onClick={() => onOpenChange(false)}
-              >
-                查看全部消息
-              </Button>
-              <Button
-                variant="ghost"
-                className="h-9 rounded-lg px-3 text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
-                onClick={onClearAll}
-              >
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                清空
-              </Button>
+          {isMessagesTab ? (
+            <div className="border-t border-[hsl(var(--outline-variant))]/15 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  variant="ghost"
+                  className="h-9 flex-1 rounded-lg text-xs text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
+                  onClick={() => onOpenChange(false)}
+                >
+                  查看全部消息
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-9 rounded-lg px-3 text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={onClearAll}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  清空
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

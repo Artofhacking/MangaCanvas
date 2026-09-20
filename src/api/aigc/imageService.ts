@@ -1,5 +1,6 @@
 import { appClient } from '@/api/clients/appClient'
 import { requestData } from '@/api/core/response'
+import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import type { ImageGenerateOptions } from './types'
 
 export const isDashScopeDirectModel = (model: string) => model.startsWith('wan')
@@ -22,25 +23,38 @@ export const persistMedia = async (url: string): Promise<string> => {
 
 export const imageService = {
   async generate(options: ImageGenerateOptions): Promise<string[]> {
-    options.onProgress?.({ status: 'RUNNING' })
-    const resp = await requestData<BackendImageResponse>(appClient, {
-      url: '/ai/images/generations',
-      method: 'POST',
-      data: {
-        model: options.model,
-        prompt: options.prompt,
-        n: options.n ?? 1,
-        size: options.size ?? '1024x1024',
-        quality: options.quality,
-        images: options.images,
-        negative_prompt: options.negativePrompt,
-      },
+    const historyId = useGenerationHistoryStore.getState().start({
+      mediaType: 'image',
+      prompt: options.prompt,
+      title: titleFromPrompt(options.prompt, '图像生成'),
+      source: 'image',
     })
-    const urls = (resp.data || []).map((item) => item.url).filter((url): url is string => Boolean(url))
-    options.onProgress?.({ status: urls.length ? 'SUCCEEDED' : 'FAILED' })
-    if (!urls.length) {
-      throw new Error('生成成功但未返回图片')
+    options.onProgress?.({ status: 'RUNNING' })
+    try {
+      const resp = await requestData<BackendImageResponse>(appClient, {
+        url: '/ai/images/generations',
+        method: 'POST',
+        data: {
+          model: options.model,
+          prompt: options.prompt,
+          n: options.n ?? 1,
+          size: options.size ?? '1024x1024',
+          quality: options.quality,
+          images: options.images,
+          negative_prompt: options.negativePrompt,
+        },
+      })
+      const urls = (resp.data || []).map((item) => item.url).filter((url): url is string => Boolean(url))
+      options.onProgress?.({ status: urls.length ? 'SUCCEEDED' : 'FAILED' })
+      if (!urls.length) {
+        throw new Error('生成成功但未返回图片')
+      }
+      useGenerationHistoryStore.getState().succeed(historyId, urls[0])
+      return urls
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '生成失败'
+      useGenerationHistoryStore.getState().fail(historyId, message)
+      throw error
     }
-    return urls
   },
 }
