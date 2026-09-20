@@ -155,7 +155,7 @@ export interface ObjectCreateData {
   genMethod: 'model' | 'upload'
   model?: string
   prompt?: string
-  aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3'
+  aspectRatio?: string
   referenceImage?: string
   referenceImages?: string[]
   sourceWorkflowId?: string

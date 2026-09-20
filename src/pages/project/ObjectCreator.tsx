@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/sheet"
 import { X } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { ImageGenerationForm, type ImageGenerationConfig } from "@/components/forms/ImageGenerationForm"
+import { ImageGenerationForm } from "@/components/forms/ImageGenerationForm"
+import { defaultImageGenerationConfig, type ImageGenerationConfig } from "@/lib/generateSettings"
 import GenerationTaskPanel, {
   AssetEditorActions,
   GenerationTaskListButton,
@@ -27,7 +28,7 @@ export interface ObjectCreateData {
   genMethod: "model" | "upload"
   model?: string
   prompt?: string
-  aspectRatio?: "1:1" | "16:9" | "9:16" | "4:3"
+  aspectRatio?: string
   quantity?: number
   referenceImage?: string
   referenceImages?: string[]
@@ -56,13 +57,7 @@ export default function ObjectCreator({
 }: ObjectCreatorProps) {
   const { notify } = useFeedback()
   const [objectName, setObjectName] = useState("")
-  const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>({
-    model: "",
-    prompt: "",
-    aspectRatio: "1:1",
-    quantity: 1,
-    referenceImages: [],
-  })
+  const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>(() => defaultImageGenerationConfig())
   const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
     useCollapsibleTaskPanel(open)
   const allTasks = useAssetGenerationStore((state) => state.tasks)
@@ -79,16 +74,11 @@ export default function ObjectCreator({
   const runningKey = projectId ? assetTaskKey("object", Number(projectId), initialData?.id) : ""
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
+  const setCover = useAssetGenerationStore((state) => state.setCover)
 
   const resetForm = () => {
     setObjectName("")
-    setGenerationConfig({
-      model: "",
-      prompt: "",
-      aspectRatio: "1:1",
-      quantity: 1,
-      referenceImages: [],
-    })
+    setGenerationConfig(defaultImageGenerationConfig())
   }
 
   useEffect(() => {
@@ -98,7 +88,7 @@ export default function ObjectCreator({
       setGenerationConfig((prev) => ({
         ...prev,
         prompt: initialData.description || "",
-        aspectRatio: (initialData.aspectRatio as ImageGenerationConfig["aspectRatio"]) || prev.aspectRatio,
+        aspectRatio: initialData.aspectRatio || prev.aspectRatio,
         referenceImages: initialData.hasImage && initialData.image ? [initialData.image] : [],
       }))
     } else {
@@ -150,6 +140,9 @@ export default function ObjectCreator({
       prompt: generationConfig.prompt.trim(),
       model: generationConfig.model,
       aspectRatio: generationConfig.aspectRatio,
+      quality: generationConfig.quality,
+      clarity: generationConfig.clarity,
+      n: generationConfig.quantity,
       referenceImages: generationConfig.referenceImages,
     }).then((result) => {
       if (result === "ok") {
@@ -200,7 +193,12 @@ export default function ObjectCreator({
             <ImageGenerationForm directory="objects" value={generationConfig} onChange={setGenerationConfig} />
           </div>
           {panelOpen ? (
-            <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+            <GenerationTaskPanel
+              tasks={tasks}
+              highlight={highlightTasks}
+              panelRef={taskPanelRef}
+              onSetCover={(task, url) => setCover(task.id, url)}
+            />
           ) : null}
         </div>
 

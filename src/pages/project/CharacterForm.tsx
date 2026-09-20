@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown, Loader2 } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { ImageGenerationForm, type ImageGenerationConfig } from "@/components/forms/ImageGenerationForm"
+import { ImageGenerationForm } from "@/components/forms/ImageGenerationForm"
+import { defaultImageGenerationConfig, type ImageGenerationConfig } from "@/lib/generateSettings"
 import { generateAssetImage } from "@/lib/generateAssetImage"
 import type { CharacterCreateData, CharacterEditData, Character } from "@/types"
 
@@ -35,6 +36,9 @@ export type CharacterFormValues = {
   model: string
   prompt: string
   aspectRatio: ImageGenerationConfig["aspectRatio"]
+  quality: ImageGenerationConfig["quality"]
+  clarity: ImageGenerationConfig["clarity"]
+  quantity: number
   referenceImages: string[]
 }
 
@@ -62,13 +66,7 @@ export default function CharacterForm({
   const [characterName, setCharacterName] = useState("")
   const [style, setStyle] = useState("")
 
-  const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>({
-    model: "",
-    prompt: "",
-    aspectRatio: "1:1",
-    quantity: 1,
-    referenceImages: [],
-  })
+  const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>(() => defaultImageGenerationConfig())
   const initializedRef = useRef(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -81,13 +79,14 @@ export default function CharacterForm({
       setGender(initialData.gender || "")
       setAge(initialData.ageGroup || "")
       setStyle(initialData.style || "")
-      setGenerationConfig({
-        model: initialData.model || "",
-        prompt: initialData.description || "",
-        aspectRatio: (initialData.aspectRatio as ImageGenerationConfig["aspectRatio"]) || "1:1",
-        quantity: 1,
-        referenceImages: initialData.image ? [initialData.image] : [],
-      })
+      setGenerationConfig(
+        defaultImageGenerationConfig({
+          model: initialData.model || "",
+          prompt: initialData.description || "",
+          aspectRatio: initialData.aspectRatio || "1:1",
+          referenceImages: initialData.image ? [initialData.image] : [],
+        })
+      )
     } else {
       resetForm()
     }
@@ -103,6 +102,9 @@ export default function CharacterForm({
       model: generationConfig.model,
       prompt: generationConfig.prompt,
       aspectRatio: generationConfig.aspectRatio,
+      quality: generationConfig.quality,
+      clarity: generationConfig.clarity,
+      quantity: generationConfig.quantity,
       referenceImages: generationConfig.referenceImages,
     })
   }, [age, characterName, gender, generationConfig, onValuesChange, style])
@@ -112,13 +114,7 @@ export default function CharacterForm({
     setGender("")
     setAge("")
     setStyle("")
-    setGenerationConfig({
-      model: "",
-      prompt: "",
-      aspectRatio: "1:1",
-      quantity: 1,
-      referenceImages: [],
-    })
+    setGenerationConfig(defaultImageGenerationConfig())
   }
 
   const buildPayload = (referenceImage?: string): CharacterCreateData | CharacterEditData => {
@@ -179,14 +175,17 @@ export default function CharacterForm({
 
     setSubmitting(true)
     try {
-      const imageUrl = await generateAssetImage({
+      const urls = await generateAssetImage({
         model: generationConfig.model,
         prompt: generationConfig.prompt.trim(),
         aspectRatio: generationConfig.aspectRatio,
+        quality: generationConfig.quality,
+        clarity: generationConfig.clarity,
         referenceImages: generationConfig.referenceImages,
-        n: 1,
+        n: generationConfig.quantity,
       })
-      setGenerationConfig((current) => ({ ...current, referenceImages: [imageUrl] }))
+      const imageUrl = urls[0]
+      setGenerationConfig((current) => ({ ...current, referenceImages: urls }))
       onSubmit?.(buildPayload(imageUrl), "generate")
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "生成失败")
@@ -276,7 +275,6 @@ export default function CharacterForm({
       <ImageGenerationForm
         value={generationConfig}
         onChange={setGenerationConfig}
-        quantityOptions={[1, 2, 3, 4, 5]}
         directory="characters"
       />
 

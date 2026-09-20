@@ -11,15 +11,11 @@ import { useMultiUpload } from "@/hooks/useUpload"
 import type { UploadDirectory } from "@/api/uploadApi"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useImageModels } from "@/features/infinite-canvas/hooks/useModels"
+import { GenerateSettingsPopover } from "@/components/forms/GenerateSettingsPopover"
+import { type ImageGenerationConfig } from "@/lib/generateSettings"
 import { cn } from "@/lib/utils"
 
-export interface ImageGenerationConfig {
-  model: string
-  prompt: string
-  aspectRatio: "1:1" | "16:9" | "9:16" | "4:3"
-  quantity: number
-  referenceImages: string[]
-}
+export type { ImageGenerationConfig } from "@/lib/generateSettings"
 
 interface ImageGenerationFormProps {
   value: ImageGenerationConfig
@@ -39,62 +35,11 @@ const fallbackModels = [
   { id: "sdxl", name: "SDXL", desc: "通用型底模，便于快速出图" },
 ]
 
-const aspectRatioValues = ["1:1", "16:9", "9:16", "4:3"] as const
-
-function PromptChromePills<T extends string | number>({
-  label,
-  options,
-  value,
-  disabled,
-  onChange,
-  format,
-  title,
-}: {
-  label: string
-  options: T[]
-  value: T
-  disabled?: boolean
-  onChange: (next: T) => void
-  format?: (option: T) => string
-  title?: string
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      title={title}
-      className="flex items-center gap-0.5 rounded-full bg-[hsl(var(--surface-container-lowest))] p-0.5"
-    >
-      {options.map((option) => {
-        const active = option === value
-        return (
-          <button
-            key={String(option)}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            disabled={disabled}
-            onClick={() => onChange(option)}
-            className={cn(
-              "h-8 min-w-[2.25rem] whitespace-nowrap rounded-full px-3 text-xs font-semibold tracking-tight transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))] disabled:opacity-50",
-              active
-                ? "signature-gradient text-white shadow-sm"
-                : "text-[hsl(var(--on-surface-variant))] hover:bg-[hsl(var(--surface-container-high))]"
-            )}
-          >
-            {format ? format(option) : String(option)}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export function ImageGenerationForm({
   value,
   onChange,
   models: propModels,
-  quantityOptions = [1, 2, 3, 4],
+  quantityOptions,
   showQuantity = true,
   disabled = false,
   directory = "objects",
@@ -233,7 +178,7 @@ export function ImageGenerationForm({
         </p>
       </div>
 
-      {/* Prompt composer: refs + ratio/qty live in the box chrome */}
+      {/* Prompt composer: refs + settings capsule live in the box chrome */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
           <span className="mr-1 text-red-500">*</span>提示词
@@ -314,39 +259,15 @@ export function ImageGenerationForm({
               </button>
             </div>
 
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
-              <PromptChromePills
-                label="生成比例"
-                options={[...aspectRatioValues]}
-                value={value.aspectRatio}
+            <div className="ml-auto">
+              <GenerateSettingsPopover
+                model={value.model}
+                value={value}
+                onChange={(next) => onChange({ ...value, ...next })}
+                quantityOptions={quantityOptions}
+                showQuantity={showQuantity}
                 disabled={disabled}
-                onChange={(next) => updateField("aspectRatio", next)}
               />
-              {showQuantity ? (
-                <>
-                  <span
-                    className="h-4 w-px bg-[hsl(var(--outline-variant))]/45"
-                    aria-hidden
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <PromptChromePills
-                      label="生成数量"
-                      options={quantityOptions}
-                      value={value.quantity}
-                      disabled={disabled}
-                      onChange={(next) => updateField("quantity", next)}
-                      format={(qty) => `${qty}张`}
-                      title="每次生成会消耗相应积分"
-                    />
-                    <span
-                      className="text-[10px] leading-none text-[hsl(var(--secondary))]"
-                      title="每次生成会消耗相应积分"
-                    >
-                      耗积分
-                    </span>
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </div>

@@ -58,6 +58,7 @@ export default function CharacterCreator({
   const runningKey = projectId ? assetTaskKey("character", Number(projectId), initialData?.id) : ""
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
+  const setCover = useAssetGenerationStore((state) => state.setCover)
 
   const handleValuesChange = useCallback((values: CharacterFormValues) => {
     valuesRef.current = values
@@ -129,6 +130,9 @@ export default function CharacterCreator({
       prompt: values.prompt.trim(),
       model: values.model,
       aspectRatio: values.aspectRatio,
+      quality: values.quality,
+      clarity: values.clarity,
+      n: values.quantity,
       referenceImages: values.referenceImages,
       extras: {
         gender: values.gender,
@@ -178,7 +182,12 @@ export default function CharacterCreator({
             />
           </div>
           {panelOpen ? (
-            <GenerationTaskPanel tasks={tasks} highlight={highlightTasks} panelRef={taskPanelRef} />
+            <GenerationTaskPanel
+              tasks={tasks}
+              highlight={highlightTasks}
+              panelRef={taskPanelRef}
+              onSetCover={(task, url) => setCover(task.id, url)}
+            />
           ) : null}
         </div>
 
