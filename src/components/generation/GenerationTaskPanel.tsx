@@ -132,14 +132,19 @@ export function AssetEditorActions({
   )
   if (!hasExisting) {
     return (
-      <Button
-        type="button"
-        onClick={onGenerate}
-        disabled={submitting}
-        className="w-full h-12 signature-gradient text-white rounded-xl font-bold text-lg border-0 disabled:opacity-60"
-      >
-        {generateLabel}
-      </Button>
+      <div className="space-y-2">
+        <Button
+          type="button"
+          onClick={onGenerate}
+          disabled={submitting}
+          className="w-full h-12 signature-gradient text-white rounded-xl font-bold text-lg border-0 disabled:opacity-60"
+        >
+          {generateLabel}
+        </Button>
+        <p className="text-center text-xs text-[hsl(var(--secondary))]">
+          生成成功后将自动加入素材库
+        </p>
+      </div>
     )
   }
   return (

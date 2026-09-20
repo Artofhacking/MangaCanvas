@@ -1,4 +1,4 @@
-import { Wand2, Workflow } from "lucide-react"
+import { Upload, Wand2, Workflow } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type AssetQuickCreateVariant = "character" | "scene" | "object"
@@ -9,6 +9,7 @@ interface AssetQuickCreateCardProps {
   description: string
   quickHint: string
   onQuickCreate: () => void
+  onUpload?: () => void
   onOpenCanvas: () => void
 }
 
@@ -63,6 +64,7 @@ export default function AssetQuickCreateCard({
   description,
   quickHint,
   onQuickCreate,
+  onUpload,
   onOpenCanvas,
 }: AssetQuickCreateCardProps) {
   const styles = variantStyles[variant]
@@ -100,6 +102,19 @@ export default function AssetQuickCreateCard({
           >
             <Wand2 className={iconButton.icon} />
           </button>
+          {onUpload ? (
+            <button
+              type="button"
+              onClick={onUpload}
+              aria-label="上传到素材库"
+              className={cn(
+                "flex items-center justify-center border border-[hsl(var(--primary))]/25 bg-[hsl(var(--surface))]/80 text-[hsl(var(--primary))] transition-all hover:border-[hsl(var(--primary))]/45 hover:bg-[hsl(var(--primary))]/10",
+                iconButton.wrap,
+              )}
+            >
+              <Upload className={iconButton.icon} />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onOpenCanvas}
@@ -132,6 +147,24 @@ export default function AssetQuickCreateCard({
               {quickHint}
             </span>
           </button>
+          {onUpload ? (
+            <button
+              type="button"
+              onClick={onUpload}
+              className="min-w-0 flex-1 text-center transition-colors hover:text-[hsl(var(--primary))]"
+            >
+              <span className={cn(styles.footerTitle, "block")}>上传入库</span>
+              <span
+                className={cn(
+                  "cn-nowrap block text-[13px] text-[hsl(var(--secondary))]",
+                  styles.footerMeta,
+                  variant === "scene" && "font-medium",
+                )}
+              >
+                图片进库
+              </span>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onOpenCanvas}

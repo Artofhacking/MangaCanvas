@@ -122,78 +122,116 @@ function patchTask(tasks: AssetGenTask[], id: string, patch: Partial<AssetGenTas
   return next
 }
 
+const persistKindLabel: Record<AssetKind, string> = {
+  scene: '场景',
+  character: '角色',
+  object: '物品',
+  episode: '片段',
+}
+
+function requirePersisted<T>(value: T | null | undefined, kind: AssetKind, action: 'create' | 'update'): T {
+  if (value) return value
+  const noun = persistKindLabel[kind]
+  const storeError = useProjectStore.getState().error
+  throw new Error(storeError || (action === 'create' ? `${noun}未能加入素材库` : `${noun}未能保存到素材库`))
+}
+
 async function persistGenerated(input: StartAssetGenerationInput, imageUrl: string) {
   const store = useProjectStore.getState()
   const extras = input.extras || {}
   if (input.kind === 'scene') {
     if (input.assetId) {
-      await store.updateScene(input.projectId, input.assetId, {
-        name: input.name,
-        description: extras.description ?? input.prompt,
-        image: imageUrl,
-        status: 'in-use',
-        aspectRatio: input.aspectRatio,
-      })
+      requirePersisted(
+        await store.updateScene(input.projectId, input.assetId, {
+          name: input.name,
+          description: extras.description ?? input.prompt,
+          image: imageUrl,
+          status: 'in-use',
+          aspectRatio: input.aspectRatio,
+        }),
+        'scene',
+        'update',
+      )
       return
     }
-    await store.createScene(input.projectId, {
-      name: input.name,
-      genMethod: 'model',
-      model: input.model,
-      description: extras.description ?? input.prompt,
-      distance: extras.distance ?? 8,
-      zoom: extras.zoom ?? 0.6,
-      status: 'in-use',
-      referenceImage: imageUrl,
-    })
+    requirePersisted(
+      await store.createScene(input.projectId, {
+        name: input.name,
+        genMethod: 'model',
+        model: input.model,
+        description: extras.description ?? input.prompt,
+        distance: extras.distance ?? 8,
+        zoom: extras.zoom ?? 0.6,
+        status: 'in-use',
+        referenceImage: imageUrl,
+      }),
+      'scene',
+      'create',
+    )
     return
   }
   if (input.kind === 'character') {
     if (input.assetId) {
-      await store.updateCharacter(input.projectId, input.assetId, {
-        name: input.name,
-        description: input.prompt,
-        image: imageUrl,
-        model: input.model,
-        gender: extras.gender,
-        ageGroup: extras.ageGroup,
-        style: extras.style,
-        hasImage: true,
-        aspectRatio: input.aspectRatio,
-      })
+      requirePersisted(
+        await store.updateCharacter(input.projectId, input.assetId, {
+          name: input.name,
+          description: input.prompt,
+          image: imageUrl,
+          model: input.model,
+          gender: extras.gender,
+          ageGroup: extras.ageGroup,
+          style: extras.style,
+          hasImage: true,
+          aspectRatio: input.aspectRatio,
+        }),
+        'character',
+        'update',
+      )
       return
     }
-    await store.createCharacter(input.projectId, {
-      name: input.name,
-      gender: extras.gender || 'other',
-      ageGroup: extras.ageGroup || 'young',
-      genMethod: 'model',
-      model: input.model,
-      style: extras.style,
-      description: input.prompt,
-      aspectRatio: input.aspectRatio,
-      referenceImage: imageUrl,
-    })
+    requirePersisted(
+      await store.createCharacter(input.projectId, {
+        name: input.name,
+        gender: extras.gender || 'other',
+        ageGroup: extras.ageGroup || 'young',
+        genMethod: 'model',
+        model: input.model,
+        style: extras.style,
+        description: input.prompt,
+        aspectRatio: input.aspectRatio,
+        referenceImage: imageUrl,
+      }),
+      'character',
+      'create',
+    )
     return
   }
   if (input.kind === 'object') {
     if (input.assetId) {
-      await store.updateObject(input.projectId, input.assetId, {
-        name: input.name,
-        description: input.prompt,
-        image: imageUrl,
-        aspectRatio: input.aspectRatio,
-      })
+      requirePersisted(
+        await store.updateObject(input.projectId, input.assetId, {
+          name: input.name,
+          description: input.prompt,
+          image: imageUrl,
+          aspectRatio: input.aspectRatio,
+        }),
+        'object',
+        'update',
+      )
       return
     }
-    await store.createObject(input.projectId, {
-      name: input.name,
-      genMethod: 'model',
-      model: input.model,
-      prompt: input.prompt,
-      aspectRatio: input.aspectRatio,
-      referenceImage: imageUrl,
-    })
+    requirePersisted(
+      await store.createObject(input.projectId, {
+        name: input.name,
+        genMethod: 'model',
+        model: input.model,
+        prompt: input.prompt,
+        aspectRatio: input.aspectRatio,
+        referenceImage: imageUrl,
+      }),
+      'object',
+      'create',
+    )
   }
 }
 
