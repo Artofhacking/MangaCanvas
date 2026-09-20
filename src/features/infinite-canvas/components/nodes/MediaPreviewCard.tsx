@@ -56,6 +56,8 @@ interface MediaPreviewCardProps {
   onLabelBlur?: () => void
   onLabelKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void
   className?: string
+  /** True when the card shows generated/uploaded media (keeps a dark well behind it). */
+  filled?: boolean
   children: React.ReactNode
 }
 
@@ -91,7 +93,7 @@ export function MediaEmptyGlyph({ kind }: { kind: 'image' | 'video' }) {
 export function MediaStageLoading({ kind }: { kind: 'image' | 'video' }) {
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-[hsl(var(--primary)/0.08)] to-transparent" />
       <MediaEmptyGlyph kind={kind} />
     </div>
   )
@@ -113,6 +115,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
   onLabelBlur,
   onLabelKeyDown,
   className,
+  filled,
   children,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -203,11 +206,12 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
         <div
           className={cn(
             'relative h-full w-full overflow-hidden rounded-[20px] border transition-[border-color,box-shadow] duration-200',
+            filled && 'media-preview-card__stage--filled',
             dropActive
               ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
               : selected
-                ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_hsl(var(--primary)/0.28)]'
-                : 'border-[hsl(var(--media-stage-fg)/0.14)]'
+                ? 'border-[hsl(var(--primary))] shadow-[0_0_0_2px_hsl(var(--primary)/0.28)]'
+                : 'border-[hsl(var(--outline-variant)/0.7)]'
           )}
           style={{ backgroundColor: 'hsl(var(--media-stage))' }}
         >
