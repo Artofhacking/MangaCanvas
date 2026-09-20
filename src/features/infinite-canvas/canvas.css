@@ -61,38 +61,28 @@ code {
 .canvas-edge-flow {
   fill: none;
   stroke: var(--ic-primary, hsl(var(--primary)));
-  stroke-width: 2.25;
+  stroke-width: 2.5;
   stroke-linecap: round;
-  stroke-dasharray: 5 11;
-  animation: canvas-edge-dash 0.85s linear infinite;
+  stroke-dasharray: 7 12;
+  animation: canvas-edge-dash 0.7s linear infinite;
   pointer-events: none;
 }
 
 .canvas-edge-particle {
   fill: var(--ic-primary, hsl(var(--primary)));
-  offset-rotate: 0deg;
-  animation: canvas-edge-particle 1.35s linear infinite;
+  stroke: hsl(var(--primary-foreground));
+  stroke-width: 1.15;
   pointer-events: none;
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ic-primary, hsl(var(--primary))) 55%, transparent));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ic-primary, hsl(var(--primary))) 70%, transparent));
 }
 
 .canvas-edge-particle--trail {
-  opacity: 0.4;
-  animation-delay: -0.45s;
+  opacity: 0.45;
 }
 
 @keyframes canvas-edge-dash {
   to {
-    stroke-dashoffset: -16;
-  }
-}
-
-@keyframes canvas-edge-particle {
-  from {
-    offset-distance: 0%;
-  }
-  to {
-    offset-distance: 100%;
+    stroke-dashoffset: -19;
   }
 }
 

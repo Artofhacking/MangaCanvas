@@ -40,7 +40,6 @@ const CanvasFlowEdge: React.FC<EdgeProps<CustomEdge['data']>> = ({
   );
 
   const isActive = isAdjacentSelected || Boolean(selected);
-  const particlePath = `path('${edgePath}')`;
 
   return (
     <>
@@ -53,8 +52,8 @@ const CanvasFlowEdge: React.FC<EdgeProps<CustomEdge['data']>> = ({
           ...style,
           ...(isActive
             ? {
-                stroke: ACTIVE_STROKE,
-                strokeWidth: 2.25,
+                stroke: `color-mix(in srgb, ${ACTIVE_STROKE} 42%, transparent)`,
+                strokeWidth: 2,
               }
             : null),
         }}
@@ -62,18 +61,12 @@ const CanvasFlowEdge: React.FC<EdgeProps<CustomEdge['data']>> = ({
       {isActive ? (
         <>
           <path d={edgePath} className="canvas-edge-flow" fill="none" aria-hidden />
-          <circle
-            r="3.25"
-            className="canvas-edge-particle canvas-edge-particle--trail"
-            style={{ offsetPath: particlePath }}
-            aria-hidden
-          />
-          <circle
-            r="3.25"
-            className="canvas-edge-particle"
-            style={{ offsetPath: particlePath }}
-            aria-hidden
-          />
+          <circle r="3" className="canvas-edge-particle canvas-edge-particle--trail" aria-hidden>
+            <animateMotion dur="1.2s" begin="-0.4s" repeatCount="indefinite" path={edgePath} />
+          </circle>
+          <circle r="3.75" className="canvas-edge-particle" aria-hidden>
+            <animateMotion dur="1.2s" repeatCount="indefinite" path={edgePath} />
+          </circle>
         </>
       ) : null}
     </>
