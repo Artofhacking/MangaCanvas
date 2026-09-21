@@ -4,6 +4,8 @@ import {
   coerceGenerateParams,
   listImageAspectRatios,
   listImageSizes,
+  listVideoAspectRatios,
+  listVideoResolutions,
 } from './generateParams'
 import type { CustomNode } from '../types'
 
@@ -57,6 +59,14 @@ describe('万相 2.7 selectable ratios', () => {
       size: '960*1696',
       ratio: '9:16',
     })
+  })
+})
+
+describe('video capability lookup', () => {
+  it('limits HappyHorse t2v to the catalog 16:9 / 9:16 sizes instead of a generic 5-ratio skeleton', () => {
+    expect(listVideoAspectRatios('happyhorse-1.1-t2v')).toEqual(['16:9', '9:16'])
+    expect(listVideoResolutions('happyhorse-1.1-t2v')).toEqual(['1080P', '720P'])
+    expect(listVideoResolutions('doubao-seedance-2-0-fast-260128')).toEqual(['720P'])
   })
 })
 

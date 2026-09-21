@@ -7,6 +7,8 @@ interface NodeDockOverlayProps {
   barWidth: number
   estimatedHeight: number
   dockKey: 'generate' | 'text-edit'
+  maxWidth?: number
+  fitContent?: boolean
   children?: React.ReactNode | ((ctx: { placeAbove: boolean }) => React.ReactNode)
 }
 
@@ -15,6 +17,8 @@ export function NodeDockOverlay({
   barWidth,
   estimatedHeight,
   dockKey,
+  maxWidth,
+  fitContent,
   children,
 }: NodeDockOverlayProps) {
   const anchor = useNodeDockAnchor(nodeId)
@@ -56,7 +60,12 @@ export function NodeDockOverlay({
         className="pointer-events-auto absolute nodrag nowheel nopan"
         data-node-dock={dockKey}
         data-generate-bar={dockKey === 'generate' ? 'true' : undefined}
-        style={{ left, top, width: barWidth }}
+        style={{
+          left,
+          top,
+          width: fitContent ? 'max-content' : barWidth,
+          maxWidth,
+        }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >

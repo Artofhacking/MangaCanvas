@@ -1,6 +1,11 @@
 import type { ModelConfig, SizeOption } from '../types';
 import { labeledSizes } from '../utils/aspectRatio';
 
+/**
+ * Capability map keyed by GET /ai/models ids.
+ * Not a picker source — empty/error live lists must not dump this catalog.
+ */
+
 export const IMAGE_MODELS: ModelConfig[] = [
   {
     key: 'gpt-image-2',
@@ -190,6 +195,24 @@ export const VIDEO_MODELS: ModelConfig[] = [
     },
   },
   {
+    key: 'happyhorse-1.1-r2v',
+    label: 'HappyHorse 参考图生视频',
+    type: 'video',
+    async: true,
+    resolutions: [
+      { label: '720P', key: '720P' },
+      { label: '1080P', key: '1080P' },
+    ],
+    durs: [
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+    ],
+    defaultParams: {
+      resolution: '720P',
+      duration: 5,
+    },
+  },
+  {
     key: 'doubao-seedance-2-0-260128',
     label: 'Seedance 2.0',
     type: 'video',
@@ -272,7 +295,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
   },
   {
     key: 'MiniMax-H3',
-    label: 'MiniMax H3',
+    label: '海螺 MiniMax H3',
     type: 'video',
     enabled: false,
     async: true,
@@ -294,7 +317,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
   },
   {
     key: 'MiniMax-H3-Max',
-    label: 'MiniMax H3 Max',
+    label: '海螺 MiniMax H3 Max',
     type: 'video',
     enabled: false,
     async: true,
@@ -362,30 +385,39 @@ export function enabledModels<T extends { enabled?: boolean }>(all: T[]): T[] {
   return all.filter((item) => item.enabled !== false)
 }
 
-export function filterLiveModels<T extends { key: string; enabled?: boolean }>(all: T[], liveIds: string[]): T[] {
+export function filterLiveModels<T extends { key: string; enabled?: boolean }>(
+  all: T[],
+  liveIds: readonly string[]
+): T[] {
   const set = new Set(liveIds)
   return enabledModels(all).filter((item) => set.has(item.key))
 }
 
+/** Live API ids only. Empty/error live lists never dump the static catalog. */
 export function resolvePickerModels<T extends { key: string; enabled?: boolean }>(
   all: T[],
-  liveIds: string[],
+  liveIds: readonly string[],
   loading: boolean
 ): T[] {
-  const catalog = enabledModels(all)
-  const live = filterLiveModels(catalog, liveIds)
-  if (loading || live.length === 0) return catalog
-  return live
+  if (loading || liveIds.length === 0) return []
+  return filterLiveModels(all, liveIds)
 }
 
-export function remapVideoModel(key: string | undefined): string {
-  const name = key || 'happyhorse-1.1-t2v'
-  if (enabledModels(VIDEO_MODELS).some((m) => m.key === name)) {
-    return name
+export function remapVideoModel(key: string | undefined, liveIds: readonly string[] = []): string {
+  const name = (key || '').trim()
+  if (liveIds.length) {
+    if (name && liveIds.includes(name)) return name
+    if (name.includes('i2v') || name.includes('kf2v') || name.includes('r2v')) {
+      return liveIds.find((id) => id.includes('r2v') && name.includes('r2v'))
+        || liveIds.find((id) => id.includes('i2v'))
+        || liveIds[0]
+    }
+    return liveIds.find((id) => id.includes('t2v')) || liveIds[0]
   }
-  if (name.includes('i2v') || name.includes('kf2v')) {
-    return 'happyhorse-1.1-i2v'
-  }
+  if (!name) return 'happyhorse-1.1-t2v'
+  if (VIDEO_MODELS.some((item) => item.key === name)) return name
+  if (name.includes('r2v')) return 'happyhorse-1.1-r2v'
+  if (name.includes('i2v') || name.includes('kf2v')) return 'happyhorse-1.1-i2v'
   return 'happyhorse-1.1-t2v'
 }
 

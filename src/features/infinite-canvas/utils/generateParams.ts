@@ -1,7 +1,12 @@
-import { isMiniMaxModel, isSeedanceModel, isT2VModel } from '@/api/aigc'
-import { IMAGE_MODELS, VIDEO_MODELS, remapVideoModel } from '../config/models'
-import type { CustomNode, NodeData, SizeOption } from '../types'
-import { getSizeRatio, uniqueAspectRatios } from './aspectRatio'
+import { isT2VModel } from '@/api/aigc'
+import {
+  remapModelId,
+  resolveImageCapabilities,
+  resolveVideoCapabilities,
+} from '../config/modelCapabilities'
+import { remapVideoModel } from '../config/models'
+import type { CustomNode, ModelConfig, NodeData, SizeOption } from '../types'
+import { getSizeRatio, labeledSizes, uniqueAspectRatios } from './aspectRatio'
 
 export { getSizeRatio, uniqueAspectRatios } from './aspectRatio'
 
@@ -51,27 +56,45 @@ export function videoSizeFor(resolution: string, ratio: string): string {
   return mapped || VIDEO_SIZE_MAP['720P']['16:9']
 }
 
-export function listVideoResolutions(modelKey: string): Resolution[] {
-  if (isSeedanceModel(modelKey) && (modelKey.includes('fast') || modelKey.includes('mini'))) {
-    return ['720P']
+export function listVideoResolutions(modelKey: string, model?: ModelConfig): Resolution[] {
+  const caps = model || resolveVideoCapabilities(modelKey)
+  const fromResolutions = (caps.resolutions || [])
+    .map((item) => item.key)
+    .filter((item): item is Resolution => RESOLUTIONS.includes(item as Resolution))
+  if (fromResolutions.length) return fromResolutions
+  const fromSizes = new Set<Resolution>()
+  for (const size of caps.sizes || []) {
+    fromSizes.add(parseVideoSize(size.key).resolution)
   }
-  if (isMiniMaxModel(modelKey) && /h3-max/i.test(modelKey)) {
-    return ['720P']
-  }
-  return ['1080P', '720P']
+  if (fromSizes.size) return RESOLUTIONS.filter((item) => fromSizes.has(item))
+  return ['720P']
 }
 
-export function listImageSizes(modelKey: string, quality?: string): SizeOption[] {
-  const model = IMAGE_MODELS.find((item) => item.key === modelKey)
-  if (!model) return []
-  if (model.getSizesByQuality) {
-    return model.getSizesByQuality(quality || model.defaultParams?.quality || 'medium')
-  }
-  return model.sizes || []
+export function listVideoAspectRatios(modelKey: string, model?: ModelConfig): string[] {
+  const caps = model || resolveVideoCapabilities(modelKey)
+  if (caps.ratios?.length) return caps.ratios.map((item) => item.key)
+  if (caps.sizes?.length) return uniqueAspectRatios(caps.sizes)
+  if (caps.supportsAspect === false) return []
+  return [...ASPECT_RATIOS]
 }
 
-export function listImageAspectRatios(modelKey: string, quality?: string): string[] {
-  return uniqueAspectRatios(listImageSizes(modelKey, quality))
+export function listImageSizes(modelKey: string, quality?: string, model?: ModelConfig): SizeOption[] {
+  const caps = model || resolveImageCapabilities(modelKey)
+  if (caps.getSizesByQuality) {
+    return caps.getSizesByQuality(quality || caps.defaultParams?.quality || 'medium')
+  }
+  if (caps.sizes?.length) return caps.sizes
+  return labeledSizes(['1024x1024'])
+}
+
+export function listQuantityOptions(modelKey: string, model?: ModelConfig): number[] {
+  const caps = model || resolveImageCapabilities(modelKey)
+  const maxN = Math.max(1, Math.min(caps.maxN || 1, 4))
+  return [1, 2, 4].filter((item) => item <= maxN)
+}
+
+export function listImageAspectRatios(modelKey: string, quality?: string, model?: ModelConfig): string[] {
+  return uniqueAspectRatios(listImageSizes(modelKey, quality, model))
 }
 
 export function formatParamStub(node: CustomNode): string {
@@ -85,43 +108,61 @@ export function formatParamStub(node: CustomNode): string {
   return [ratio, size].filter(Boolean).slice(0, 1).join('')
 }
 
-export function applyModelDefaults(nodeType: string, modelKey: string, node?: CustomNode): Partial<NodeData> {
+export function applyModelDefaults(
+  nodeType: string,
+  modelKey: string,
+  node?: CustomNode,
+  liveIds: readonly string[] = [],
+  model?: ModelConfig
+): Partial<NodeData> {
   if (nodeType === 'videoConfig') {
-    const nextKey = remapVideoModel(modelKey)
-    const model = VIDEO_MODELS.find((item) => item.key === nextKey)
-    let size = model?.defaultParams?.size || '1280*720'
-    let resolution = (model?.defaultParams?.resolution || parseVideoSize(size).resolution) as string
+    const nextKey = liveIds.length
+      ? remapModelId(modelKey, liveIds, 'video')
+      : remapVideoModel(modelKey)
+    const caps = model || resolveVideoCapabilities(nextKey)
+    let size = caps.defaultParams?.size || '1280*720'
+    let resolution = (caps.defaultParams?.resolution || parseVideoSize(size).resolution) as string
     const { ratio } = parseVideoSize(size)
-    const limited = listVideoResolutions(nextKey)
+    const limited = listVideoResolutions(nextKey, caps)
     if (!limited.includes(resolution as Resolution)) {
       resolution = limited[0] || '720P'
       size = videoSizeFor(resolution, ratio)
     }
-    return {
+    const next: Partial<NodeData> = {
       model: nextKey,
       size,
       resolution,
       ratio,
-      duration: model?.defaultParams?.duration || 5,
+      duration: caps.defaultParams?.duration || 5,
     }
+    if (node && !node.data.isLabelCustomized && caps.label) {
+      next.label = getShortLabelFromModel(caps.label)
+    }
+    return next
   }
 
-  const model = IMAGE_MODELS.find((item) => item.key === modelKey)
-  const size = model?.defaultParams?.size || '1024x1024'
+  const caps = model || resolveImageCapabilities(modelKey)
+  const size = caps.defaultParams?.size || '1024x1024'
   const next: Partial<NodeData> = {
     model: modelKey,
-    quality: model?.defaultParams?.quality,
+    quality: caps.defaultParams?.quality,
     size,
     ratio: getSizeRatio(size),
+    n: caps.defaultParams?.n || 1,
   }
-  if (node && !node.data.isLabelCustomized && model?.label) {
-    next.label = getShortLabelFromModel(model.label)
+  if (node && !node.data.isLabelCustomized && caps.label) {
+    next.label = getShortLabelFromModel(caps.label)
   }
   return next
 }
 
-export function applyImageRatio(modelKey: string, quality: string | undefined, ratio: string): Partial<NodeData> | null {
-  const sizes = listImageSizes(modelKey, quality)
+export function applyImageRatio(
+  modelKey: string,
+  quality: string | undefined,
+  ratio: string,
+  model?: ModelConfig
+): Partial<NodeData> | null {
+  const sizes = listImageSizes(modelKey, quality, model)
   const matching = sizes.find((item) => getSizeRatio(item.key) === ratio)
   if (!matching) return null
   return { size: matching.key, ratio }
@@ -143,36 +184,51 @@ export function applyVideoRatio(resolution: string, ratio: string): Partial<Node
   }
 }
 
-export function coerceGenerateParams(node: CustomNode): Partial<NodeData> | null {
+export function coerceGenerateParams(
+  node: CustomNode,
+  liveIds: readonly string[] = [],
+  model?: ModelConfig
+): Partial<NodeData> | null {
   if (node.type === 'imageConfig') {
     const modelKey = typeof node.data.model === 'string' ? node.data.model : 'gpt-image-2'
     const quality = typeof node.data.quality === 'string' ? node.data.quality : undefined
-    const sizes = listImageSizes(modelKey, quality)
+    const caps = model || resolveImageCapabilities(modelKey)
+    const sizes = listImageSizes(modelKey, quality, caps)
     if (!sizes.length) return null
+    const patch: Partial<NodeData> = {}
     const currentSize = typeof node.data.size === 'string' ? node.data.size : ''
     if (sizes.some((item) => item.key === currentSize)) {
       const actual = getSizeRatio(currentSize)
-      if (node.data.ratio !== actual) return { ratio: actual }
-      return null
+      if (node.data.ratio !== actual) patch.ratio = actual
+    } else {
+      const currentRatio =
+        typeof node.data.ratio === 'string' && node.data.ratio
+          ? node.data.ratio
+          : currentSize
+            ? getSizeRatio(currentSize)
+            : ''
+      const matching = currentRatio
+        ? sizes.find((item) => getSizeRatio(item.key) === currentRatio)
+        : undefined
+      const nextSize = matching?.key || sizes[0].key
+      patch.size = nextSize
+      patch.ratio = getSizeRatio(nextSize)
     }
-    const currentRatio =
-      typeof node.data.ratio === 'string' && node.data.ratio
-        ? node.data.ratio
-        : currentSize
-          ? getSizeRatio(currentSize)
-          : ''
-    const matching = currentRatio
-      ? sizes.find((item) => getSizeRatio(item.key) === currentRatio)
-      : undefined
-    const nextSize = matching?.key || sizes[0].key
-    return { size: nextSize, ratio: getSizeRatio(nextSize) }
+    const maxN = Math.max(1, caps.maxN || 1)
+    const quantity = typeof node.data.n === 'number' ? node.data.n : 1
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > maxN) {
+      patch.n = Math.min(maxN, Math.max(1, quantity || 1))
+    }
+    return Object.keys(patch).length ? patch : null
   }
 
   if (node.type === 'videoConfig') {
-    const modelKey = remapVideoModel(typeof node.data.model === 'string' ? node.data.model : undefined)
-    const model = VIDEO_MODELS.find((item) => item.key === modelKey)
+    const raw = typeof node.data.model === 'string' ? node.data.model : undefined
+    const modelKey = liveIds.length ? remapModelId(raw, liveIds, 'video') : remapVideoModel(raw)
+    const caps = model || resolveVideoCapabilities(modelKey)
     const patch: Partial<NodeData> = {}
-    const available = listVideoResolutions(modelKey)
+    if (liveIds.length && modelKey !== raw) patch.model = modelKey
+    const available = listVideoResolutions(modelKey, caps)
     const parsed = parseVideoSize(typeof node.data.size === 'string' ? node.data.size : undefined)
     const currentResolution =
       (typeof node.data.resolution === 'string' && node.data.resolution) || parsed.resolution
@@ -182,7 +238,7 @@ export function coerceGenerateParams(node: CustomNode): Partial<NodeData> | null
       patch.size = videoSizeFor(next, parsed.ratio)
       patch.ratio = parsed.ratio
     }
-    const durs = model?.durs?.map((item) => item.key) || []
+    const durs = caps.durs?.map((item) => item.key) || []
     if (durs.length && (typeof node.data.duration !== 'number' || !durs.includes(node.data.duration))) {
       patch.duration = durs[0]
     }

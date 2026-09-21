@@ -222,6 +222,19 @@ export interface ModelParameter {
   description?: string
 }
 
+/** Structured generation options returned by GET /ai/models. */
+export interface ModelParameterSet {
+  sizes?: string[] | { label: string; key: string }[]
+  qualities?: { label: string; key: string }[]
+  resolutions?: string[] | { label: string; key: string }[]
+  ratios?: string[] | { label: string; key: string }[]
+  durations?: number[] | { label: string; key: number }[]
+  max_n?: number
+  maxN?: number
+  supports_aspect?: boolean
+  supportsAspect?: boolean
+}
+
 export interface ModelDTO {
   id: string
   model_id?: string  // API 返回的原始字段
@@ -230,7 +243,7 @@ export interface ModelDTO {
   modality: ModelModality
   description?: string
   capabilities?: ModelCapability[]
-  parameters?: ModelParameter[]
+  parameters?: ModelParameterSet | ModelParameter[]
   defaultParams?: Record<string, unknown>
   isEnabled: boolean
   icon?: string

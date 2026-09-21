@@ -14,7 +14,6 @@ import {
   isRatioSupported,
   resolveApiQuality,
   resolveGenerateSize,
-  sizeForRatio,
 } from './generateSettings'
 
 describe('formatSettingsCapsule', () => {
@@ -99,14 +98,16 @@ describe('万相 2.7 support', () => {
 })
 
 describe('unknown model fallback', () => {
-  it('keeps 标准 + 1K and computes a ratio size instead of inventing 2K/4K', () => {
+  it('keeps 标准 + 1K 1:1 instead of inventing a full fake ratio menu', () => {
     expect(isQualitySupported('jimeng-3', 'standard')).toBe(true)
     expect(isQualitySupported('jimeng-3', 'high')).toBe(false)
-    expect(isRatioSupported('jimeng-3', 'standard', '3:4')).toBe(true)
-    expect(isClaritySupported('jimeng-3', 'standard', '3:4', '1k')).toBe(true)
-    expect(isClaritySupported('jimeng-3', 'standard', '3:4', '2k')).toBe(false)
-    expect(resolveGenerateSize('jimeng-3', 'standard', '3:4', '1k')).toEqual({
-      size: sizeForRatio('3:4', 1024),
+    expect(availableRatios('jimeng-3', 'standard')).toEqual(['1:1'])
+    expect(isRatioSupported('jimeng-3', 'standard', '3:4')).toBe(false)
+    expect(isRatioSupported('jimeng-3', 'standard', '1:1')).toBe(true)
+    expect(isClaritySupported('jimeng-3', 'standard', '1:1', '1k')).toBe(true)
+    expect(isClaritySupported('jimeng-3', 'standard', '1:1', '2k')).toBe(false)
+    expect(resolveGenerateSize('jimeng-3', 'standard', '1:1', '1k')).toEqual({
+      size: '1024x1024',
       quality: 'medium',
     })
   })

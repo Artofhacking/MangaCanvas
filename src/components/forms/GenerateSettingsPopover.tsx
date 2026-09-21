@@ -25,6 +25,7 @@ import {
   type QualityTier,
   QUANTITY_OPTIONS,
 } from "@/lib/generateSettings"
+import { listQuantityOptions } from "@/features/infinite-canvas/utils/generateParams"
 import { cn } from "@/lib/utils"
 
 interface GenerateSettingsPopoverProps {
@@ -80,12 +81,13 @@ export function GenerateSettingsPopover({
   model,
   value,
   onChange,
-  quantityOptions = [...QUANTITY_OPTIONS],
+  quantityOptions,
   showQuantity = true,
   disabled = false,
   align = "end",
 }: GenerateSettingsPopoverProps) {
   const { notify } = useFeedback()
+  const resolvedQuantity = quantityOptions ?? (model ? listQuantityOptions(model) : [...QUANTITY_OPTIONS])
 
   useEffect(() => {
     if (!model) return
@@ -216,11 +218,11 @@ export function GenerateSettingsPopover({
             <section>
               <SectionLabel>生成数量</SectionLabel>
               <div className="grid grid-cols-3 gap-1.5">
-                {quantityOptions.map((qty) => (
+                {resolvedQuantity.map((qty) => (
                   <ChoiceButton
                     key={qty}
                     active={value.quantity === qty}
-                    onClick={() => commit(applyQuantity(value, qty))}
+                    onClick={() => commit(applyQuantity(value, qty, model))}
                   >
                     {qty}张
                   </ChoiceButton>

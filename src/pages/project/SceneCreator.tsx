@@ -35,10 +35,6 @@ import {
 } from "@/store/assetGenerationStore"
 import type { Scene } from "@/types"
 
-const fallbackSceneModels = [
-  { id: "jimeng-3", name: "即梦 3.0", description: "中文语义强，适合场景氛围" },
-]
-
 export interface SceneCreateData {
   name: string
   genMethod: string
@@ -104,7 +100,7 @@ export default function SceneCreator({
   const initializedRef = useRef(false)
   const prevOpenRef = useRef(open)
 
-  const availableModels = imageModels.length > 0 ? imageModels : fallbackSceneModels
+  const availableModels = imageModels
 
   useEffect(() => {
     if (modelsLoading && imageModels.length === 0) return
@@ -291,6 +287,10 @@ export default function SceneCreator({
                         <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
                           加载模型列表...
                         </DropdownMenuItem>
+                      ) : availableModels.length === 0 ? (
+                        <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
+                          {modelsError ? "模型列表加载失败" : "接口未返回可用模型"}
+                        </DropdownMenuItem>
                       ) : (
                         availableModels.map((model) => (
                           <DropdownMenuItem
@@ -314,8 +314,11 @@ export default function SceneCreator({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <p className="text-xs text-[hsl(var(--secondary))]">
-                    {availableModels.find((model) => model.id === selectedModel)?.description}
-                    {modelsError ? `（模型列表加载失败：${modelsError}，可先用默认模型生成）` : ""}
+                    {modelsError
+                      ? `模型列表加载失败：${modelsError}`
+                      : !modelsLoading && availableModels.length === 0
+                        ? "接口未返回可用模型"
+                        : availableModels.find((model) => model.id === selectedModel)?.description}
                   </p>
                 </div>
 
