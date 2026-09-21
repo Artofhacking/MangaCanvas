@@ -9,7 +9,16 @@ import React, {
   useState,
 } from 'react'
 import type { ReferenceSlot } from '../utils/generateSlots'
-import { fitMentionPromptHeight, syncOverlayScroll } from '../utils/mentionPromptLayout'
+import {
+  fitMentionPromptHeight,
+  MENTION_PROMPT_FIELD_CLASS,
+  MENTION_PROMPT_OVERLAY_SCROLL_CLASS,
+  MENTION_PROMPT_TEXTAREA_SCROLL_CLASS,
+  MENTION_TOKEN_BROKEN_CLASS,
+  MENTION_TOKEN_MARK_CLASS,
+  MENTION_TOKEN_OK_CLASS,
+  syncOverlayScroll,
+} from '../utils/mentionPromptLayout'
 import {
   filterMentionSlots,
   getAtQuery,
@@ -43,10 +52,8 @@ function HighlightedPrompt({ value, slots }: { value: string; slots: ReferenceSl
           <span
             key={`${index}-${part}`}
             className={cn(
-              'rounded-md px-0.5 font-semibold',
-              broken
-                ? 'bg-red-500/15 text-red-600'
-                : 'bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]'
+              MENTION_TOKEN_MARK_CLASS,
+              broken ? MENTION_TOKEN_BROKEN_CLASS : MENTION_TOKEN_OK_CLASS
             )}
           >
             {part}
@@ -207,7 +214,11 @@ const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInp
           <div
             ref={highlightRef}
             aria-hidden
-            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2.5 text-sm leading-5 text-[hsl(var(--on-surface))] [scrollbar-gutter:stable]"
+            className={cn(
+              'pointer-events-none absolute inset-0 rounded-2xl text-[hsl(var(--on-surface))]',
+              MENTION_PROMPT_FIELD_CLASS,
+              MENTION_PROMPT_OVERLAY_SCROLL_CLASS
+            )}
           >
             {value ? (
               <HighlightedPrompt value={value} slots={slots} />
@@ -228,7 +239,11 @@ const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInp
             onKeyUp={(event) => syncCaret(event.currentTarget)}
             onSelect={(event) => syncCaret(event.currentTarget)}
             spellCheck={false}
-            className="min-h-[120px] max-h-[min(45vh,320px)] w-full resize-none overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-2xl bg-[hsl(var(--surface-container-low))] px-3 py-2.5 text-sm leading-5 text-transparent caret-[hsl(var(--on-surface))] placeholder:text-transparent [scrollbar-gutter:stable] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+            className={cn(
+              'min-h-[120px] max-h-[min(45vh,320px)] w-full resize-none rounded-2xl border-0 bg-[hsl(var(--surface-container-low))] text-transparent caret-[hsl(var(--on-surface))] placeholder:text-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]',
+              MENTION_PROMPT_FIELD_CLASS,
+              MENTION_PROMPT_TEXTAREA_SCROLL_CLASS
+            )}
           />
         </div>
       </div>
