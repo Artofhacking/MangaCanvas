@@ -1,9 +1,10 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Download, Image as ImageIcon, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
+import { Copy, Download, FolderPlus, Image as ImageIcon, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
+import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { PlusHandle } from './PlusHandle';
@@ -25,6 +26,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [editLabel, setEditLabel] = useState(data.label || '');
   const [extracting, setExtracting] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -158,6 +160,15 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     });
   };
 
+  const handleSaveToMaterials = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!data.url) {
+      message.info('当前节点还没有视频');
+      return;
+    }
+    setShowSaveToMaterialsModal(true);
+  }, [data.url]);
+
   return (
     <div className="relative">
       <MediaPreviewCard
@@ -195,6 +206,13 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             onClick: handleExtractLastFrame,
             hidden: !data.url,
             disabled: extracting,
+          },
+          {
+            key: 'save',
+            label: '保存到我的素材',
+            icon: <FolderPlus className="h-4 w-4" />,
+            onClick: handleSaveToMaterials,
+            hidden: !data.url,
           },
           { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !data.url },
           { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
@@ -264,6 +282,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         url={data?.url || ''}
         title={data.label || '视频预览'}
         nodeId={id}
+        initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
         params={{
           prompt: data?.prompt as string | undefined,
           model: data?.model as string | undefined,
@@ -271,6 +290,17 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           resolution: data?.resolution as string | undefined,
           duration: data?.duration as number | undefined,
         }}
+      />
+
+      <SaveToMaterialsModal
+        open={showSaveToMaterialsModal}
+        onClose={() => setShowSaveToMaterialsModal(false)}
+        imageUrl={mediaUrl(data?.url) || undefined}
+        mediaType="video"
+        initialName={data?.label || '视频素材'}
+        initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
+        nodeId={id}
+        prompt={typeof data?.prompt === 'string' ? data.prompt : undefined}
       />
     </div>
   );

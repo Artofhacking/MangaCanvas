@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Position, NodeProps } from 'reactflow';
 import { Upload, Spin, message } from 'antd';
 import { DeleteOutlined, DownloadOutlined, CopyOutlined, PictureOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined } from '@ant-design/icons';
-import { Copy, Download, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Copy, Download, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
@@ -377,6 +377,13 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           </>
         }
         actions={[
+          {
+            key: 'save',
+            label: '保存到我的素材',
+            icon: <FolderPlus className="h-4 w-4" />,
+            onClick: handleSaveToMaterials,
+            hidden: !data?.url,
+          },
           { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !data?.url },
           { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
           { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
@@ -439,6 +446,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         initialName={data?.label || '图片素材'}
         initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
         nodeId={id}
+        prompt={typeof data?.prompt === 'string' ? data.prompt : undefined}
       />
 
       {contextMenu && typeof document !== 'undefined' && createPortal(
