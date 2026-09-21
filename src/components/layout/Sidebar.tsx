@@ -9,7 +9,6 @@ import {
   LayoutGrid, 
   Settings,
   ChevronDown,
-  ChevronLeft,
   Plus,
   Check,
   Loader2,
@@ -48,7 +47,6 @@ export default function Sidebar() {
   const [isSwitching, setIsSwitching] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isProjectCreatorOpen, setIsProjectCreatorOpen] = useState(false)
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const routeProjectId = getProjectIdFromPath(location.pathname)
@@ -131,15 +129,7 @@ export default function Sidebar() {
       <aside className="h-screen w-64 fixed left-0 top-0 bg-[hsl(var(--surface-container-low))] flex flex-col p-5 gap-y-3 z-50">
         {inProjectShell ? (
           <div className="mb-2">
-            <button
-              type="button"
-              onClick={() => setProjectMenuOpen(true)}
-              className="mb-3 flex items-center gap-1 px-2 text-xs font-medium text-[hsl(var(--secondary))] hover:text-[hsl(var(--on-surface))]"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              全部项目
-            </button>
-            <DropdownMenu open={projectMenuOpen} onOpenChange={setProjectMenuOpen}>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="w-full text-left p-3 rounded-xl hover:bg-[hsl(var(--surface-container-high))] transition-colors group">
                   <div className="flex items-center justify-between">
