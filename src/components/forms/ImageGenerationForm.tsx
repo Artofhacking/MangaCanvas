@@ -13,6 +13,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useImageModels } from "@/features/infinite-canvas/hooks/useModels"
 import { GenerateSettingsPopover } from "@/components/forms/GenerateSettingsPopover"
 import { type ImageGenerationConfig } from "@/lib/generateSettings"
+import { displayModelName } from "@/lib/displayModelName"
 import { cn } from "@/lib/utils"
 
 export type { ImageGenerationConfig } from "@/lib/generateSettings"
@@ -132,7 +133,9 @@ export function ImageGenerationForm({
               <span>
                 {modelsLoading 
                   ? "加载模型中..." 
-                  : selectedModelInfo?.name ?? "选择生成模型"}
+                  : selectedModelInfo
+                    ? displayModelName(selectedModelInfo.name)
+                    : "选择生成模型"}
               </span>
               {modelsLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--secondary))]" />
@@ -166,7 +169,7 @@ export function ImageGenerationForm({
                     value.model === model.id ? "opacity-100" : "opacity-0"
                   }`}
                 />
-                <span>{model.name}</span>
+                <span>{displayModelName(model.name)}</span>
               </DropdownMenuItem>
               ))
             )}

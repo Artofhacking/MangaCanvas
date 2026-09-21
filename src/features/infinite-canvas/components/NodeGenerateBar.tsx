@@ -52,6 +52,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { displayModelName } from '@/lib/displayModelName'
 import { cn } from '@/lib/utils'
 
 const BAR_MIN_WIDTH = 560
@@ -238,7 +239,11 @@ function GenerateBarModelPicker({
             label={
               loading && !selected
                 ? '加载模型…'
-                : selected?.label || (pickerModels.length === 0 ? '暂无可用模型' : currentKey || '选择模型')
+                : selected
+                  ? displayModelName(selected.label)
+                  : pickerModels.length === 0
+                    ? '暂无可用模型'
+                    : displayModelName(currentKey) || '选择模型'
             }
           />
         </DropdownMenuTrigger>
@@ -258,7 +263,7 @@ function GenerateBarModelPicker({
                 className={menuItemClass(currentKey === model.key)}
               >
                 <Check className={cn('mr-2 h-3.5 w-3.5', currentKey === model.key ? 'opacity-100' : 'opacity-0')} />
-                <span className="truncate">{model.label}</span>
+                <span className="truncate">{displayModelName(model.label)}</span>
               </DropdownMenuItem>
             ))
           )}

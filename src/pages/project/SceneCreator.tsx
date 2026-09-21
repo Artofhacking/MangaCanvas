@@ -20,6 +20,7 @@ import {
 import { useState, useRef, useEffect } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { GenerateSettingsPopover } from "@/components/forms/GenerateSettingsPopover"
+import { displayModelName } from "@/lib/displayModelName"
 import { DEFAULT_GENERATE_SETTINGS, type GenerateSettings } from "@/lib/generateSettings"
 import { useImageModels } from "@/features/infinite-canvas/hooks"
 import GenerationTaskPanel, {
@@ -101,6 +102,7 @@ export default function SceneCreator({
   const prevOpenRef = useRef(open)
 
   const availableModels = imageModels
+  const selectedSceneModel = availableModels.find((model) => model.id === selectedModel)
 
   useEffect(() => {
     if (modelsLoading && imageModels.length === 0) return
@@ -272,8 +274,9 @@ export default function SceneCreator({
                         <span>
                           {modelsLoading && imageModels.length === 0
                             ? "加载中..."
-                            : (availableModels.find((model) => model.id === selectedModel)?.name ?? "选择场景模型")
-                          }
+                            : selectedSceneModel
+                              ? displayModelName(selectedSceneModel.name)
+                              : "选择场景模型"}
                         </span>
                         <ChevronDown className="h-4 w-4 text-[hsl(var(--secondary))]" />
                       </Button>
@@ -307,7 +310,7 @@ export default function SceneCreator({
                                 selectedModel === model.id ? "opacity-100" : "opacity-0"
                               }`}
                             />
-                            <span>{model.name}</span>
+                            <span>{displayModelName(model.name)}</span>
                           </DropdownMenuItem>
                         ))
                       )}
