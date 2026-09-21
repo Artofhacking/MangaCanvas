@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useCanvasStore } from '../stores/canvasStore'
-import { collectGenerateInputs, getIncomingReferenceSlots } from './generateSlots'
+import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from './generateSlots'
 import { resolveMentionsForSend } from './promptMentions'
 import { spawnGenerateFromSource } from './spawnGenerateFromSource'
 
@@ -57,5 +57,15 @@ describe('spawnGenerateFromSource', () => {
     expect(resolved).toBe('keep lighting @1')
     expect(inputs.prompt).toBe('keep lighting @1')
     expect(inputs.refImages).toEqual(['https://example.com/ref.png'])
+  })
+
+  it('creates a 文本 note that is not a generation entry', () => {
+    const id = useCanvasStore.getState().addNode('text', { x: 0, y: 0 })
+    const node = useCanvasStore.getState().nodes.find((item) => item.id === id)
+
+    expect(node?.type).toBe('text')
+    expect(node?.data.label).toBe('文本')
+    expect(node?.data.content).toBe('')
+    expect(isGenerateNodeType(node?.type)).toBe(false)
   })
 })
