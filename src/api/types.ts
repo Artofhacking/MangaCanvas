@@ -197,6 +197,16 @@ export interface EpisodeDTO {
   scenes?: EpisodeRelationRef[]
   objects?: EpisodeRelationRef[]
   sceneCount?: number
+  storyboard?: Array<{
+    id?: string
+    index?: number
+    prompt?: string
+    characterIds?: number[]
+    sceneId?: number | null
+    imageUrl?: string | null
+    status?: string
+    error?: string | null
+  }>
   createdAt?: string
   updatedAt?: string
 }

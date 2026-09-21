@@ -24,6 +24,9 @@ export const projectSettingsPath = (projectId: number | string) => `/project/${p
 export const projectEpisodePath = (projectId: number | string, episodeId: number | string) =>
   `/project/${projectId}/episode/${episodeId}`
 
+export const projectEpisodeStoryboardPath = (projectId: number | string, episodeId: number | string) =>
+  `/project/${projectId}/episode/${episodeId}?view=storyboard`
+
 export type WorkflowCanvasEntry =
   | "workflows"
   | "episodes"

@@ -137,6 +137,50 @@ def obj(row: models.ProjectObject) -> dict:
     }
 
 
+STORYBOARD_STATUSES = {"empty", "generating", "ready", "failed"}
+
+
+def normalize_storyboard(value) -> list:
+    if not isinstance(value, list):
+        return []
+    shots = []
+    for index, item in enumerate(value[:80]):
+        if not isinstance(item, dict):
+            continue
+        raw_status = str(item.get("status") or "")
+        image_url = item.get("imageUrl") or item.get("image") or None
+        if raw_status == "generating":
+            status = "ready" if image_url else "empty"
+        elif raw_status in STORYBOARD_STATUSES:
+            status = raw_status
+        else:
+            status = "ready" if image_url else "empty"
+        character_ids = []
+        for cid in item.get("characterIds") or []:
+            try:
+                character_ids.append(int(cid))
+            except (TypeError, ValueError):
+                continue
+        scene_id = item.get("sceneId")
+        try:
+            scene_id = int(scene_id) if scene_id not in (None, "", 0, "0") else None
+        except (TypeError, ValueError):
+            scene_id = None
+        shots.append(
+            {
+                "id": str(item.get("id") or f"shot_{index + 1}"),
+                "index": index + 1,
+                "prompt": str(item.get("prompt") or "")[:4000],
+                "characterIds": character_ids[:12],
+                "sceneId": scene_id,
+                "imageUrl": str(image_url)[:1024] if image_url else None,
+                "status": status,
+                "error": str(item.get("error") or "")[:400] or None,
+            }
+        )
+    return shots
+
+
 def episode(db: Session, row: models.Episode) -> dict:
     char_ids = [r.character_id for r in db.query(models.EpisodeCharacter).filter_by(episode_id=row.id)]
     scene_ids = [r.scene_id for r in db.query(models.EpisodeScene).filter_by(episode_id=row.id)]
@@ -173,6 +217,7 @@ def episode(db: Session, row: models.Episode) -> dict:
         "scenes": [{"id": s.id, "name": s.name, "image": rewrite_stored_media_url(s.image)} for s in scenes],
         "objects": [{"id": o.id, "name": o.name, "image": rewrite_stored_media_url(o.image), "type": o.type} for o in objects],
         "sceneCount": len(scenes),
+        "storyboard": rewrite_media_tree(normalize_storyboard(getattr(row, "storyboard", None))),
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),
     }

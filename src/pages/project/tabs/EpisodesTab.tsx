@@ -10,6 +10,7 @@ import { Plus, MoreHorizontal, Play, Check, Trash2, Copy } from "lucide-react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useProjectStore } from "@/store/projectStore"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
+import { projectEpisodeStoryboardPath } from "@/lib/workspaceRoutes"
 import type { CanvasLaunchSource, Episode } from "@/types"
 import { useState } from "react"
 import EpisodeCreator from "../EpisodeCreator"
@@ -190,6 +191,17 @@ export default function EpisodesTab({
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
                   打开画布
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    navigate(projectEpisodeStoryboardPath(projectId ?? routeProjectId ?? "", episode.id))
+                  }}
+                  className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                >
+                  分镜表
                 </Button>
                 <Button
                   variant="secondary"

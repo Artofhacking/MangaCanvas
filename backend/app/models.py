@@ -181,6 +181,7 @@ class Episode(Base):
     creation_mode: Mapped[str] = mapped_column(String(16), default="quick")
     source_workflow_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_node_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    storyboard: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 

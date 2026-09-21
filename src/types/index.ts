@@ -26,6 +26,19 @@ export interface EpisodeRelationItem {
   type?: string
 }
 
+export type StoryboardShotStatus = 'empty' | 'generating' | 'ready' | 'failed'
+
+export interface StoryboardShot {
+  id: string
+  index: number
+  prompt: string
+  characterIds: number[]
+  sceneId?: number | null
+  imageUrl?: string
+  status: StoryboardShotStatus
+  error?: string
+}
+
 export interface Episode {
   id: number
   name: string
@@ -43,6 +56,7 @@ export interface Episode {
   characterIds?: number[]
   sceneIds?: number[]
   objectIds?: number[]
+  storyboard?: StoryboardShot[]
 }
 
 export type CanvasLaunchSource = {
