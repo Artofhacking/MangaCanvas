@@ -2,6 +2,8 @@
 
 密钥只放本机和生产机的 `backend/.env`，不要写入 git、文档或前端。
 
+已接入且未禁用云商的官方文档、调用参数和刊例换算见 [`docs/vendor-pricing.md`](./vendor-pricing.md)。
+
 ## nexcor（图像 / HappyHorse 视频 / 润色）
 
 | 环境变量 | 值 |

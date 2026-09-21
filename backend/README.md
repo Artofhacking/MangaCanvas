@@ -57,4 +57,4 @@ VITE_APP_API_BASE_URL=/api/v1
 - Vidu Q3：`VIDU_API_KEY` / `VIDU_BASE_URL`（默认关闭，`VIDU_ENABLED=1` 才开放）
 - 百度云 VOD 密钥：`BAIDU_VOD_AK` / `BAIDU_VOD_SK`（已配置，播放域名未接）
 
-密钥只写 `backend/.env`，不要提交。网关说明见 `docs/ai-providers.md`。
+密钥只写 `backend/.env`，不要提交。网关说明见 `docs/ai-providers.md`。官方文档与刊例见 `docs/vendor-pricing.md`。
