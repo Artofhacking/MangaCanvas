@@ -270,6 +270,8 @@ function GenerateBarModelPicker({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <DockDivider />
+
       {isVideo ? (
         <>
           {showVideoAspect ? (
@@ -317,23 +319,25 @@ function GenerateBarModelPicker({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <DockSelectTrigger icon={<Clock className="h-3 w-3" />} label={durationLabel} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
-              {durations.map((item) => (
-                <DropdownMenuItem
-                  key={item.key}
-                  onClick={() => onChange({ duration: item.key })}
-                  className={menuItemClass(node.data.duration === item.key)}
-                >
-                  <Check className={cn('mr-2 h-3.5 w-3.5', node.data.duration === item.key ? 'opacity-100' : 'opacity-0')} />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {durations.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <DockSelectTrigger icon={<Clock className="h-3 w-3" />} label={durationLabel} />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
+                {durations.map((item) => (
+                  <DropdownMenuItem
+                    key={item.key}
+                    onClick={() => onChange({ duration: item.key })}
+                    className={menuItemClass(node.data.duration === item.key)}
+                  >
+                    <Check className={cn('mr-2 h-3.5 w-3.5', node.data.duration === item.key ? 'opacity-100' : 'opacity-0')} />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </>
       ) : (
         <>
