@@ -392,7 +392,9 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           <img
             src={mediaUrl(data.url)}
             alt={data.label}
+            draggable={false}
             className="h-full w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+            onDragStart={(event) => event.preventDefault()}
             onClick={() => setShowPreview(true)}
           />
         ) : (
