@@ -43,6 +43,47 @@ describe('resolvePickerModels', () => {
     expect(livePicked.map((item) => item.key)).toEqual(['gpt-image-2', 'unknown-live'])
     expect(IMAGE_MODELS.some((item) => item.key === 'unknown-live')).toBe(false)
   })
+
+  it('shows live Seedance even if a static catalog row is enabled:false', () => {
+    const liveIds = [
+      'happyhorse-1.1-t2v',
+      'doubao-seedance-2-0-260128',
+      'doubao-seedance-2-0-fast-260128',
+      'doubao-seedance-2-0-mini-260615',
+      'doubao-seedance-2-5-260628',
+    ]
+    const picked = resolvePickerModels(
+      VIDEO_MODELS.map((item) =>
+        item.key.includes('seedance') ? { ...item, enabled: false } : item
+      ),
+      liveIds,
+      false
+    )
+    expect(picked.map((item) => item.key)).toEqual(liveIds)
+    expect(picked.map((item) => item.label)).toEqual([
+      'HappyHorse 文生视频',
+      'Seedance 2.0',
+      'Seedance 2.0 Fast',
+      'Seedance 2.0 Mini',
+      'Seedance 2.5',
+    ])
+    const livePicked = liveModelsToPicker(
+      liveIds.map((id) => {
+        const row = VIDEO_MODELS.find((item) => item.key === id)
+        return live(id, row?.label || id, 'video', { provider: 'baidu' })
+      }),
+      'video',
+      false
+    )
+    expect(livePicked.map((item) => item.key)).toEqual(liveIds)
+    expect(livePicked.map((item) => displayModelName(item.label))).toEqual([
+      'HappyHorse',
+      'Seedance 2.0',
+      'Seedance 2.0 Fast',
+      'Seedance 2.0 Mini',
+      'Seedance 2.5',
+    ])
+  })
 })
 
 describe('capability lookup by id', () => {

@@ -231,7 +231,6 @@ export const VIDEO_MODELS: ModelConfig[] = [
     key: 'doubao-seedance-2-0-260128',
     label: 'Seedance 2.0',
     type: 'video',
-    enabled: false,
     async: true,
     sizes: [
       { label: '720P 16:9 (1280*720)', key: '1280*720' },
@@ -252,7 +251,6 @@ export const VIDEO_MODELS: ModelConfig[] = [
     key: 'doubao-seedance-2-0-fast-260128',
     label: 'Seedance 2.0 Fast',
     type: 'video',
-    enabled: false,
     async: true,
     sizes: [
       { label: '720P 16:9 (1280*720)', key: '1280*720' },
@@ -271,7 +269,6 @@ export const VIDEO_MODELS: ModelConfig[] = [
     key: 'doubao-seedance-2-0-mini-260615',
     label: 'Seedance 2.0 Mini',
     type: 'video',
-    enabled: false,
     async: true,
     sizes: [
       { label: '720P 16:9 (1280*720)', key: '1280*720' },
@@ -290,7 +287,6 @@ export const VIDEO_MODELS: ModelConfig[] = [
     key: 'doubao-seedance-2-5-260628',
     label: 'Seedance 2.5',
     type: 'video',
-    enabled: false,
     async: true,
     sizes: [
       { label: '720P 16:9 (1280*720)', key: '1280*720' },
@@ -405,7 +401,8 @@ export function filterLiveModels<T extends { key: string; enabled?: boolean }>(
   liveIds: readonly string[]
 ): T[] {
   const set = new Set(liveIds)
-  return enabledModels(all).filter((item) => set.has(item.key))
+  // Live /ai/models wins over static enabled:false (Seedance / MiniMax / Vidu).
+  return all.filter((item) => set.has(item.key))
 }
 
 /** Live API ids only. Empty/error live lists never dump the static catalog. */
