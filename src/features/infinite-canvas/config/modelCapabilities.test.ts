@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelDTO } from '@/api/types'
+import { displayModelName } from '@/lib/displayModelName'
 import { IMAGE_MODELS, VIDEO_MODELS, resolvePickerModels } from './models'
 import {
   LEGACY_MODEL_ALIASES,
   capabilitiesFromApi,
+  collapseVideoPickerModels,
+  findVideoPickerModel,
   liveModelsToPicker,
   remapModelId,
   resolveImageCapabilities,
@@ -109,5 +112,45 @@ describe('legacy node.model remapping', () => {
       false
     )
     expect(picker[0]).toMatchObject({ key: 'MiniMax-H3', label: '海螺 图生视频' })
+  })
+})
+
+describe('video picker family collapse', () => {
+  it('collapses HappyHorse t2v/i2v/r2v to one distinct label', () => {
+    const picker = liveModelsToPicker(
+      [
+        live('happyhorse-1.1-t2v', 'HappyHorse 文生视频', 'video'),
+        live('happyhorse-1.1-i2v', 'HappyHorse 图生视频', 'video'),
+        live('happyhorse-1.1-r2v', 'HappyHorse 参考图生视频', 'video'),
+        live('doubao-seedance-2-0-260128', 'Seedance 2.0', 'video'),
+        live('doubao-seedance-2-0-fast-260128', 'Seedance 2.0 Fast', 'video'),
+      ],
+      'video',
+      false
+    )
+    const labels = picker.map((item) => displayModelName(item.label))
+    expect(labels).toEqual(['HappyHorse', 'Seedance 2.0', 'Seedance 2.0 Fast'])
+    expect(new Set(labels).size).toBe(labels.length)
+    expect(picker.map((item) => item.key)).toEqual([
+      'happyhorse-1.1-t2v',
+      'doubao-seedance-2-0-260128',
+      'doubao-seedance-2-0-fast-260128',
+    ])
+  })
+
+  it('treats a stored i2v node as the collapsed HappyHorse row', () => {
+    const picker = collapseVideoPickerModels([
+      resolveVideoCapabilities('happyhorse-1.1-t2v'),
+      resolveVideoCapabilities('happyhorse-1.1-i2v'),
+    ])
+    expect(findVideoPickerModel(picker, 'happyhorse-1.1-i2v')?.key).toBe('happyhorse-1.1-t2v')
+    expect(findVideoPickerModel(picker, 'happyhorse-1.1-r2v')?.key).toBe('happyhorse-1.1-t2v')
+  })
+
+  it('maps seeddance / Seedance aliases onto catalog ids', () => {
+    expect(LEGACY_MODEL_ALIASES.seeddance).toBe('doubao-seedance-2-0-260128')
+    expect(
+      remapModelId('seeddance', ['doubao-seedance-2-0-260128', 'happyhorse-1.1-t2v'], 'video')
+    ).toBe('doubao-seedance-2-0-260128')
   })
 })

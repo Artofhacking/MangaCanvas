@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { message } from 'antd'
 import { useCanvasStore } from '../stores/canvasStore'
-import { liveModelsToPicker, remapModelId } from '../config/modelCapabilities'
+import { findVideoPickerModel, liveModelsToPicker, remapModelId } from '../config/modelCapabilities'
 import { useImageModels, useVideoModels } from '../hooks/useModels'
 import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
 import { useNodeGenerateAction } from '../hooks/useNodeGenerateAction'
@@ -169,7 +169,9 @@ function GenerateBarModelPicker({
     liveIds,
     isVideo ? 'video' : 'image'
   )
-  const selected = pickerModels.find((item) => item.key === currentKey)
+  const selected = isVideo
+    ? findVideoPickerModel(pickerModels, currentKey)
+    : pickerModels.find((item) => item.key === currentKey)
   const currentModel = selected
   const imageRatios = useMemo(
     () =>
@@ -203,7 +205,7 @@ function GenerateBarModelPicker({
 
   useEffect(() => {
     if (loading || pickerModels.length === 0) return
-    if (!pickerModels.some((item) => item.key === currentKey)) {
+    if (!selected) {
       onChange(applyModelDefaults(node.type, pickerModels[0].key, node, liveIds, pickerModels[0]))
       return
     }
@@ -212,6 +214,7 @@ function GenerateBarModelPicker({
   }, [
     currentKey,
     currentModel,
+    selected,
     liveIds,
     loading,
     node,
@@ -264,9 +267,9 @@ function GenerateBarModelPicker({
               <DropdownMenuItem
                 key={model.key}
                 onClick={() => handleSelect(model)}
-                className={menuItemClass(currentKey === model.key)}
+                className={menuItemClass(selected?.key === model.key)}
               >
-                <Check className={cn('mr-2 h-3.5 w-3.5', currentKey === model.key ? 'opacity-100' : 'opacity-0')} />
+                <Check className={cn('mr-2 h-3.5 w-3.5', selected?.key === model.key ? 'opacity-100' : 'opacity-0')} />
                 <span className="truncate">{displayModelName(model.label)}</span>
               </DropdownMenuItem>
             ))

@@ -1,4 +1,5 @@
 import type { ModelDTO, ModelParameterSet } from '@/api/types'
+import { displayModelName } from '@/lib/displayModelName'
 import { useModelsStore } from '@/store/modelsStore'
 import type { ModelConfig, SizeOption } from '../types'
 import { labeledSizes } from '../utils/aspectRatio'
@@ -42,6 +43,11 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   'wan2.7': 'wan2.7-image',
   'wanx2.7-image': 'wan2.7-image',
   'wan2.6': 'wan2.6-t2i',
+  seedance: 'doubao-seedance-2-0-260128',
+  seeddance: 'doubao-seedance-2-0-260128',
+  'seedance-2.0': 'doubao-seedance-2-0-260128',
+  'seedance-2.0-fast': 'doubao-seedance-2-0-fast-260128',
+  'seedance-2.5': 'doubao-seedance-2-5-260628',
 }
 
 function normalizeModelId(value: string): string {
@@ -202,13 +208,56 @@ function mergeModelConfig(
   }
 }
 
+function videoPickerScore(model: ModelConfig): number {
+  return (
+    (model.sizes?.length ? 4 : 0) +
+    (model.supportsAspect ? 2 : 0) +
+    (model.resolutions?.length || 0) +
+    (model.durs?.length || 0)
+  )
+}
+
+/**
+ * One picker row per display name. HappyHorse t2v/i2v/r2v all strip to
+ * 「HappyHorse」; keep the richest variant (usually t2v) and let generate
+ * routing pick t2v/i2v/r2v from refs.
+ */
+export function collapseVideoPickerModels(models: ModelConfig[]): ModelConfig[] {
+  const kept = new Map<string, ModelConfig>()
+  const order: string[] = []
+  for (const model of models) {
+    const label = displayModelName(model.label || model.key)
+    const current = kept.get(label)
+    if (!current) {
+      kept.set(label, model)
+      order.push(label)
+      continue
+    }
+    if (videoPickerScore(model) > videoPickerScore(current)) {
+      kept.set(label, model)
+    }
+  }
+  return order.map((label) => kept.get(label)!).filter(Boolean)
+}
+
+export function findVideoPickerModel(
+  picker: readonly ModelConfig[],
+  key: string
+): ModelConfig | undefined {
+  const exact = picker.find((item) => item.key === key)
+  if (exact) return exact
+  const currentLabel = displayModelName(getVideoModel(key)?.label || key)
+  if (!currentLabel) return undefined
+  return picker.find((item) => displayModelName(item.label || item.key) === currentLabel)
+}
+
 export function liveModelsToPicker(
   liveModels: readonly ModelDTO[],
   type: 'image' | 'video',
   loading: boolean
 ): ModelConfig[] {
   if (loading) return []
-  return liveModels
+  const mapped = liveModels
     .filter((item) => item.id && item.isEnabled !== false)
     .map((item) =>
       mergeModelConfig(
@@ -217,6 +266,7 @@ export function liveModelsToPicker(
         type === 'image' ? getImageModel(item.id) : getVideoModel(item.id)
       )
     )
+  return type === 'video' ? collapseVideoPickerModels(mapped) : mapped
 }
 
 /** Picker source is live API ids only. An empty live list never dumps the static catalog. */

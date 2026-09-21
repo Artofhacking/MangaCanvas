@@ -210,10 +210,13 @@ async def images(request: Request, user: models.User = Depends(current_user_deta
 
 def _assert_video_channel(model: str) -> None:
     if is_seedance_model(model):
+        if settings.baidu_enabled and settings.baidu_api_key:
+            return
+        if settings.openai_api_key:
+            return
         if not settings.baidu_enabled:
-            fail(3001, "百度云视频渠道已禁用", 503)
-        if not settings.baidu_api_key:
-            fail(3001, "未配置百度网关 API Key", 503)
+            fail(3001, "Seedance 渠道不可用：nexcor 未配置且百度云已禁用", 503)
+        fail(3001, "未配置百度网关 API Key", 503)
         return
     if is_minimax_model(model):
         if not settings.minimax_enabled:
@@ -246,16 +249,30 @@ async def _generate_video_url(
     template: str | None,
 ) -> str:
     if is_seedance_model(model):
-        url = await baidu_video_generate(
-            prompt=prompt,
-            model=model,
-            size=size,
-            resolution=str(resolution or ""),
-            duration=duration,
-            first_frame=first_frame,
-            last_frame=last_frame,
-        )
-        return await persist_remote_url(url)
+        if settings.baidu_enabled and settings.baidu_api_key:
+            url = await baidu_video_generate(
+                prompt=prompt,
+                model=model,
+                size=size,
+                resolution=str(resolution or ""),
+                duration=duration,
+                first_frame=first_frame,
+                last_frame=last_frame,
+            )
+            return await persist_remote_url(url)
+        if settings.openai_api_key:
+            url = await openai_video_generate(
+                prompt=prompt,
+                model=model,
+                size=openai_video_size(size, resolution),
+                duration=duration,
+                resolution=str(resolution or ""),
+                first_frame=first_frame,
+                images=images,
+                names=image_names,
+            )
+            return await persist_remote_url(url)
+        fail(3001, "Seedance 渠道不可用：nexcor 未配置且百度云已禁用", 503)
 
     if is_minimax_model(model):
         url = await minimax_video_generate(
