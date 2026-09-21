@@ -34,6 +34,9 @@ try:
         if "cover_image" not in columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE episodes ADD COLUMN cover_image VARCHAR(1024) NULL"))
+        if "storyboard" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE episodes ADD COLUMN storyboard JSON"))
 except Exception:
     pass
 with SessionLocal() as db:

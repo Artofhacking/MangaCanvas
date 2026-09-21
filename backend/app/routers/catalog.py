@@ -72,6 +72,7 @@ class EpisodeIn(BaseModel):
     creationMode: str | None = None
     sourceWorkflowId: str | None = None
     sourceNodeId: str | None = None
+    storyboard: list[dict] | None = None
 
 
 class RelationsIn(BaseModel):
@@ -448,6 +449,7 @@ def create_episode(
         creation_mode=mode,
         source_workflow_id=wf,
         source_node_id=node,
+        storyboard=serialize.normalize_storyboard(body.storyboard),
     )
     db.add(row)
     try:
@@ -497,6 +499,8 @@ def update_episode(
             setattr(row, attr, value)
     if any(v is not None for v in (body.characterIds, body.sceneIds, body.objectIds)):
         _set_relations(db, row.id, body.characterIds, body.sceneIds, body.objectIds)
+    if body.storyboard is not None:
+        row.storyboard = serialize.normalize_storyboard(body.storyboard)
     row.updated_at = now()
     try:
         db.flush()

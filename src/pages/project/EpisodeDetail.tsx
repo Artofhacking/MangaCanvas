@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Sidebar from "@/components/layout/Sidebar"
@@ -21,10 +21,12 @@ import {
   Users,
 } from "lucide-react"
 import { QuerySpinner } from "@/components/feedback/ListQueryState"
+import EpisodeStoryboard from "./EpisodeStoryboard"
 
 export default function EpisodeDetail() {
   const { projectId, episodeId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { notify } = useFeedback()
   const launchWorkflow = useWorkflowLauncher()
   const [episode, setEpisode] = useState<Episode | null>(null)
@@ -33,6 +35,13 @@ export default function EpisodeDetail() {
     scenes: [],
     objects: [],
   })
+  const view = searchParams.get("view") === "storyboard" ? "storyboard" : "overview"
+  const setView = (next: "overview" | "storyboard") => {
+    const params = new URLSearchParams(searchParams)
+    if (next === "storyboard") params.set("view", "storyboard")
+    else params.delete("view")
+    setSearchParams(params, { replace: true })
+  }
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<{ characterIds: number[]; sceneIds: number[]; objectIds: number[] }>({
     characterIds: [],
@@ -197,6 +206,40 @@ export default function EpisodeDetail() {
         </div>
 
         <div className="px-8 py-8">
+          <div className="mb-6 flex flex-wrap gap-2">
+            {(
+              [
+                { id: "overview" as const, label: "本集" },
+                { id: "storyboard" as const, label: "分镜表" },
+              ]
+            ).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setView(item.id)}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                  view === item.id
+                    ? "signature-gradient text-white"
+                    : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {view === "storyboard" ? (
+            <EpisodeStoryboard
+              projectId={Number(projectId)}
+              episode={episode}
+              characters={catalog.characters}
+              scenes={catalog.scenes}
+              onEpisodeChange={setEpisode}
+            />
+          ) : null}
+
+          {view === "overview" ? (
+          <>
           <section className="overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#c53a09_0%,#db5d32_52%,#f08b57_100%)] p-8 text-white shadow-[0_24px_60px_rgba(174,65,21,0.22)]">
             <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
               <div>
@@ -216,10 +259,18 @@ export default function EpisodeDetail() {
                 <div className="mt-8 flex flex-wrap gap-3">
                   <Button
                     size="lg"
-                    onClick={() => void openCanvas()}
+                    onClick={() => setView("storyboard")}
                     className="h-14 rounded-full bg-white px-8 text-base font-bold text-[#a22d08] hover:bg-white/92"
                   >
                     <Clapperboard className="mr-2 h-5 w-5" />
+                    打开分镜表
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => void openCanvas()}
+                    className="h-14 rounded-full border-white/30 bg-white/10 px-8 text-base font-semibold text-white hover:bg-white/16 hover:text-white"
+                  >
                     进入无限画布
                   </Button>
                   <Button
@@ -468,6 +519,8 @@ export default function EpisodeDetail() {
               </div>
             </div>
           </section>
+          </>
+          ) : null}
         </div>
       </main>
     </div>

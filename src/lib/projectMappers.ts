@@ -9,6 +9,7 @@ import type {
   SceneDTO,
 } from '@/api/types'
 import type { Character, Episode, ObjectItem, Scene } from '@/types'
+import { normalizeStoryboard } from '@/features/project/storyboard'
 
 const relativeTime = (iso?: string) => {
   if (!iso) {
@@ -87,6 +88,7 @@ export const mapEpisode = (episode: EpisodeDTO): Episode => ({
   characterIds: episode.characters?.map((item) => item.id) ?? [],
   sceneIds: episode.scenes?.map((item) => item.id) ?? [],
   objectIds: episode.objects?.map((item) => item.id) ?? [],
+  storyboard: normalizeStoryboard(episode.storyboard),
 })
 
 export const mapScene = (scene: SceneDTO): Scene => ({
