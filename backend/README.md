@@ -37,7 +37,7 @@ VITE_APP_API_BASE_URL=/api/v1
 - Canvas workflows + members
 - Assets / Upload（本地预签名 PUT）
 - Credits / Billing quotas
-- `POST /api/v1/ai/images/generations`（无网关密钥时返回本地占位图）
+- `POST /api/v1/ai/images/generations`（无网关密钥、上游无图或落盘失败时返回错误，不再回近黑占位图）
 
 飞书登录：配置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET` 后启用。企业自建应用 **MangaCanvas**（`cli_aa21391b3ef89bef`）已创建，重定向 URL：
 
