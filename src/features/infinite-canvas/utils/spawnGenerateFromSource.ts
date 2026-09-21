@@ -11,7 +11,9 @@ export function spawnGenerateFromSource(
   const source = nodes.find((node) => node.id === sourceId)
   if (!source) return null
 
-  const data: Partial<NodeData> = { prompt: '@1 ' }
+  // Incoming edges still create numbered reference slots. Leave the prompt empty
+  // so a new 画面节点 does not auto-insert @1 before the user types.
+  const data: Partial<NodeData> = {}
   if (source.type === 'image') {
     if (type === 'imageConfig') {
       data.label = '图生图'
