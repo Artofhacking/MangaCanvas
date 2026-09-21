@@ -12,6 +12,7 @@ import { formatGeneratingLabel } from '../../utils/generationJobs'
 
 export const IMAGE_PREVIEW_WIDTH = 448
 export const VIDEO_PREVIEW_WIDTH = 448
+export const TEXT_NOTE_WIDTH = 300
 export const IMAGE_EMPTY_ASPECT = '16 / 10'
 
 function parseAspectParts(ratio?: string, fallback = '1 / 1') {
@@ -57,6 +58,10 @@ interface MediaPreviewCardProps {
   onLabelBlur?: () => void
   onLabelKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void
   className?: string
+  /** Cover fills a fixed aspect box. Flow sizes the paper body to its children. */
+  layout?: 'cover' | 'flow'
+  /** Optional label node (e.g. plot mentions). Falls back to `label` text. */
+  labelContent?: React.ReactNode
   /** True when the card shows generated/uploaded media (keeps a dark well behind it). */
   filled?: boolean
   /** Darker preview well while a generation job is in flight. */
@@ -148,13 +153,16 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
   onLabelBlur,
   onLabelKeyDown,
   className,
+  layout = 'cover',
+  labelContent,
   filled,
   generating,
   children,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const visibleActions = (actions || []).filter((action) => !action.hidden)
-  const height = previewCardHeight(width, aspectRatio)
+  const isFlow = layout === 'flow'
+  const height = isFlow ? undefined : previewCardHeight(width, aspectRatio)
 
   return (
     <div className={cn('media-preview-card group/media-card relative', className)} style={{ width }}>
@@ -181,7 +189,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
               onDoubleClick={onLabelDoubleClick}
               title="双击编辑"
             >
-              {label}
+              {labelContent ?? label}
             </span>
           )}
         </div>
@@ -235,11 +243,12 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
         ) : null}
       </div>
 
-      <div className="relative" style={{ height }}>
+      <div className="relative" style={height ? { height } : undefined}>
         {handles}
         <div
           className={cn(
-            'relative h-full w-full overflow-hidden rounded-[20px] border transition-[border-color,box-shadow] duration-200',
+            'relative w-full overflow-hidden rounded-[20px] border transition-[border-color,box-shadow] duration-200',
+            isFlow ? 'min-h-[200px]' : 'h-full',
             filled && 'media-preview-card__stage--filled',
             generating && 'media-preview-card__stage--generating',
             dropActive
@@ -252,7 +261,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
           )}
           style={{ backgroundColor: 'hsl(var(--media-stage))' }}
         >
-          <div className="absolute inset-0">{children}</div>
+          {isFlow ? children : <div className="absolute inset-0">{children}</div>}
         </div>
       </div>
     </div>
