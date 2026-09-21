@@ -119,26 +119,35 @@ const WorkflowPanel: React.FC<WorkflowPanelProps> = ({ visible, onClose }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-3 gap-4">
-          {workflows.map((workflow) => (
-            <div
-              key={workflow.id}
-              className="cursor-pointer transition-transform hover:-translate-y-0.5"
-              onClick={() => handleAddWorkflow(workflow)}
-            >
-              <div className="aspect-square rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-700 flex items-center justify-center hover:border-blue-500 transition-colors">
-                {workflow.cover ? (
-                  <img src={workflow.cover} alt={workflow.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl text-gray-400">📋</span>
-                )}
+        {workflows.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 px-4 py-10 text-center">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">暂无漫剧工作流模板</p>
+            <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+              请添加画面节点，或从素材库拖入角色、场景、物品开始编排。
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            {workflows.map((workflow) => (
+              <div
+                key={workflow.id}
+                className="cursor-pointer transition-transform hover:-translate-y-0.5"
+                onClick={() => handleAddWorkflow(workflow)}
+              >
+                <div className="aspect-square rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-700 flex items-center justify-center hover:border-blue-500 transition-colors">
+                  {workflow.cover ? (
+                    <img src={workflow.cover} alt={workflow.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-3xl text-gray-400">📋</span>
+                  )}
+                </div>
+                <div className="mt-2.5 text-[13px] text-gray-900 dark:text-white text-center overflow-hidden text-ellipsis whitespace-nowrap">
+                  {workflow.name}
+                </div>
               </div>
-              <div className="mt-2.5 text-[13px] text-gray-900 dark:text-white text-center overflow-hidden text-ellipsis whitespace-nowrap">
-                {workflow.name}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <style>{`

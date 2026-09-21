@@ -74,6 +74,7 @@ import ImageRoleEdge from './components/edges/ImageRoleEdge';
 import ApiSettings from './components/ApiSettings';
 import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
+import { hasStarterWorkflowTemplates } from './config/workflows';
 import NodeGenerateBar from './components/NodeGenerateBar';
 import ConnectDropMenu, { type ConnectDropMenuState } from './components/ConnectDropMenu';
 import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
@@ -1234,9 +1235,9 @@ const CanvasInner: React.FC = () => {
         {nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center p-6">
             <div className="pointer-events-auto w-[min(420px,calc(100%-2rem))] rounded-[28px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/95 p-6 text-center shadow-[0_18px_50px_rgba(42,28,24,0.12)] backdrop-blur-md">
-              <p className="text-lg font-bold text-[hsl(var(--on-surface))]">从画面或视频节点开始</p>
+              <p className="text-lg font-bold text-[hsl(var(--on-surface))]">从画面节点或素材库开始</p>
               <p className="mt-1.5 text-sm leading-6 text-[hsl(var(--secondary))]">
-                选中节点后用底部生成栏发送。也可从左侧素材库拖入资产。
+                添加画面节点开始编排漫剧，或从左侧素材库拖入角色、场景、物品。
               </p>
               <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                 <button
@@ -1277,17 +1278,19 @@ const CanvasInner: React.FC = () => {
               <PlusOutlined style={{ fontSize: 20 }} />
             </button>
           </Tooltip>
-          <Tooltip title="工作流模板" placement="right">
-            <button
-              onClick={() => {
-                setShowWorkflowPanel(true);
-                setShowMaterialPanel(false);
-              }}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors"
-            >
-              <AppstoreOutlined style={{ fontSize: 20 }} />
-            </button>
-          </Tooltip>
+          {hasStarterWorkflowTemplates() ? (
+            <Tooltip title="工作流模板" placement="right">
+              <button
+                onClick={() => {
+                  setShowWorkflowPanel(true);
+                  setShowMaterialPanel(false);
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors"
+              >
+                <AppstoreOutlined style={{ fontSize: 20 }} />
+              </button>
+            </Tooltip>
+          ) : null}
           <Tooltip title="我的素材" placement="right">
             <button
               onClick={() => {
@@ -1462,7 +1465,9 @@ const CanvasInner: React.FC = () => {
       </div>
 
       {/* Modals */}
-      <WorkflowPanel visible={showWorkflowPanel} onClose={() => setShowWorkflowPanel(false)} />
+      {hasStarterWorkflowTemplates() ? (
+        <WorkflowPanel visible={showWorkflowPanel} onClose={() => setShowWorkflowPanel(false)} />
+      ) : null}
       <MaterialPanel
         visible={showMaterialPanel}
         onClose={() => setShowMaterialPanel(false)}
