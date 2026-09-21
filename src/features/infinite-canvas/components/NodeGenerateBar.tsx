@@ -236,6 +236,7 @@ function GenerateBarModelPicker({
             wide
             loading={loading && pickerModels.length === 0}
             disabled={loading && pickerModels.length === 0}
+            title={selected?.label || currentKey || '选择模型'}
             label={
               loading && !selected
                 ? '加载模型…'
