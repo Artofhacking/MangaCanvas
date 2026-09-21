@@ -403,7 +403,7 @@ export default function Dashboard() {
                 <Users className="w-5 h-5 text-[hsl(var(--primary))]" />
               </div>
               <h4 className="text-sm font-bold text-[hsl(var(--on-surface))] mb-1">角色管理</h4>
-              <p className="text-[13px] text-[hsl(var(--secondary))]">角色和人物设定</p>
+              <p className="text-[13px] text-[hsl(var(--secondary))]">角色设定</p>
             </Card>
             <Card 
               onClick={handleEnterCanvas}

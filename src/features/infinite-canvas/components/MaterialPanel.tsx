@@ -15,13 +15,13 @@ type LibraryTab = 'materials' | 'subjects';
 type CategoryTab = 'all' | 'character' | 'scene' | 'object';
 
 const libraryTabs: Array<{ key: LibraryTab; label: string }> = [
-  { key: 'materials', label: '我的素材' },
-  { key: 'subjects', label: '我的主体库' },
+  { key: 'materials', label: '素材库' },
+  { key: 'subjects', label: '角色库' },
 ];
 
 const categoryTabs: Array<{ key: CategoryTab; label: string }> = [
   { key: 'all', label: '全部' },
-  { key: 'character', label: '人物' },
+  { key: 'character', label: '角色' },
   { key: 'scene', label: '场景' },
   { key: 'object', label: '物品' },
 ];
@@ -109,6 +109,31 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
       return Boolean(item.cover);
     });
   }, [activeCategory, activeLibrary, items]);
+
+  const emptyCopy = useMemo(() => {
+    if (activeLibrary === 'subjects' || activeCategory === 'character') {
+      return {
+        title: '暂无角色',
+        desc: '在资产管理中创建角色后，就可以拖进画布。',
+      };
+    }
+    if (activeCategory === 'scene') {
+      return {
+        title: '暂无场景',
+        desc: '在资产管理中创建场景后，就可以拖进画布。',
+      };
+    }
+    if (activeCategory === 'object') {
+      return {
+        title: '暂无物品',
+        desc: '在资产管理中创建物品后，就可以拖进画布。',
+      };
+    }
+    return {
+      title: '暂无素材',
+      desc: '在资产管理中创建角色、场景或物品后，就可以拖进画布。',
+    };
+  }, [activeCategory, activeLibrary]);
 
   const handleItemDragStart = (event: React.DragEvent<HTMLButtonElement>, item: CanvasMaterialItem) => {
     if (!item.cover) return;
@@ -202,9 +227,9 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[hsl(var(--surface-container-high))] text-[hsl(var(--secondary))]">
                   <InboxOutlined style={{ fontSize: 22 }} />
                 </div>
-                <div className="text-[17px] font-semibold text-[hsl(var(--on-surface))]">暂无素材</div>
+                <div className="text-[17px] font-semibold text-[hsl(var(--on-surface))]">{emptyCopy.title}</div>
                 <div className="mt-2 text-[13px] leading-6 text-[hsl(var(--secondary))]">
-                  在资产管理中创建角色、场景或物品后，就可以拖进画布。
+                  {emptyCopy.desc}
                 </div>
               </div>
             </div>

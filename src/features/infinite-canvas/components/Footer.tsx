@@ -11,7 +11,7 @@ interface FooterProps {
  * Footer 组件 - 页面底部统一页脚
  */
 const Footer: React.FC<FooterProps> = ({ 
-  copyright = '© 2024 Infinite Canvas. 基于 React Flow 构建。',
+  copyright = '© 2024 MangaCanvas. 基于 React Flow 构建。',
   show = true 
 }) => {
   if (!show) return null;

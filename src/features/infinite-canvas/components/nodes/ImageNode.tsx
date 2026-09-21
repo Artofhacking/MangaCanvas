@@ -31,6 +31,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [isDropActive, setIsDropActive] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
+  const [saveCategory, setSaveCategory] = useState<string | undefined>(undefined);
   const contextMenuRef = React.useRef<HTMLDivElement | null>(null);
 
   const closeContextMenu = useCallback(() => {
@@ -289,12 +290,14 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   const handleSaveToMaterials = useCallback(() => {
     closeContextMenu();
+    setSaveCategory(undefined);
     setShowSaveToMaterialsModal(true);
   }, [closeContextMenu]);
 
-  const handleCreateSubject = useCallback(() => {
+  const handleSaveAsCharacter = useCallback(() => {
     closeContextMenu();
-    message.info('创建主体功能即将接入');
+    setSaveCategory('character');
+    setShowSaveToMaterialsModal(true);
   }, [closeContextMenu]);
 
   React.useEffect(() => {
@@ -379,7 +382,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         actions={[
           {
             key: 'save',
-            label: '保存到我的素材',
+            label: '保存到素材库',
             icon: <FolderPlus className="h-4 w-4" />,
             onClick: handleSaveToMaterials,
             hidden: !data?.url,
@@ -443,10 +446,13 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
       <SaveToMaterialsModal
         open={showSaveToMaterialsModal}
-        onClose={() => setShowSaveToMaterialsModal(false)}
+        onClose={() => {
+          setShowSaveToMaterialsModal(false);
+          setSaveCategory(undefined);
+        }}
         imageUrl={mediaUrl(data?.url) || undefined}
         initialName={data?.label || '图片素材'}
-        initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
+        initialCategory={saveCategory ?? (typeof data?.sourceType === 'string' ? data.sourceType : undefined)}
         nodeId={id}
         prompt={typeof data?.prompt === 'string' ? data.prompt : undefined}
       />
@@ -480,15 +486,15 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
               className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] transition-colors hover:bg-black/5"
             >
               <FolderAddOutlined style={{ fontSize: 17 }} />
-              <span>保存到我的素材</span>
+              <span>保存到素材库</span>
             </button>
 
             <button
-              onClick={handleCreateSubject}
+              onClick={handleSaveAsCharacter}
               className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] transition-colors hover:bg-black/5"
             >
               <AppstoreAddOutlined style={{ fontSize: 17 }} />
-              <span>创建主体</span>
+              <span>保存为角色</span>
             </button>
           </div>
 

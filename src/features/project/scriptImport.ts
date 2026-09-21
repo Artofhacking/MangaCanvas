@@ -7,7 +7,7 @@ function countTotal(counts: ScriptImportCounts) {
 }
 
 function formatCounts(counts: ScriptImportCounts) {
-  return `${counts.episodes} 集、${counts.scenes} 个场景、${counts.objects} 件道具、${counts.characters} 个人物`
+  return `${counts.episodes} 集、${counts.scenes} 个场景、${counts.objects} 件道具、${counts.characters} 个角色`
 }
 
 export function formatScriptImportToast(created: ScriptImportCounts, skipped: ScriptImportCounts) {
