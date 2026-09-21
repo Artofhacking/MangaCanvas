@@ -13,6 +13,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useImageModels } from "@/features/infinite-canvas/hooks/useModels"
 import { GenerateSettingsPopover } from "@/components/forms/GenerateSettingsPopover"
 import { type ImageGenerationConfig } from "@/lib/generateSettings"
+import { displayModelName } from "@/lib/displayModelName"
 import { cn } from "@/lib/utils"
 
 export type { ImageGenerationConfig } from "@/lib/generateSettings"
@@ -27,13 +28,7 @@ interface ImageGenerationFormProps {
   directory?: UploadDirectory
 }
 
-// 模型数据从 API 获取，此处保留作为极端情况下的 fallback
-const fallbackModels = [
-  { id: "jimeng-3", name: "即梦 3.0", desc: "中文语义强，适合概念物品" },
-  { id: "keling-3", name: "可灵 3.0", desc: "质感稳定，适合商品表达" },
-  { id: "mj-v7", name: "Midjourney V7", desc: "风格化强，适合创意设计" },
-  { id: "sdxl", name: "SDXL", desc: "通用型底模，便于快速出图" },
-]
+// 模型只来自 GET /ai/models。空列表 / 错误时不回退到静态目录。
 
 export function ImageGenerationForm({
   value,
@@ -63,8 +58,7 @@ export function ImageGenerationForm({
         desc: m.description || "",
       }))
     }
-    // 否则使用 fallback
-    return fallbackModels
+    return []
   }, [propModels, apiModels])
 
   // 如果当前选中的模型不在列表中，自动切换到第一个可用模型
@@ -139,7 +133,9 @@ export function ImageGenerationForm({
               <span>
                 {modelsLoading 
                   ? "加载模型中..." 
-                  : selectedModelInfo?.name ?? "选择生成模型"}
+                  : selectedModelInfo
+                    ? displayModelName(selectedModelInfo.name)
+                    : "选择生成模型"}
               </span>
               {modelsLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--secondary))]" />
@@ -153,7 +149,12 @@ export function ImageGenerationForm({
             sideOffset={10}
             className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-2 shadow-xl"
           >
-            {models.map((model) => (
+            {models.length === 0 ? (
+              <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
+                {modelsLoading ? "加载模型列表..." : modelsError ? "模型列表加载失败" : "接口未返回可用模型"}
+              </DropdownMenuItem>
+            ) : (
+              models.map((model) => (
               <DropdownMenuItem
                 key={model.id}
                 onClick={() => updateField("model", model.id)}
@@ -168,9 +169,10 @@ export function ImageGenerationForm({
                     value.model === model.id ? "opacity-100" : "opacity-0"
                   }`}
                 />
-                <span>{model.name}</span>
+                <span>{displayModelName(model.name)}</span>
               </DropdownMenuItem>
-            ))}
+              ))
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <p className="text-xs text-[hsl(var(--secondary))]">

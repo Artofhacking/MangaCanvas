@@ -17,6 +17,7 @@ const getDefaultNodeData = (type: string): NodeData => {
         size: '1024x1024',
         quality: 'medium',
         ratio: '1:1',
+        n: 1,
         label: '画面节点',
       };
     case 'image':

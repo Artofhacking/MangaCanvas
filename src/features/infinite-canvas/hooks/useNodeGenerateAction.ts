@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react'
 import { message } from 'antd'
 import { isI2IModel, UNSUPPORTED_REFERENCE_IMAGE_MESSAGE } from '@/api/aigc'
 import { isCanceledError } from '@/api/core'
-import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel, remapVideoModel } from '../config/models'
+import { remapModelId, resolveImageCapabilities, resolveVideoCapabilities } from '../config/modelCapabilities'
+import { useModelsStore } from '@/store/modelsStore'
 import { useCanvasStore } from '../stores/canvasStore'
 import { finishGenerationJob, startGenerationJob } from '../utils/generationJobs'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from '../utils/generateSlots'
@@ -47,17 +48,23 @@ export function useNodeGenerateAction(nodeId: string | null) {
     })
 
     const isImage = node.type === 'imageConfig'
+    const liveIds = useModelsStore
+      .getState()
+      .getModelsByModality(isImage ? 'image' : 'video')
+      .map((item) => item.id)
+    const storedModel = typeof node.data.model === 'string' ? node.data.model : ''
     const model = isImage
-      ? ((typeof node.data.model === 'string' && node.data.model) || DEFAULT_IMAGE_MODEL)
-      : remapVideoModel((typeof node.data.model === 'string' && node.data.model) || DEFAULT_VIDEO_MODEL)
+      ? remapModelId(storedModel || DEFAULT_IMAGE_MODEL, liveIds, 'image')
+      : remapModelId(storedModel || DEFAULT_VIDEO_MODEL, liveIds, 'video')
 
     if (isImage && inputs.refImages.length && !isI2IModel(model)) {
       message.error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE)
       return
     }
+    const liveName = useModelsStore.getState().getModelById(model)?.name
     const modelLabel = isImage
-      ? (getImageModel(model)?.label || IMAGE_MODELS.find((item) => item.key === model)?.label || model)
-      : (getVideoModel(model)?.label || VIDEO_MODELS.find((item) => item.key === model)?.label || model)
+      ? (liveName || resolveImageCapabilities(model).label || model)
+      : (liveName || resolveVideoCapabilities(model).label || model)
 
     const signal = startGenerationJob(nodeId)
     const applyProgress = (_status: string, percent?: number) => {
@@ -85,7 +92,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
           quality: typeof node.data.quality === 'string' ? node.data.quality : undefined,
           image: inputs.refImages[0],
           images: inputs.refImages.length ? inputs.refImages : undefined,
-          n: 1,
+          n: typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1,
           signal,
         }, applyProgress)
 

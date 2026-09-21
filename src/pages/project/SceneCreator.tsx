@@ -20,6 +20,7 @@ import {
 import { useState, useRef, useEffect } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { GenerateSettingsPopover } from "@/components/forms/GenerateSettingsPopover"
+import { displayModelName } from "@/lib/displayModelName"
 import { DEFAULT_GENERATE_SETTINGS, type GenerateSettings } from "@/lib/generateSettings"
 import { useImageModels } from "@/features/infinite-canvas/hooks"
 import GenerationTaskPanel, {
@@ -34,10 +35,6 @@ import {
   withExistingAssetResult,
 } from "@/store/assetGenerationStore"
 import type { Scene } from "@/types"
-
-const fallbackSceneModels = [
-  { id: "jimeng-3", name: "即梦 3.0", description: "中文语义强，适合场景氛围" },
-]
 
 export interface SceneCreateData {
   name: string
@@ -104,7 +101,8 @@ export default function SceneCreator({
   const initializedRef = useRef(false)
   const prevOpenRef = useRef(open)
 
-  const availableModels = imageModels.length > 0 ? imageModels : fallbackSceneModels
+  const availableModels = imageModels
+  const selectedSceneModel = availableModels.find((model) => model.id === selectedModel)
 
   useEffect(() => {
     if (modelsLoading && imageModels.length === 0) return
@@ -276,8 +274,9 @@ export default function SceneCreator({
                         <span>
                           {modelsLoading && imageModels.length === 0
                             ? "加载中..."
-                            : (availableModels.find((model) => model.id === selectedModel)?.name ?? "选择场景模型")
-                          }
+                            : selectedSceneModel
+                              ? displayModelName(selectedSceneModel.name)
+                              : "选择场景模型"}
                         </span>
                         <ChevronDown className="h-4 w-4 text-[hsl(var(--secondary))]" />
                       </Button>
@@ -290,6 +289,10 @@ export default function SceneCreator({
                       {modelsLoading && imageModels.length === 0 ? (
                         <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
                           加载模型列表...
+                        </DropdownMenuItem>
+                      ) : availableModels.length === 0 ? (
+                        <DropdownMenuItem disabled className="text-[hsl(var(--secondary))]">
+                          {modelsError ? "模型列表加载失败" : "接口未返回可用模型"}
                         </DropdownMenuItem>
                       ) : (
                         availableModels.map((model) => (
@@ -307,15 +310,18 @@ export default function SceneCreator({
                                 selectedModel === model.id ? "opacity-100" : "opacity-0"
                               }`}
                             />
-                            <span>{model.name}</span>
+                            <span>{displayModelName(model.name)}</span>
                           </DropdownMenuItem>
                         ))
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <p className="text-xs text-[hsl(var(--secondary))]">
-                    {availableModels.find((model) => model.id === selectedModel)?.description}
-                    {modelsError ? `（模型列表加载失败：${modelsError}，可先用默认模型生成）` : ""}
+                    {modelsError
+                      ? `模型列表加载失败：${modelsError}`
+                      : !modelsLoading && availableModels.length === 0
+                        ? "接口未返回可用模型"
+                        : availableModels.find((model) => model.id === selectedModel)?.description}
                   </p>
                 </div>
 

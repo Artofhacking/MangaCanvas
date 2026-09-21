@@ -1,5 +1,5 @@
-import { getImageModel } from '@/features/infinite-canvas/config/models'
-import { listImageSizes } from '@/features/infinite-canvas/utils/generateParams'
+import { resolveImageCapabilities } from '@/features/infinite-canvas/config/modelCapabilities'
+import { listImageSizes, listQuantityOptions } from '@/features/infinite-canvas/utils/generateParams'
 import { getSizeRatio, parseSizeDimensions } from '@/features/infinite-canvas/utils/aspectRatio'
 import { resolveImageReferences } from '@/api/aigc'
 import type { ImageGenerateOptions } from '@/api/aigc/types'
@@ -100,27 +100,18 @@ export function sizeForRatio(ratio: string, longEdge: number): string {
 }
 
 export function resolveApiQuality(model: string, tier: QualityTier): string | null {
-  const catalog = getImageModel(model)
+  const catalog = resolveImageCapabilities(model)
   const keys = QUALITY_TIERS.find((item) => item.id === tier)?.apiKeys ?? []
-  const available = catalog?.qualities?.map((item) => item.key) ?? []
+  const available = catalog.qualities?.map((item) => item.key) ?? []
   if (available.length > 0) {
     return keys.find((key) => available.includes(key)) ?? null
   }
-  // Unknown / fallback models: only 标准 → medium
   return tier === 'standard' ? 'medium' : null
-}
-
-function fallbackSizes(): { key: string; label: string }[] {
-  return GENERATE_ASPECT_RATIOS.map((ratio) => ({
-    key: sizeForRatio(ratio, 1024),
-    label: ratio,
-  }))
 }
 
 export function listSettingsSizes(model: string, quality: QualityTier) {
   const apiQuality = resolveApiQuality(model, quality) ?? resolveApiQuality(model, 'standard') ?? 'medium'
-  const catalogSizes = listImageSizes(model, apiQuality)
-  return catalogSizes.length > 0 ? catalogSizes : fallbackSizes()
+  return listImageSizes(model, apiQuality)
 }
 
 export function isQualitySupported(model: string, tier: QualityTier): boolean {
@@ -190,11 +181,10 @@ export function firstSupportedSettings(
   const clarities = availableClarities(model, quality, aspectRatio)
   const clarity =
     preferred.clarity && clarities.includes(preferred.clarity) ? preferred.clarity : clarities[0] ?? '1k'
-  const quantity = QUANTITY_OPTIONS.includes(preferred.quantity as (typeof QUANTITY_OPTIONS)[number])
+  const allowed = listQuantityOptions(model)
+  const quantity = allowed.includes(preferred.quantity as number)
     ? (preferred.quantity as number)
-    : preferred.quantity && preferred.quantity >= 1 && preferred.quantity <= 4
-      ? preferred.quantity
-      : 1
+    : allowed[0] ?? 1
   return { quality, aspectRatio, clarity, quantity }
 }
 
@@ -255,10 +245,12 @@ export function applyClarityTier(
 
 export function applyQuantity(
   settings: GenerateSettings,
-  quantity: number
+  quantity: number,
+  model?: string
 ): { settings: GenerateSettings; ok: boolean; message?: string } {
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 4) {
-    return { settings, ok: false, message: '生成数量仅支持 1–4 张' }
+  const allowed = model ? listQuantityOptions(model) : [...QUANTITY_OPTIONS]
+  if (!allowed.includes(quantity)) {
+    return { settings, ok: false, message: `生成数量仅支持 ${allowed.join('/')} 张` }
   }
   return { settings: { ...settings, quantity }, ok: true }
 }

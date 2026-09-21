@@ -9,30 +9,271 @@ PROBE_TIMEOUT = 2.5
 CACHE_TTL = 90.0
 DOWN_TTL = 180.0
 
+def _quality(label: str, key: str) -> dict:
+    return {"label": label, "key": key}
+
+
+GPT_IMAGE_SIZES = ["1024x1024", "1024x1536", "1536x1024"]
+GPT_IMAGE_QUALITIES = [_quality("低", "low"), _quality("中", "medium"), _quality("高", "high")]
+WAN27_SIZES = ["1280*1280", "1104*1472", "1472*1104", "960*1696", "1696*960"]
+WAN26_T2I_SIZES = [*WAN27_SIZES, "1440*1440"]
+WAN26_I2I_SIZES = [
+    "1280*1280",
+    "1024*1024",
+    "800*1200",
+    "1200*800",
+    "960*1280",
+    "1280*960",
+    "720*1280",
+    "1280*720",
+    "1344*576",
+]
+STANDARD_QUALITY = [_quality("标准", "standard")]
+WIDESCREEN_VIDEO_SIZES = ["1280*720", "720*1280", "1920*1080", "1080*1920"]
+WIDESCREEN_720_SIZES = ["1280*720", "720*1280"]
+
+
+def _image_caps(*, sizes: list[str], qualities: list[dict], default_size: str, default_quality: str, max_n: int = 4) -> dict:
+    return {
+        "parameters": {
+            "sizes": list(sizes),
+            "qualities": qualities,
+            "max_n": max_n,
+        },
+        "defaultParams": {"size": default_size, "quality": default_quality, "n": 1},
+    }
+
+
+def _video_caps(
+    *,
+    sizes: list[str] | None = None,
+    resolutions: list[str],
+    durations: list[int],
+    default_size: str | None = None,
+    default_resolution: str,
+    default_duration: int = 5,
+    supports_aspect: bool = False,
+) -> dict:
+    parameters: dict = {
+        "resolutions": list(resolutions),
+        "durations": list(durations),
+        "supports_aspect": supports_aspect,
+    }
+    if sizes:
+        parameters["sizes"] = list(sizes)
+    defaults: dict = {"resolution": default_resolution, "duration": default_duration}
+    if default_size:
+        defaults["size"] = default_size
+    return {"parameters": parameters, "defaultParams": defaults}
+
+
 IMAGE_CATALOG = [
-    {"id": "gpt-image-2", "name": "GPT Image 2 文生图", "owned_by": "nexcor", "modality": "image"},
-    {"id": "gpt-image-2.5-flare", "name": "GPT Image 2.5 Flare 文生图", "owned_by": "nexcor", "modality": "image"},
-    {"id": "gpt-image-2.5-sunburst", "name": "GPT Image 2.5 Sunburst 文生图", "owned_by": "nexcor", "modality": "image"},
-    {"id": "wan2.7-image", "name": "万相 2.7 文生图", "owned_by": "nexcor", "modality": "image"},
-    {"id": "wan2.7-image-pro", "name": "万相 2.7 文生图 Pro", "owned_by": "nexcor", "modality": "image"},
-    {"id": "qwen-image-2.0", "name": "通义千问生图", "owned_by": "nexcor", "modality": "image"},
-    {"id": "qwen-image-2.0-pro", "name": "通义千问生图 Pro", "owned_by": "nexcor", "modality": "image"},
-    {"id": "wan2.6-t2i", "name": "万相 2.6 文生图", "owned_by": "dashscope", "modality": "image"},
-    {"id": "wan2.6-image", "name": "万相 2.6 图生图", "owned_by": "dashscope", "modality": "image"},
+    {
+        "id": "gpt-image-2",
+        "name": "GPT Image 2 文生图",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
+    },
+    {
+        "id": "gpt-image-2.5-flare",
+        "name": "GPT Image 2.5 Flare 文生图",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
+    },
+    {
+        "id": "gpt-image-2.5-sunburst",
+        "name": "GPT Image 2.5 Sunburst 文生图",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
+    },
+    {
+        "id": "wan2.7-image",
+        "name": "万相 2.7 文生图",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=WAN27_SIZES, qualities=STANDARD_QUALITY, default_size="1280*1280", default_quality="standard"),
+    },
+    {
+        "id": "wan2.7-image-pro",
+        "name": "万相 2.7 文生图 Pro",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=WAN27_SIZES, qualities=STANDARD_QUALITY, default_size="1280*1280", default_quality="standard"),
+    },
+    {
+        "id": "qwen-image-2.0",
+        "name": "通义千问生图",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=STANDARD_QUALITY, default_size="1024x1024", default_quality="standard"),
+    },
+    {
+        "id": "qwen-image-2.0-pro",
+        "name": "通义千问生图 Pro",
+        "owned_by": "nexcor",
+        "modality": "image",
+        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=STANDARD_QUALITY, default_size="1024x1024", default_quality="standard"),
+    },
+    {
+        "id": "wan2.6-t2i",
+        "name": "万相 2.6 文生图",
+        "owned_by": "dashscope",
+        "modality": "image",
+        **_image_caps(sizes=WAN26_T2I_SIZES, qualities=STANDARD_QUALITY, default_size="1280*1280", default_quality="standard"),
+    },
+    {
+        "id": "wan2.6-image",
+        "name": "万相 2.6 图生图",
+        "owned_by": "dashscope",
+        "modality": "image",
+        **_image_caps(sizes=WAN26_I2I_SIZES, qualities=STANDARD_QUALITY, default_size="1280*1280", default_quality="standard"),
+    },
 ]
 
 VIDEO_CATALOG = [
-    {"id": "happyhorse-1.1-t2v", "name": "HappyHorse 文生视频", "owned_by": "nexcor", "modality": "video"},
-    {"id": "happyhorse-1.1-i2v", "name": "HappyHorse 图生视频", "owned_by": "nexcor", "modality": "video"},
-    {"id": "happyhorse-1.1-r2v", "name": "HappyHorse 参考图生视频", "owned_by": "nexcor", "modality": "video"},
-    {"id": "doubao-seedance-2-0-260128", "name": "Seedance 2.0", "owned_by": "baidu", "modality": "video"},
-    {"id": "doubao-seedance-2-0-fast-260128", "name": "Seedance 2.0 Fast", "owned_by": "baidu", "modality": "video"},
-    {"id": "doubao-seedance-2-0-mini-260615", "name": "Seedance 2.0 Mini", "owned_by": "baidu", "modality": "video"},
-    {"id": "doubao-seedance-2-5-260628", "name": "Seedance 2.5", "owned_by": "baidu", "modality": "video"},
-    {"id": "MiniMax-H3", "name": "MiniMax H3", "owned_by": "minimax", "modality": "video"},
-    {"id": "MiniMax-H3-Max", "name": "MiniMax H3 Max", "owned_by": "minimax", "modality": "video"},
-    {"id": "viduq3-pro", "name": "Vidu Q3 Pro", "owned_by": "vidu", "modality": "video"},
-    {"id": "viduq3-turbo", "name": "Vidu Q3 Turbo", "owned_by": "vidu", "modality": "video"},
+    {
+        "id": "happyhorse-1.1-t2v",
+        "name": "HappyHorse 文生视频",
+        "owned_by": "nexcor",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_VIDEO_SIZES,
+            resolutions=["720P", "1080P"],
+            durations=[5, 10],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "happyhorse-1.1-i2v",
+        "name": "HappyHorse 图生视频",
+        "owned_by": "nexcor",
+        "modality": "video",
+        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10], default_resolution="720P"),
+    },
+    {
+        "id": "happyhorse-1.1-r2v",
+        "name": "HappyHorse 参考图生视频",
+        "owned_by": "nexcor",
+        "modality": "video",
+        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10], default_resolution="720P"),
+    },
+    {
+        "id": "doubao-seedance-2-0-260128",
+        "name": "Seedance 2.0",
+        "owned_by": "baidu",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_VIDEO_SIZES,
+            resolutions=["720P", "1080P"],
+            durations=[5, 10],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "doubao-seedance-2-0-fast-260128",
+        "name": "Seedance 2.0 Fast",
+        "owned_by": "baidu",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_720_SIZES,
+            resolutions=["720P"],
+            durations=[5, 10],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "doubao-seedance-2-0-mini-260615",
+        "name": "Seedance 2.0 Mini",
+        "owned_by": "baidu",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_720_SIZES,
+            resolutions=["720P"],
+            durations=[5, 10],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "doubao-seedance-2-5-260628",
+        "name": "Seedance 2.5",
+        "owned_by": "baidu",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_VIDEO_SIZES,
+            resolutions=["720P", "1080P"],
+            durations=[5, 10, 15],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "MiniMax-H3",
+        "name": "海螺 MiniMax H3",
+        "owned_by": "minimax",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_VIDEO_SIZES,
+            resolutions=["720P", "1080P"],
+            durations=[5, 10, 15],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "MiniMax-H3-Max",
+        "name": "海螺 MiniMax H3 Max",
+        "owned_by": "minimax",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_720_SIZES,
+            resolutions=["720P"],
+            durations=[5, 10, 15],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "viduq3-pro",
+        "name": "Vidu Q3 Pro",
+        "owned_by": "vidu",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_VIDEO_SIZES,
+            resolutions=["720P", "1080P"],
+            durations=[5, 10, 15],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
+    {
+        "id": "viduq3-turbo",
+        "name": "Vidu Q3 Turbo",
+        "owned_by": "vidu",
+        "modality": "video",
+        **_video_caps(
+            sizes=WIDESCREEN_VIDEO_SIZES,
+            resolutions=["720P", "1080P"],
+            durations=[5, 10, 15],
+            default_size="1280*720",
+            default_resolution="720P",
+            supports_aspect=True,
+        ),
+    },
 ]
 
 TEXT_CATALOG = [

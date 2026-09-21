@@ -16,6 +16,7 @@ export interface NodeData {
   ratio?: string;
   resolution?: string;
   duration?: number;
+  n?: number;
   prompt?: string;
   executed?: boolean;
   outputNodeId?: string;
@@ -98,7 +99,10 @@ export interface ModelConfig {
     ratio?: string;
     duration?: number;
     resolution?: string;
+    n?: number;
   };
+  maxN?: number;
+  supportsAspect?: boolean;
   getSizesByQuality?: (quality: string) => { label: string; key: string }[];
   tips?: string;
 }

@@ -1,4 +1,9 @@
-import type { ModelDTO, ModelModality } from '@/api/types'
+import type { ModelDTO, ModelModality, ModelParameter, ModelParameterSet } from '@/api/types'
+
+function isParameterPayload(value: unknown): value is ModelParameterSet | ModelParameter[] {
+  if (Array.isArray(value)) return true
+  return Boolean(value) && typeof value === 'object'
+}
 import { errorResponse, successResponse, toApiResponse } from '@/features/project/api/shared'
 import type { ApiResponse } from '@/features/project/api/shared'
 
@@ -41,6 +46,9 @@ export const modelsApi = {
       const models = rawModels.map((m: unknown): ModelDTO => {
         const model = m as Record<string, unknown>
         const id = String(model.model_id || model.id || '')
+        const defaultParams = (model.defaultParams || model.default_params) as
+          | Record<string, unknown>
+          | undefined
         return {
           id,
           model_id: String(model.model_id || id),
@@ -48,6 +56,8 @@ export const modelsApi = {
           provider: String(model.provider || model.owned_by || 'unknown'),
           modality: (String(model.modality || '') || modality || '') as ModelModality,
           description: String(model.modality_label || model.description || ''),
+          parameters: isParameterPayload(model.parameters) ? model.parameters : undefined,
+          defaultParams,
           isEnabled: model.status === 'active' || model.isEnabled !== false,
           status: String(model.status || ''),
         }
