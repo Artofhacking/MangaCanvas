@@ -3,7 +3,6 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
-  Clapperboard,
   Clock,
   Copy,
   FileText,
@@ -12,7 +11,6 @@ import {
   Monitor,
   Music2,
   Sparkles,
-  Tag,
   Users,
   Video,
 } from 'lucide-react'
@@ -63,12 +61,6 @@ const BAR_MAX_WIDTH = 860
 const BAR_ESTIMATED_HEIGHT = 168
 const DOCK_MENU =
   'z-[80] min-w-[10.5rem] overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl'
-const CAPABILITY_CHIPS = [
-  { id: 'mark', label: '标记', icon: Tag },
-  { id: 'fx', label: '特效', icon: Sparkles },
-  { id: 'cast', label: '角色库', icon: Users },
-  { id: 'camera', label: '运镜', icon: Clapperboard },
-] as const
 
 function DockDivider() {
   return <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-[hsl(var(--outline-variant))]/50" />
@@ -616,8 +608,8 @@ const NodeGenerateBar: React.FC = () => {
     mentionRef.current?.insertSlot(slot)
   }
 
-  const handleChipClick = () => {
-    message.info('能力面板将在后续版本接入')
+  const handleCastClick = () => {
+    message.info('角色库将在后续版本接入')
   }
 
   const insufficient = Boolean(quote && (!quote.sufficient || !quote.quotaOk))
@@ -699,20 +691,14 @@ const NodeGenerateBar: React.FC = () => {
 
           <div className="mt-2 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
             <div className="flex shrink-0 items-center gap-1.5">
-              {CAPABILITY_CHIPS.map((chip) => {
-                const Icon = chip.icon
-                return (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    onClick={handleChipClick}
-                    className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
-                  >
-                    <Icon className="h-3 w-3" />
-                    {chip.label}
-                  </button>
-                )
-              })}
+              <button
+                type="button"
+                onClick={handleCastClick}
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
+              >
+                <Users className="h-3 w-3" />
+                角色库
+              </button>
             </div>
             <DockDivider />
             <GenerateBarModelPicker node={node} onChange={handleModelChange} />
