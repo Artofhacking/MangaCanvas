@@ -5,7 +5,7 @@ export type CollectCategory = 'character' | 'scene' | 'object'
 export const COLLECT_SOURCES: readonly CollectSource[] = ['favorite', 'collect']
 
 export const COLLECT_CATEGORY_LABEL: Record<CollectCategory, string> = {
-  character: '人物',
+  character: '角色',
   scene: '场景',
   object: '物品',
 }

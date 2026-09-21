@@ -1317,7 +1317,7 @@ const CanvasInner: React.FC = () => {
               </button>
             </Tooltip>
           ) : null}
-          <Tooltip title="我的素材" placement="right">
+          <Tooltip title="素材库" placement="right">
             <button
               onClick={() => {
                 setShowMaterialPanel((current) => {

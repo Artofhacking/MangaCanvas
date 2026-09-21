@@ -39,7 +39,7 @@ describe('collect metadata marker', () => {
   })
 
   it('reads category, media type and favorited time from metadata', () => {
-    expect(collectCategoryLabel('character')).toBe('人物')
+    expect(collectCategoryLabel('character')).toBe('角色')
     expect(collectCategoryLabel('unknown')).toBe('素材')
     expect(inferCollectMediaType('/static/a.png', { mediaType: 'video' })).toBe('video')
     expect(inferCollectMediaType('https://cdn.example/clip.mp4')).toBe('video')

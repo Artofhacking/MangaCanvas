@@ -26,7 +26,7 @@ interface SaveToMaterialsModalProps {
 }
 
 const categoryOptions = [
-  { label: '人物', value: 'character' },
+  { label: '角色', value: 'character' },
   { label: '场景', value: 'scene' },
   { label: '物品', value: 'object' },
 ];
@@ -265,8 +265,8 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
                     ? '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这段视频。'
                     : '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这张图。'
                   : mediaType === 'video'
-                    ? '将当前视频写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'
-                    : '将当前图片写回人物、场景或物品库，之后可在素材面板和片段中继续使用。'}
+                    ? '将当前视频写回角色、场景或物品库，之后可在素材面板和片段中继续使用。'
+                    : '将当前图片写回角色、场景或物品库，之后可在素材面板和片段中继续使用。'}
               </div>
             </div>
 

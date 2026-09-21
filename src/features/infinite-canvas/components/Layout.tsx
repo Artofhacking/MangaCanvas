@@ -51,7 +51,7 @@ const Layout: React.FC<LayoutProps> = ({
               onClick={() => navigate('/')}
               className="text-xl font-bold tracking-tighter text-[#3755c3] dark:text-[#6d89fa] hover:opacity-80 transition-opacity"
             >
-              Infinite Canvas
+              MangaCanvas
             </button>
             
             {/* Navigation Links */}

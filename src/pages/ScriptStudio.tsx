@@ -38,7 +38,7 @@ const AGENT_STEPS = [
   "读取剧本原文",
   "提炼剧情主线",
   "按情节拆分集数",
-  "抽取人物、场景与道具",
+  "抽取角色、场景与道具",
 ]
 
 type ResultTab = "plot" | "episodes" | "scenes" | "props" | "characters"
@@ -48,7 +48,7 @@ const RESULT_TABS: { id: ResultTab; label: string }[] = [
   { id: "episodes", label: "分集" },
   { id: "scenes", label: "场景" },
   { id: "props", label: "道具" },
-  { id: "characters", label: "人物" },
+  { id: "characters", label: "角色" },
 ]
 
 const ROLE_LABEL: Record<string, string> = { main: "主角", support: "配角" }
@@ -408,7 +408,7 @@ export default function ScriptStudio() {
               </div>
               <h2 className="text-2xl font-black text-[hsl(var(--on-surface))] mb-2">正在把故事拆成可拍的资产</h2>
               <p className="text-sm text-[hsl(var(--secondary))] mb-8">
-                Agent 会先读完全文，再提炼主线、分集，并抽出人物、场景和道具。
+                Agent 会先读完全文，再提炼主线、分集，并抽出角色、场景和道具。
               </p>
               <ol className="space-y-4">
                 {AGENT_STEPS.map((step, index) => {
@@ -439,7 +439,7 @@ export default function ScriptStudio() {
                 <StatCard icon={Clapperboard} label="分集" value={counts.episodes} />
                 <StatCard icon={Image} label="场景" value={counts.scenes} />
                 <StatCard icon={Box} label="道具" value={counts.props} />
-                <StatCard icon={Users} label="人物" value={counts.characters} />
+                <StatCard icon={Users} label="角色" value={counts.characters} />
               </div>
               <Card className="border-0 bg-[hsl(var(--surface-container-lowest))] p-6 rounded-2xl shadow-none">
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
@@ -505,7 +505,7 @@ export default function ScriptStudio() {
                     excluded={excluded}
                     onToggle={toggleExcluded}
                     render={(item) => <CharacterCard character={item} />}
-                    empty="没有拆出人物"
+                    empty="没有拆出角色"
                   />
                 ) : null}
               </Card>
@@ -544,13 +544,13 @@ export default function ScriptStudio() {
                 把一篇故事变成一套制作清单
               </h2>
               <p className="text-[hsl(var(--secondary))] max-w-lg mb-8 leading-relaxed">
-                上传 txt 或 md，剧本 Agent 会一次性拆出剧情主线、分集、场景、道具和人物。解析完成后会自动写入当前项目，也可再核对后手动补写。
+                上传 txt 或 md，剧本 Agent 会一次性拆出剧情主线、分集、场景、道具和角色。解析完成后会自动写入当前项目，也可再核对后手动补写。
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <GhostHint icon={FileText} title="剧情" desc="一句话故事 + 梗概" />
                 <GhostHint icon={Clapperboard} title="分集" desc="按情节切开的集数" />
                 <GhostHint icon={Image} title="场景" desc="地点、时段与氛围" />
-                <GhostHint icon={Users} title="人物 / 道具" desc="可直接进入资产库" />
+                <GhostHint icon={Users} title="角色 / 道具" desc="可直接进入资产库" />
               </div>
             </Card>
           )}

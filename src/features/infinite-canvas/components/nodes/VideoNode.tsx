@@ -209,7 +209,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           },
           {
             key: 'save',
-            label: '保存到我的素材',
+            label: '保存到素材库',
             icon: <FolderPlus className="h-4 w-4" />,
             onClick: handleSaveToMaterials,
             hidden: !data.url,
