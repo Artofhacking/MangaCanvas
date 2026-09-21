@@ -244,106 +244,8 @@ export default function Billing() {
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-          {superAdmin ? (
-            <section className="rounded-2xl bg-[hsl(var(--surface-container-lowest))] p-5">
-              <h2 className="mb-4 text-base font-bold text-[hsl(var(--on-surface))]">发放积分</h2>
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                <Input
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="用户邮箱"
-                  className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
-                />
-                <Button type="button" variant="secondary" onClick={() => void handleLookup()}>
-                  查找
-                </Button>
-              </div>
-              {lookup ? (
-                <p className="mt-2 text-xs text-[hsl(var(--secondary))]">
-                  {lookup.username} · {lookup.email} · id {lookup.id}
-                </p>
-              ) : null}
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <Input
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                  placeholder="数量"
-                  className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
-                />
-                <Input
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  placeholder="说明"
-                  className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
-                />
-                <Button
-                  type="button"
-                  disabled={granting}
-                  onClick={() => void handleGrant()}
-                  className="signature-gradient rounded-xl border-0 text-white"
-                >
-                  {granting ? "发放中..." : "发放"}
-                </Button>
-              </div>
-            </section>
-          ) : (
+          {!superAdmin ? (
             <p className="text-sm text-[hsl(var(--secondary))]">积分由管理员发放，本页不支持在线支付。</p>
-          )}
-
-          {superAdmin && prices.length > 0 ? (
-            <section className="overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-lowest))]">
-              <div className="bg-[hsl(var(--surface-container-low))] px-4 py-3 text-sm font-bold text-[hsl(var(--on-surface))]">
-                价目（1 积分 = ¥0.01）
-              </div>
-              <table className="w-full text-sm">
-                <thead className="text-left text-[hsl(var(--secondary))]">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">模型</th>
-                    <th className="px-4 py-2 font-medium">单位</th>
-                    <th className="px-4 py-2 font-medium">规格</th>
-                    <th className="px-4 py-2 font-medium text-right">单价</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {prices.map((row) => (
-                    <tr key={row.id} className="border-t border-[hsl(var(--outline-variant))]/15">
-                      <td className="px-4 py-2 text-[hsl(var(--on-surface))]">{row.modelId}</td>
-                      <td className="px-4 py-2 text-[hsl(var(--on-surface))]">{row.unit}</td>
-                      <td className="px-4 py-2 text-[hsl(var(--secondary))]">
-                        {[row.quality, row.resolution].filter(Boolean).join(" / ") || "—"}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {editingId === row.id ? (
-                          <span className="inline-flex items-center gap-2">
-                            <Input
-                              className="h-8 w-20 rounded-xl border-none bg-[hsl(var(--surface-container-low))]"
-                              value={editingValue}
-                              onChange={(event) => setEditingValue(event.target.value)}
-                            />
-                            <button
-                              className="text-[hsl(var(--primary))]"
-                              onClick={() => void handleSavePrice(row.id)}
-                            >
-                              保存
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            className="font-semibold text-[hsl(var(--on-surface))]"
-                            onClick={() => {
-                              setEditingId(row.id)
-                              setEditingValue(String(row.creditsPerUnit))
-                            }}
-                          >
-                            {row.creditsPerUnit}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
           ) : null}
 
           <section className="overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-lowest))]">
@@ -410,6 +312,106 @@ export default function Billing() {
               </>
             )}
           </section>
+
+          {superAdmin ? (
+            <section className="rounded-2xl bg-[hsl(var(--surface-container-lowest))] p-5">
+              <h2 className="mb-4 text-base font-bold text-[hsl(var(--on-surface))]">发放积分</h2>
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <Input
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="用户邮箱"
+                  className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+                />
+                <Button type="button" variant="secondary" onClick={() => void handleLookup()}>
+                  查找
+                </Button>
+              </div>
+              {lookup ? (
+                <p className="mt-2 text-xs text-[hsl(var(--secondary))]">
+                  {lookup.username} · {lookup.email} · id {lookup.id}
+                </p>
+              ) : null}
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <Input
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  placeholder="数量"
+                  className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+                />
+                <Input
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="说明"
+                  className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+                />
+                <Button
+                  type="button"
+                  disabled={granting}
+                  onClick={() => void handleGrant()}
+                  className="signature-gradient rounded-xl border-0 text-white"
+                >
+                  {granting ? "发放中..." : "发放"}
+                </Button>
+              </div>
+            </section>
+          ) : null}
+
+          {superAdmin && prices.length > 0 ? (
+            <details className="overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-lowest))]">
+              <summary className="cursor-pointer bg-[hsl(var(--surface-container-low))] px-4 py-3 text-sm font-bold text-[hsl(var(--on-surface))]">
+                价目（1 积分 = ¥0.01）· {prices.length} 条
+              </summary>
+              <table className="w-full text-sm">
+                <thead className="text-left text-[hsl(var(--secondary))]">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">模型</th>
+                    <th className="px-4 py-2 font-medium">单位</th>
+                    <th className="px-4 py-2 font-medium">规格</th>
+                    <th className="px-4 py-2 font-medium text-right">单价</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prices.map((row) => (
+                    <tr key={row.id} className="border-t border-[hsl(var(--outline-variant))]/15">
+                      <td className="px-4 py-2 text-[hsl(var(--on-surface))]">{row.modelId}</td>
+                      <td className="px-4 py-2 text-[hsl(var(--on-surface))]">{row.unit}</td>
+                      <td className="px-4 py-2 text-[hsl(var(--secondary))]">
+                        {[row.quality, row.resolution].filter(Boolean).join(" / ") || "—"}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {editingId === row.id ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Input
+                              className="h-8 w-20 rounded-xl border-none bg-[hsl(var(--surface-container-low))]"
+                              value={editingValue}
+                              onChange={(event) => setEditingValue(event.target.value)}
+                            />
+                            <button
+                              className="text-[hsl(var(--primary))]"
+                              onClick={() => void handleSavePrice(row.id)}
+                            >
+                              保存
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            className="font-semibold text-[hsl(var(--on-surface))]"
+                            onClick={() => {
+                              setEditingId(row.id)
+                              setEditingValue(String(row.creditsPerUnit))
+                            }}
+                          >
+                            {row.creditsPerUnit}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          ) : null}
         </div>
       )}
     </WorkspaceLayout>
