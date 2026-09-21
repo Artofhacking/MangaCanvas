@@ -479,6 +479,18 @@ function App() {
           <Route path="/project/:projectId/episode/:episodeId" element={<RequireAuth><EpisodeDetail /></RequireAuth>} />
           <Route path="/project/:id/:tab" element={<RequireAuth><RedirectLegacyAssetTab /></RequireAuth>} />
           <Route path="/project/:id" element={<RequireAuth><RedirectProjectRoot /></RequireAuth>} />
+          <Route
+            path="*"
+            element={
+              <div className="flex min-h-screen flex-col items-center justify-center bg-[hsl(var(--surface))] px-6 text-center">
+                <h1 className="text-2xl font-black text-[hsl(var(--on-surface))]">页面不存在</h1>
+                <p className="mt-2 text-sm text-[hsl(var(--secondary))]">请检查地址，或返回工作台。</p>
+                <Link to="/dashboard" className="mt-6 text-sm font-semibold text-[hsl(var(--primary))]">
+                  返回工作台
+                </Link>
+              </div>
+            }
+          />
         </Routes>
       </Suspense>
     </BrowserRouter>
