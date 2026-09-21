@@ -1,4 +1,5 @@
 import { HttpError } from '@/api/core/error'
+import { createRandomUuid } from '@/lib/randomUuid'
 import { applySessionCredits } from '@/lib/session'
 
 export interface BillingPayload {
@@ -45,7 +46,7 @@ export function shouldRetrySameIdempotencyKey(error: unknown) {
 }
 
 export async function withIdempotentGenerate<T>(run: (key: string) => Promise<T>): Promise<T> {
-  const key = crypto.randomUUID()
+  const key = createRandomUuid()
   for (;;) {
     try {
       return await run(key)
