@@ -38,6 +38,9 @@ const GenerateSettingsPreview = import.meta.env.DEV
 const TextNodePreview = import.meta.env.DEV
   ? lazy(() => import("./pages/dev/TextNodePreview"))
   : null
+const GenerateDockPreview = import.meta.env.DEV
+  ? lazy(() => import("./pages/dev/GenerateDockPreview"))
+  : null
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
@@ -447,6 +450,9 @@ function App() {
           ) : null}
           {import.meta.env.DEV && TextNodePreview ? (
             <Route path="/dev/text-node" element={<TextNodePreview />} />
+          ) : null}
+          {import.meta.env.DEV && GenerateDockPreview ? (
+            <Route path="/dev/generate-dock" element={<GenerateDockPreview />} />
           ) : null}
 
           <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
