@@ -1,5 +1,15 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { ReferenceSlot } from '../utils/generateSlots'
+import { fitMentionPromptHeight, syncOverlayScroll } from '../utils/mentionPromptLayout'
 import {
   filterMentionSlots,
   getAtQuery,
@@ -51,8 +61,30 @@ function HighlightedPrompt({ value, slots }: { value: string; slots: ReferenceSl
 const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInputProps>(
   ({ value, slots, placeholder, onChange }, ref) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const highlightRef = useRef<HTMLDivElement>(null)
     const [caret, setCaret] = useState(0)
     const [activeIndex, setActiveIndex] = useState(0)
+
+    const syncHighlightScroll = useCallback(() => {
+      const el = textareaRef.current
+      const overlay = highlightRef.current
+      if (!el || !overlay) return
+      syncOverlayScroll(el, overlay)
+    }, [])
+
+    const syncTextareaLayout = useCallback(() => {
+      const el = textareaRef.current
+      if (!el) return
+      const caretAtEnd = el.selectionStart >= el.value.length
+      const prevScroll = el.scrollTop
+      fitMentionPromptHeight(el)
+      el.scrollTop = caretAtEnd ? el.scrollHeight : prevScroll
+      syncHighlightScroll()
+    }, [syncHighlightScroll])
+
+    useLayoutEffect(() => {
+      syncTextareaLayout()
+    }, [syncTextareaLayout, value])
 
     const atQuery = useMemo(() => getAtQuery(value, caret), [caret, value])
     const filtered = useMemo(
@@ -74,6 +106,7 @@ const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInp
         el.focus()
         el.setSelectionRange(next.caret, next.caret)
         setCaret(next.caret)
+        syncTextareaLayout()
       })
     }
 
@@ -172,8 +205,9 @@ const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInp
 
         <div className="relative">
           <div
+            ref={highlightRef}
             aria-hidden
-            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2.5 text-sm leading-5 text-[hsl(var(--on-surface))]"
+            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2.5 text-sm leading-5 text-[hsl(var(--on-surface))] [scrollbar-gutter:stable]"
           >
             {value ? (
               <HighlightedPrompt value={value} slots={slots} />
@@ -188,12 +222,13 @@ const MentionPromptInput = forwardRef<MentionPromptInputHandle, MentionPromptInp
               onChange(event.target.value)
               setCaret(event.target.selectionStart)
             }}
+            onScroll={syncHighlightScroll}
             onKeyDown={handleKeyDown}
             onClick={(event) => syncCaret(event.currentTarget)}
             onKeyUp={(event) => syncCaret(event.currentTarget)}
             onSelect={(event) => syncCaret(event.currentTarget)}
             spellCheck={false}
-            className="min-h-[120px] w-full resize-none rounded-2xl bg-[hsl(var(--surface-container-low))] px-3 py-2.5 text-sm leading-5 text-transparent caret-[hsl(var(--on-surface))] placeholder:text-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+            className="min-h-[120px] max-h-[min(45vh,320px)] w-full resize-none overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-2xl bg-[hsl(var(--surface-container-low))] px-3 py-2.5 text-sm leading-5 text-transparent caret-[hsl(var(--on-surface))] placeholder:text-transparent [scrollbar-gutter:stable] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
           />
         </div>
       </div>
