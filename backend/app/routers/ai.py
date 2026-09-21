@@ -19,7 +19,6 @@ from ..ai_media import (
     openai_video_generate,
     openai_video_size,
     persist_openai_images,
-    persist_placeholder,
     persist_remote_url,
     _is_local_url,
     video_template_prompt,
@@ -47,13 +46,10 @@ def _record_usage(db: Session, user: models.User, description: str, reference_ty
     )
 
 
-async def _persist_or_placeholder(url: str | None) -> str:
-    if url:
-        try:
-            return await persist_remote_url(url)
-        except ApiError:
-            pass
-    return persist_placeholder()
+async def _persist_generated_url(url: str | None) -> str:
+    if not url:
+        fail(3001, "生成成功但未找到图片地址", 502)
+    return await persist_remote_url(url)
 
 
 @router.post("/images/generations")
@@ -89,7 +85,7 @@ async def images(request: Request, user: models.User = Depends(current_user), db
                 },
             )
             url = extract_media_url(payload)
-            persisted = await _persist_or_placeholder(url)
+            persisted = await _persist_generated_url(url)
             return ok({"created": int(time.time()), "data": [{"url": persisted}]})
 
         if settings.openai_api_key:
@@ -107,16 +103,15 @@ async def images(request: Request, user: models.User = Depends(current_user), db
             urls = persist_openai_images(payload)
             if not urls:
                 remote = extract_media_url(payload)
-                urls = [await _persist_or_placeholder(remote)]
+                urls = [await _persist_generated_url(remote)]
             else:
                 persisted = []
                 for url in urls:
-                    persisted.append(url if _is_local_url(url) else await _persist_or_placeholder(url))
+                    persisted.append(url if _is_local_url(url) else await _persist_generated_url(url))
                 urls = persisted
             return ok({"created": int(time.time()), "data": [{"url": url} for url in urls]})
 
-        urls = [persist_placeholder() for _ in range(max(n, 1))]
-        return ok({"created": int(time.time()), "data": [{"url": url} for url in urls]})
+        fail(3001, "未配置图像模型 API Key", 503)
     except ApiError:
         raise
     except Exception as exc:
