@@ -51,11 +51,22 @@ describe('GPT Image 2 support', () => {
     expect(resolveApiQuality('gpt-image-2', 'low')).toBe('low')
   })
 
-  it('only exposes catalog ratios, not a guessed 3:4 / 16:9', () => {
-    expect(availableRatios('gpt-image-2', 'standard')).toEqual(['1:1', '3:2', '2:3'])
-    expect(isRatioSupported('gpt-image-2', 'standard', '3:4')).toBe(false)
-    expect(isRatioSupported('gpt-image-2', 'standard', '16:9')).toBe(false)
+  it('exposes catalog ratios derived from sizes, including 16:9 / 3:4 / 21:9', () => {
+    expect(availableRatios('gpt-image-2', 'standard')).toEqual([
+      '1:1',
+      '9:16',
+      '16:9',
+      '3:4',
+      '4:3',
+      '3:2',
+      '2:3',
+      '21:9',
+    ])
+    expect(isRatioSupported('gpt-image-2', 'standard', '3:4')).toBe(true)
+    expect(isRatioSupported('gpt-image-2', 'standard', '16:9')).toBe(true)
+    expect(isRatioSupported('gpt-image-2', 'standard', '21:9')).toBe(true)
     expect(isRatioSupported('gpt-image-2', 'standard', '1:1')).toBe(true)
+    expect(isRatioSupported('gpt-image-2', 'standard', '1:2')).toBe(false)
   })
 
   it('maps 1:1 to 1K and 3:2 / 2:3 to 2K', () => {
@@ -70,6 +81,15 @@ describe('GPT Image 2 support', () => {
       quality: 'medium',
     })
     expect(resolveGenerateSize('gpt-image-2', 'standard', '3:2', '1k')).toBeNull()
+    expect(availableClarities('gpt-image-2', 'standard', '16:9')).toEqual(['2k'])
+    expect(resolveGenerateSize('gpt-image-2', 'standard', '16:9', '2k')).toEqual({
+      size: '1536x864',
+      quality: 'medium',
+    })
+    expect(resolveGenerateSize('gpt-image-2', 'standard', '3:4', '2k')).toEqual({
+      size: '1152x1536',
+      quality: 'medium',
+    })
   })
 })
 
@@ -123,9 +143,9 @@ describe('apply + clamp', () => {
     })
   })
 
-  it('rejects unsupported ratio and clamps GPT 3:4 down to 1:1', () => {
-    const current = { aspectRatio: '3:4', quality: 'standard' as const, clarity: '1k' as const, quantity: 2 }
-    expect(applyAspectRatio('gpt-image-2', current, '3:4').ok).toBe(false)
+  it('rejects unsupported ratio and clamps GPT 1:2 down to 1:1', () => {
+    const current = { aspectRatio: '1:2', quality: 'standard' as const, clarity: '1k' as const, quantity: 2 }
+    expect(applyAspectRatio('gpt-image-2', current, '1:2').ok).toBe(false)
     const clamped = clampGenerateSettings('gpt-image-2', current)
     expect(clamped.changed).toBe(true)
     expect(clamped.settings.aspectRatio).toBe('1:1')

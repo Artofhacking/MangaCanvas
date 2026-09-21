@@ -4,7 +4,22 @@ import { labeledSizes } from '../utils/aspectRatio';
 /**
  * Capability map keyed by GET /ai/models ids.
  * Not a picker source — empty/error live lists must not dump this catalog.
+ * Live `parameters.sizes` always wins; this list is last-resort only.
  */
+
+/** Mirrors backend `GPT_IMAGE_2_SIZES` — one pixel size per common ratio. */
+export const GPT_IMAGE_PRESET_SIZES = [
+  '1024x1024', // 1:1
+  '1536x864', // 16:9
+  '864x1536', // 9:16
+  '1536x1152', // 4:3
+  '1152x1536', // 3:4
+  '1536x1024', // 3:2
+  '1024x1536', // 2:3
+  '1792x768', // 21:9
+] as const
+
+const gptImagePresetSizeOptions = (): SizeOption[] => labeledSizes([...GPT_IMAGE_PRESET_SIZES])
 
 export const IMAGE_MODELS: ModelConfig[] = [
   {
@@ -21,7 +36,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'medium',
     },
-    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
+    getSizesByQuality: gptImagePresetSizeOptions,
   },
   {
     key: 'gpt-image-2.5-flare',
@@ -37,7 +52,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'medium',
     },
-    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
+    getSizesByQuality: gptImagePresetSizeOptions,
   },
   {
     key: 'gpt-image-2.5-sunburst',
@@ -53,7 +68,7 @@ export const IMAGE_MODELS: ModelConfig[] = [
       size: '1024x1024',
       quality: 'medium',
     },
-    getSizesByQuality: (): SizeOption[] => labeledSizes(['1024x1024', '1024x1536', '1536x1024']),
+    getSizesByQuality: gptImagePresetSizeOptions,
   },
   {
     key: 'wan2.7-image',

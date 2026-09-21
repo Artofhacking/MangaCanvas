@@ -13,6 +13,19 @@ def _quality(label: str, key: str) -> dict:
     return {"label": label, "key": key}
 
 
+# Official OpenAI gpt-image-2 accepts arbitrary WxH (both ÷16, ratio 1:3–3:1, max ~3840x2160).
+# These are product presets — one concrete pixel size per common ratio, labeled by true math.
+GPT_IMAGE_2_SIZES = [
+    "1024x1024",  # 1:1
+    "1536x864",  # 16:9
+    "864x1536",  # 9:16
+    "1536x1152",  # 4:3
+    "1152x1536",  # 3:4
+    "1536x1024",  # 3:2
+    "1024x1536",  # 2:3
+    "1792x768",  # 21:9
+]
+# Qwen / other OpenAI-shaped catalogs that still advertise the original three sizes.
 GPT_IMAGE_SIZES = ["1024x1024", "1024x1536", "1536x1024"]
 GPT_IMAGE_QUALITIES = [_quality("低", "low"), _quality("中", "medium"), _quality("高", "high")]
 WAN27_SIZES = ["1280*1280", "1104*1472", "1472*1104", "960*1696", "1696*960"]
@@ -73,21 +86,21 @@ IMAGE_CATALOG = [
         "name": "GPT Image 2 文生图",
         "owned_by": "nexcor",
         "modality": "image",
-        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
+        **_image_caps(sizes=GPT_IMAGE_2_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
     },
     {
         "id": "gpt-image-2.5-flare",
         "name": "GPT Image 2.5 Flare 文生图",
         "owned_by": "nexcor",
         "modality": "image",
-        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
+        **_image_caps(sizes=GPT_IMAGE_2_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
     },
     {
         "id": "gpt-image-2.5-sunburst",
         "name": "GPT Image 2.5 Sunburst 文生图",
         "owned_by": "nexcor",
         "modality": "image",
-        **_image_caps(sizes=GPT_IMAGE_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
+        **_image_caps(sizes=GPT_IMAGE_2_SIZES, qualities=GPT_IMAGE_QUALITIES, default_size="1024x1024", default_quality="medium"),
     },
     {
         "id": "wan2.7-image",

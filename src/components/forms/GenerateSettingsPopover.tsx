@@ -17,6 +17,7 @@ import {
   type ClarityTier,
   formatSettingsCapsule,
   GENERATE_ASPECT_RATIOS,
+  availableRatios,
   type GenerateSettings,
   isClaritySupported,
   isQualitySupported,
@@ -88,6 +89,7 @@ export function GenerateSettingsPopover({
 }: GenerateSettingsPopoverProps) {
   const { notify } = useFeedback()
   const resolvedQuantity = quantityOptions ?? (model ? listQuantityOptions(model) : [...QUANTITY_OPTIONS])
+  const ratioOptions = model ? availableRatios(model, value.quality) : [...GENERATE_ASPECT_RATIOS]
 
   useEffect(() => {
     if (!model) return
@@ -176,7 +178,7 @@ export function GenerateSettingsPopover({
           <section>
             <SectionLabel>比例</SectionLabel>
             <div className="grid grid-cols-5 gap-1.5">
-              {GENERATE_ASPECT_RATIOS.map((ratio) => {
+              {ratioOptions.map((ratio) => {
                 const active = value.aspectRatio === ratio
                 const supported = !model || isRatioSupported(model, value.quality, ratio)
                 const icon = aspectRatioIconSize(ratio)
