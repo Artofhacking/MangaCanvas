@@ -92,7 +92,7 @@ Token 刊例（每百万，Standard，2026-09-21）：
 
 Flare / Sunburst 与 `gpt-image-2` **同档 token 价**。官方计算器尚未单独给出 2.5 每张 token 数，seed 暂用 2.0 的 1024² 三档。
 
-本仓库质量映射（`openai_quality`）：缺省 / `standard` → `medium`；`hd` → `high`。尺寸映射（`openai_size`）落到 `1024x1024` / `1024x1536` / `1536x1024`。
+本仓库质量映射（`openai_quality`）：缺省 / `standard` → `medium`；`hd` → `high`。尺寸（`openai_size`）对合法 `WxH`（宽高 ÷16、比例 1:3–3:1、不超过约 3840×2160）原样透传，不再压成旧的三档。
 
 ### 1.2 万相 / 千问生图（厂商：阿里云百炼，经 nexcor 转售）
 

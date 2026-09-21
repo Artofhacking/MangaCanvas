@@ -1,6 +1,13 @@
 import asyncio
 
-from app.model_probe import IMAGE_CATALOG, VIDEO_CATALOG, TEXT_CATALOG, available_models, _cache
+from app.model_probe import (
+    GPT_IMAGE_2_SIZES,
+    IMAGE_CATALOG,
+    VIDEO_CATALOG,
+    TEXT_CATALOG,
+    available_models,
+    _cache,
+)
 
 
 def test_image_catalog_declares_generation_capabilities():
@@ -12,6 +19,13 @@ def test_image_catalog_declares_generation_capabilities():
         defaults = item["defaultParams"]
         assert defaults["size"] in params["sizes"]
         assert defaults["quality"] in {q["key"] for q in params["qualities"]}
+
+
+def test_gpt_image_2_capability_table_has_widescreen_presets():
+    gpt = next(item for item in IMAGE_CATALOG if item["id"] == "gpt-image-2")
+    assert gpt["parameters"]["sizes"] == GPT_IMAGE_2_SIZES
+    for size in ("1536x864", "864x1536", "1536x1152", "1152x1536", "1792x768"):
+        assert size in gpt["parameters"]["sizes"]
 
 
 def test_video_catalog_declares_duration_and_resolution():

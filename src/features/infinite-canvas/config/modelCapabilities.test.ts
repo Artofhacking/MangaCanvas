@@ -49,8 +49,13 @@ describe('capability lookup by id', () => {
     expect(gpt.qualities?.map((item) => item.key)).toEqual(['low', 'medium', 'high'])
     expect(gpt.getSizesByQuality?.('medium').map((item) => item.key)).toEqual([
       '1024x1024',
-      '1024x1536',
+      '1536x864',
+      '864x1536',
+      '1536x1152',
+      '1152x1536',
       '1536x1024',
+      '1024x1536',
+      '1792x768',
     ])
 
     const wan = resolveImageCapabilities('wan2.7-image')

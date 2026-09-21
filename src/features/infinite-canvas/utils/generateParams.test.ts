@@ -19,15 +19,41 @@ function imageNode(data: Partial<CustomNode['data']>): CustomNode {
 }
 
 describe('GPT Image 2 selectable ratios', () => {
-  it('exposes 1:1, 2:3, 3:2 from the model sizes — not the old 16:9/4:3/3:4/9:16 skeleton', () => {
-    expect(listImageAspectRatios('gpt-image-2')).toEqual(['3:2', '1:1', '2:3'])
+  it('derives 16:9 / 9:16 / 4:3 / 3:4 / 21:9 from the size list, labeled by true math', () => {
+    expect(listImageAspectRatios('gpt-image-2')).toEqual([
+      '21:9',
+      '16:9',
+      '3:2',
+      '4:3',
+      '1:1',
+      '3:4',
+      '2:3',
+      '9:16',
+    ])
     const keys = listImageSizes('gpt-image-2').map((item) => item.key)
-    expect(keys).toEqual(['1024x1024', '1024x1536', '1536x1024'])
+    expect(keys).toEqual([
+      '1024x1024',
+      '1536x864',
+      '864x1536',
+      '1536x1152',
+      '1152x1536',
+      '1536x1024',
+      '1024x1536',
+      '1792x768',
+    ])
     expect(listImageSizes('gpt-image-2').map((item) => item.label)).toEqual([
       '1:1 (1024x1024)',
-      '2:3 (1024x1536)',
+      '16:9 (1536x864)',
+      '9:16 (864x1536)',
+      '4:3 (1536x1152)',
+      '3:4 (1152x1536)',
       '3:2 (1536x1024)',
+      '2:3 (1024x1536)',
+      '21:9 (1792x768)',
     ])
+    expect(listImageSizes('gpt-image-2').find((item) => item.key === '1024x1536')?.label).toBe(
+      '2:3 (1024x1536)'
+    )
   })
 
   it('maps each selectable ratio to the matching generation size key', () => {
@@ -43,8 +69,41 @@ describe('GPT Image 2 selectable ratios', () => {
       size: '1536x1024',
       ratio: '3:2',
     })
-    expect(applyImageRatio('gpt-image-2', 'medium', '16:9')).toBeNull()
-    expect(applyImageRatio('gpt-image-2', 'medium', '3:4')).toBeNull()
+    expect(applyImageRatio('gpt-image-2', 'medium', '16:9')).toEqual({
+      size: '1536x864',
+      ratio: '16:9',
+    })
+    expect(applyImageRatio('gpt-image-2', 'medium', '3:4')).toEqual({
+      size: '1152x1536',
+      ratio: '3:4',
+    })
+    expect(applyImageRatio('gpt-image-2', 'medium', '1:2')).toBeNull()
+  })
+
+  it('prefers live /ai/models sizes over the last-resort catalog', () => {
+    const live = {
+      key: 'gpt-image-2',
+      label: 'GPT Image 2 文生图',
+      type: 'image' as const,
+      sizes: [
+        { key: '2048x2048', label: '1:1 (2048x2048)' },
+        { key: '1920x1088', label: '1920x1088' },
+      ],
+      getSizesByQuality: () => [
+        { key: '2048x2048', label: '1:1 (2048x2048)' },
+        { key: '1920x1088', label: '16:9 (1920x1088)' },
+      ],
+    }
+    expect(listImageSizes('gpt-image-2', 'medium', live).map((item) => item.key)).toEqual([
+      '2048x2048',
+      '1920x1088',
+    ])
+    expect(listImageAspectRatios('gpt-image-2', 'medium', live)).toEqual(['16:9', '1:1'])
+    expect(applyImageRatio('gpt-image-2', 'medium', '16:9', live)).toEqual({
+      size: '1920x1088',
+      ratio: '16:9',
+    })
+    expect(applyImageRatio('gpt-image-2', 'medium', '3:2', live)).toBeNull()
   })
 })
 

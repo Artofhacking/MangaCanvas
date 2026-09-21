@@ -119,24 +119,53 @@ def persist_b64_image(b64_data: str, suffix: str = ".png") -> str:
     return persist_bytes(base64.b64decode(b64_data), suffix)
 
 
+_GPT_IMAGE_ALIGN = 16
+_GPT_IMAGE_MIN_RATIO = 1 / 3
+_GPT_IMAGE_MAX_RATIO = 3.0
+_GPT_IMAGE_MAX_SIDE = 3840
+_GPT_IMAGE_MAX_PIXELS = 3840 * 2160
+_GPT_IMAGE_DEFAULT_SIZE = "1024x1024"
+_GPT_IMAGE_SIZE_RE = re.compile(r"^(\d+)\s*[x×*]\s*(\d+)$", re.I)
+
+
+def parse_image_size(size: str | None) -> tuple[int, int] | None:
+    raw = str(size or "").strip()
+    if not raw:
+        return None
+    match = _GPT_IMAGE_SIZE_RE.match(raw)
+    if not match:
+        return None
+    width, height = int(match.group(1)), int(match.group(2))
+    if width <= 0 or height <= 0:
+        return None
+    return width, height
+
+
+def is_valid_gpt_image_size(width: int, height: int) -> bool:
+    if width % _GPT_IMAGE_ALIGN or height % _GPT_IMAGE_ALIGN:
+        return False
+    if width > _GPT_IMAGE_MAX_SIDE or height > _GPT_IMAGE_MAX_SIDE:
+        return False
+    if width * height > _GPT_IMAGE_MAX_PIXELS:
+        return False
+    ratio = width / height
+    return _GPT_IMAGE_MIN_RATIO <= ratio <= _GPT_IMAGE_MAX_RATIO
+
+
 def openai_size(size: str | None) -> str:
-    raw = str(size or "1024x1024").replace("*", "x").lower()
-    mapping = {
-        "1280x1280": "1024x1024",
-        "1440x1440": "1024x1024",
-        "1024x1024": "1024x1024",
-        "1696x960": "1536x1024",
-        "1280x720": "1536x1024",
-        "1472x1104": "1536x1024",
-        "1280x960": "1536x1024",
-        "960x1696": "1024x1536",
-        "720x1280": "1024x1536",
-        "1104x1472": "1024x1536",
-        "960x1280": "1024x1536",
-        "1024x1536": "1024x1536",
-        "1536x1024": "1536x1024",
-    }
-    return mapping.get(raw, raw if "x" in raw else "1024x1024")
+    """Pass through valid gpt-image-2 WxH. Do not squash presets to the old three sizes."""
+    parsed = parse_image_size(size)
+    if parsed is None:
+        return _GPT_IMAGE_DEFAULT_SIZE
+    width, height = parsed
+    if is_valid_gpt_image_size(width, height):
+        return f"{width}x{height}"
+    fail(
+        1001,
+        f"无效的图片尺寸 {width}x{height}：宽高须为 16 的倍数，比例介于 1:3 与 3:1，且不超过约 3840x2160",
+        400,
+    )
+    raise RuntimeError("unreachable")
 
 
 def openai_quality(quality: str | None) -> str:

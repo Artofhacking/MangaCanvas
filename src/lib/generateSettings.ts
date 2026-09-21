@@ -1,6 +1,6 @@
 import { resolveImageCapabilities } from '@/features/infinite-canvas/config/modelCapabilities'
 import { listImageSizes, listQuantityOptions } from '@/features/infinite-canvas/utils/generateParams'
-import { getSizeRatio, parseSizeDimensions } from '@/features/infinite-canvas/utils/aspectRatio'
+import { getSizeRatio, parseSizeDimensions, uniqueAspectRatios } from '@/features/infinite-canvas/utils/aspectRatio'
 import { resolveImageReferences } from '@/api/aigc'
 import type { ImageGenerateOptions } from '@/api/aigc/types'
 
@@ -143,11 +143,9 @@ export function availableClarities(model: string, quality: QualityTier, ratio: s
 }
 
 export function availableRatios(model: string, quality: QualityTier): string[] {
-  const seen = new Set<string>()
-  for (const item of listSettingsSizes(model, quality)) {
-    seen.add(getSizeRatio(item.key))
-  }
-  return GENERATE_ASPECT_RATIOS.filter((ratio) => seen.has(ratio))
+  const seen = new Set(uniqueAspectRatios(listSettingsSizes(model, quality)))
+  const ordered = GENERATE_ASPECT_RATIOS.filter((ratio) => seen.has(ratio))
+  return ordered.length ? ordered : [...seen]
 }
 
 export function resolveGenerateSize(
