@@ -168,7 +168,7 @@ describe('buildImageGenerateOptions', () => {
     })
   })
 
-  it('attaches reference images only for i2i models', () => {
+  it('attaches reference images for wan2.6-image', () => {
     const result = buildImageGenerateOptions({
       model: 'wan2.6-image',
       prompt: 'refine',
@@ -179,5 +179,29 @@ describe('buildImageGenerateOptions', () => {
       n: 1,
       images: ['https://example.com/ref.png'],
     })
+  })
+
+  it('attaches reference images for GPT Image instead of stripping them', () => {
+    const result = buildImageGenerateOptions({
+      model: 'gpt-image-2',
+      prompt: '将图片做成线稿图，保证原图的细节完整性。',
+      settings: { aspectRatio: '1:1', quality: 'standard', clarity: '1k', quantity: 1 },
+      referenceImages: ['https://example.com/city.png'],
+    })
+    expect(result).toMatchObject({
+      model: 'gpt-image-2',
+      images: ['https://example.com/city.png'],
+    })
+  })
+
+  it('errors instead of silently dropping refs on text-only models', () => {
+    expect(
+      buildImageGenerateOptions({
+        model: 'wan2.7-image',
+        prompt: 'lineart',
+        settings: { aspectRatio: '1:1', quality: 'standard', clarity: '1k', quantity: 1 },
+        referenceImages: ['https://example.com/city.png'],
+      })
+    ).toEqual({ error: '当前模型不支持参考图，请改用万相 2.6 图生图' })
   })
 })

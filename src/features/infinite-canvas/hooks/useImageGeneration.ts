@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { message } from 'antd';
-import { imageService, isI2IModel } from '@/api/aigc';
+import { imageService, resolveImageReferences } from '@/api/aigc';
 import type { TaskStatus } from '@/api/aigc';
 import { isCanceledError } from '@/api/core';
 import type { ImageGenerationParams } from '../types';
@@ -31,6 +31,17 @@ export function useImageGeneration(): UseImageGenerationReturn {
     params: ImageGenerationParams,
     onProgress?: GenerationProgressHandler
   ): Promise<string[] | null> => {
+    const refs = [
+      ...(params.images || []),
+      ...(params.image ? [params.image] : []),
+    ];
+    const resolvedRefs = resolveImageReferences(params.model, refs);
+    if (resolvedRefs.error) {
+      setError(resolvedRefs.error);
+      message.error(resolvedRefs.error);
+      throw new Error(resolvedRefs.error);
+    }
+
     setLoading(true);
     setError(null);
     setStatus('准备中...');
@@ -41,7 +52,7 @@ export function useImageGeneration(): UseImageGenerationReturn {
         prompt: params.prompt,
         size: params.size,
         quality: params.quality,
-        images: isI2IModel(params.model) ? params.images : undefined,
+        images: resolvedRefs.images,
         n: params.n,
         signal: params.signal,
         onProgress: (progress) => {

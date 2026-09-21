@@ -4,7 +4,24 @@ import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHi
 import type { ImageGenerateOptions } from './types'
 
 export const isDashScopeDirectModel = (model: string) => model.startsWith('wan')
-export const isI2IModel = (model: string) => model === 'wan2.6-image'
+
+/** Models whose /ai/images/generations path actually consumes `images`. */
+export const isI2IModel = (model: string) =>
+  model === 'wan2.6-image' || model.startsWith('gpt-image')
+
+export const UNSUPPORTED_REFERENCE_IMAGE_MESSAGE =
+  '当前模型不支持参考图，请改用万相 2.6 图生图'
+
+/** Attach refs for i2i-capable models; never silently drop them. */
+export function resolveImageReferences(
+  model: string,
+  images?: Array<string | undefined>
+): { images?: string[]; error?: string } {
+  const refs = (images || []).filter((item): item is string => Boolean(item))
+  if (!refs.length) return {}
+  if (isI2IModel(model)) return { images: refs }
+  return { error: UNSUPPORTED_REFERENCE_IMAGE_MESSAGE }
+}
 
 interface BackendImageResponse {
   created: number

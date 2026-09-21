@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { message } from 'antd'
+import { isI2IModel, UNSUPPORTED_REFERENCE_IMAGE_MESSAGE } from '@/api/aigc'
 import { isCanceledError } from '@/api/core'
 import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel, remapVideoModel } from '../config/models'
 import { useCanvasStore } from '../stores/canvasStore'
@@ -49,6 +50,11 @@ export function useNodeGenerateAction(nodeId: string | null) {
     const model = isImage
       ? ((typeof node.data.model === 'string' && node.data.model) || DEFAULT_IMAGE_MODEL)
       : remapVideoModel((typeof node.data.model === 'string' && node.data.model) || DEFAULT_VIDEO_MODEL)
+
+    if (isImage && inputs.refImages.length && !isI2IModel(model)) {
+      message.error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE)
+      return
+    }
     const modelLabel = isImage
       ? (getImageModel(model)?.label || IMAGE_MODELS.find((item) => item.key === model)?.label || model)
       : (getVideoModel(model)?.label || VIDEO_MODELS.find((item) => item.key === model)?.label || model)
