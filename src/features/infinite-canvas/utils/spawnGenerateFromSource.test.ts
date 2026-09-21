@@ -68,4 +68,47 @@ describe('spawnGenerateFromSource', () => {
     expect(node?.data.content).toBe('')
     expect(isGenerateNodeType(node?.type)).toBe(false)
   })
+
+  it('wires a text note into a 画面 node as a text reference slot', () => {
+    const textId = useCanvasStore.getState().addNode('text', { x: 0, y: 0 }, {
+      content: '夜色里的旁白',
+    })
+    const imageId = useCanvasStore.getState().addNode('imageConfig', { x: 320, y: 0 })
+
+    useCanvasStore.getState().onConnect({
+      source: textId,
+      target: imageId,
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    })
+
+    const { nodes, edges } = useCanvasStore.getState()
+    expect(edges.some((edge) => edge.source === textId && edge.target === imageId)).toBe(true)
+
+    const slots = getIncomingReferenceSlots(imageId, nodes, edges)
+    expect(slots).toHaveLength(1)
+    expect(slots[0]).toMatchObject({
+      kind: 'text',
+      sourceId: textId,
+      snippet: '夜色里的旁白',
+    })
+    expect(isGenerateNodeType(nodes.find((node) => node.id === textId)?.type)).toBe(false)
+  })
+
+  it('accepts incoming edges onto a text note', () => {
+    const imageId = useCanvasStore.getState().addNode('image', { x: 0, y: 0 }, {
+      url: 'https://example.com/ref.png',
+    })
+    const textId = useCanvasStore.getState().addNode('text', { x: 320, y: 0 })
+
+    useCanvasStore.getState().onConnect({
+      source: imageId,
+      target: textId,
+      sourceHandle: 'right',
+      targetHandle: 'left',
+    })
+
+    const { edges } = useCanvasStore.getState()
+    expect(edges.some((edge) => edge.source === imageId && edge.target === textId)).toBe(true)
+  })
 })

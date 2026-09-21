@@ -150,6 +150,7 @@ code {
   display: flex !important;
   align-items: center;
   justify-content: center;
+  z-index: 12;
 }
 
 .react-flow__handle.media-plus-handle .media-plus-handle__mark {
@@ -244,6 +245,17 @@ code {
   display: block !important;
   width: 100% !important;
   height: 100% !important;
+}
+
+.text-note-card .ant-input,
+.text-note-card textarea.ant-input,
+.text-note-card .ant-input-focused,
+.text-note-card textarea.ant-input:focus {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  color: hsl(var(--on-surface));
 }
 
 /* Ant Design Theme Integration */

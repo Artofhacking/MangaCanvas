@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { Position, NodeProps, useReactFlow } from 'reactflow';
 import { Input, message } from 'antd';
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Copy, FileText, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PlotMentionText from '@/components/PlotMentionText';
 import { mentionizePlot, seedNodeId, type PlotAsset } from '@/lib/plotMentions';
 import type { CustomNode } from '../../types';
+import { PlusHandle } from './PlusHandle';
+import { MediaPreviewCard, TEXT_NOTE_WIDTH } from './MediaPreviewCard';
 
 const { TextArea } = Input;
 const DEFAULT_TEXT_LABEL = '文本';
@@ -27,6 +29,7 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
   const [editingPlot, setEditingPlot] = useState(false);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || DEFAULT_TEXT_LABEL);
+  const displayLabel = data.label || (isActNode ? '本幕' : DEFAULT_TEXT_LABEL);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -112,102 +115,64 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
   };
 
   return (
-    <div className="relative group">
-      <div
-        className={`rounded-lg shadow-lg border-2 ${
-          selected ? 'border-[hsl(var(--primary))] shadow-[0_0_0_1px_rgba(172,46,0,0.24)]' : 'border-[var(--border-color)]'
-        } min-w-[280px] transition-colors relative`}
-        style={{ 
-          backgroundColor: 'var(--bg-primary, var(--ic-surface-container-lowest, #ffffff))',
-          borderColor: selected ? undefined : 'var(--border-color, var(--ic-outline-variant, rgba(26,26,26,0.18)))',
-        }}
+    <div className="text-note-node relative">
+      <MediaPreviewCard
+        className="text-note-card"
+        selected={selected}
+        label={displayLabel}
+        labelContent={
+          isActNode ? (
+            <PlotMentionText text={displayLabel} assets={plotAssets} onMentionClick={focusAsset} />
+          ) : undefined
+        }
+        icon={<FileText />}
+        width={TEXT_NOTE_WIDTH}
+        layout="flow"
+        isEditingLabel={isEditingLabel}
+        editLabel={editLabel}
+        onLabelDoubleClick={handleLabelDoubleClick}
+        onLabelChange={handleLabelChange}
+        onLabelBlur={handleLabelBlur}
+        onLabelKeyDown={handleLabelKeyDown}
+        handles={
+          <>
+            <PlusHandle type="target" position={Position.Left} id="left" isConnectable />
+            <PlusHandle type="source" position={Position.Right} id="right" isConnectable />
+          </>
+        }
+        actions={[
+          { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
+          { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
+        ]}
       >
-        <Handle type="target" position={Position.Left} className="!bg-[hsl(var(--primary))]" />
-        <Handle type="source" position={Position.Right} className="!bg-[hsl(var(--primary))]" />
-
-        <div
-          className={`px-4 py-2 font-semibold rounded-t-md flex items-center justify-between ${
-            selected
-              ? 'text-white'
-              : ''
-          }`}
-          style={selected ? { background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, #d73b00 100%)' } : { backgroundColor: 'var(--bg-secondary, var(--ic-surface-container-low, #f4efe9))', color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}
-        >
-          {isEditingLabel ? (
-            <Input
-              value={editLabel}
-              onChange={handleLabelChange}
-              onBlur={handleLabelBlur}
-              onKeyDown={handleLabelKeyDown}
-              autoFocus
-              size="small"
-              className="nodrag w-32 text-sm"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span 
-              className="cursor-pointer hover:opacity-80"
-              onDoubleClick={handleLabelDoubleClick}
-              title="双击编辑"
-            >
-              {isActNode ? (
-                <PlotMentionText text={`📝 ${data.label || '本幕'}`} assets={plotAssets} onMentionClick={focusAsset} />
-              ) : (
-                <>📝 {data.label || DEFAULT_TEXT_LABEL}</>
-              )}
-            </span>
-          )}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleDelete}
-              className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-              title="删除"
-              style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}
-            >
-              <DeleteOutlined style={{ fontSize: 14 }} />
-            </button>
-            <button
-              onClick={handleDuplicate}
-              className="p-1 hover:bg-black/10 rounded transition-colors cursor-pointer"
-              title="复制"
-              style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}
-            >
-              <CopyOutlined style={{ fontSize: 14 }} />
-            </button>
+        <div className="flex min-h-[200px] flex-col">
+          <div className="min-h-[148px] flex-1 px-3.5 pt-3">
+            {isActNode && !editingPlot ? (
+              <div
+                className="nodrag nowheel min-h-[148px] max-h-[240px] overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--on-surface))]"
+                onClick={() => setEditingPlot(true)}
+                title="点击编辑，点 @资产 可跳转到对应节点"
+              >
+                <PlotMentionText text={localContent} assets={plotAssets} onMentionClick={focusAsset} />
+              </div>
+            ) : (
+              <TextArea
+                value={localContent}
+                onChange={(e) => setLocalContent(e.target.value)}
+                onBlur={finishPlotEdit}
+                placeholder="输入文本、旁白或便签…"
+                rows={6}
+                autoFocus={isActNode && editingPlot}
+                className="nodrag nopan nowheel !min-h-[148px] !max-h-[240px] text-sm leading-6"
+                style={{ resize: 'none', overflowY: 'auto' }}
+              />
+            )}
+          </div>
+          <div className="px-3.5 pb-2.5 pt-1 text-[11px] tabular-nums text-[hsl(var(--secondary))]">
+            {localContent.length} 字
           </div>
         </div>
-
-        <div
-          className="p-4 space-y-2 rounded-b-lg"
-          style={{ backgroundColor: "var(--bg-primary, var(--ic-surface-container-lowest, hsl(var(--surface-container-lowest))))" }}
-        >
-          {isActNode && !editingPlot ? (
-            <div
-              className="nodrag nowheel min-h-[132px] max-h-[240px] overflow-y-auto whitespace-pre-wrap rounded-md px-2 py-1 text-sm leading-6"
-              style={{ color: 'var(--text-primary, var(--ic-on-surface, #1f1f1f))' }}
-              onClick={() => setEditingPlot(true)}
-              title="点击编辑，点 @资产 可跳转到对应节点"
-            >
-              <PlotMentionText text={localContent} assets={plotAssets} onMentionClick={focusAsset} />
-            </div>
-          ) : (
-            <TextArea
-              value={localContent}
-              onChange={(e) => setLocalContent(e.target.value)}
-              onBlur={finishPlotEdit}
-              placeholder="输入文本、旁白或便签…"
-              rows={6}
-              autoFocus={isActNode && editingPlot}
-              className="nodrag nowheel"
-              style={{ resize: 'none', maxHeight: 240, overflowY: 'auto' }}
-            />
-          )}
-
-          <div className="text-xs" style={{ color: 'var(--text-secondary, var(--ic-on-surface-variant, #6b6b6b))' }}>
-            便签 · {localContent.length} 字
-          </div>
-        </div>
-      </div>
+      </MediaPreviewCard>
     </div>
   );
 };

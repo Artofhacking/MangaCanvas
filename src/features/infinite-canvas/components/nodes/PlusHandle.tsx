@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react'
 import { Handle } from 'reactflow'
 import { cn } from '@/lib/utils'
 
-/** Circular “+” port used by image/video preview cards. */
+/** Circular “+” port used by canvas node cards (image / video / text). */
 export function PlusHandle({ className, children, style, ...props }: ComponentProps<typeof Handle>) {
   return (
     <Handle
