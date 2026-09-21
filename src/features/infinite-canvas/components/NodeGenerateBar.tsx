@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useStore, type Node as RFNode } from 'reactflow'
 import {
   ArrowUp,
   Check,
@@ -18,12 +17,14 @@ import { message } from 'antd'
 import { useCanvasStore } from '../stores/canvasStore'
 import { IMAGE_MODELS, VIDEO_MODELS, filterLiveModels, remapVideoModel } from '../config/models'
 import { useImageModels, useVideoModels } from '../hooks/useModels'
+import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
 import { useNodeGenerateAction } from '../hooks/useNodeGenerateAction'
 import {
   getIncomingReferenceSlots,
   isGenerateNodeType,
   type ReferenceSlot,
 } from '../utils/generateSlots'
+import { NodeDockOverlay } from './NodeDockOverlay'
 import {
   ASPECT_RATIOS,
   applyImageRatio,
@@ -52,7 +53,6 @@ import {
 import { cn } from '@/lib/utils'
 
 const BAR_WIDTH = 560
-const BAR_GAP = 6
 const BAR_ESTIMATED_HEIGHT = 176
 const CAPABILITY_CHIPS = [
   { id: 'mark', label: '标记', icon: Tag },
@@ -60,44 +60,6 @@ const CAPABILITY_CHIPS = [
   { id: 'cast', label: '角色库', icon: Users },
   { id: 'camera', label: '运镜', icon: Clapperboard },
 ] as const
-
-interface GenerateBarAnchor {
-  id: string
-  left: number
-  top: number
-  width: number
-  height: number
-}
-
-function useSelectedGenerateNodeId(): string | null {
-  return useCanvasStore((state) => {
-    const selected = state.nodes.filter(
-      (node) => isGenerateNodeType(node.type) && Boolean((node as unknown as RFNode).selected)
-    )
-    return selected.length === 1 ? selected[0].id : null
-  })
-}
-
-function useGenerateBarAnchor(nodeId: string | null): GenerateBarAnchor | null {
-  return useStore((state) => {
-    if (!nodeId) return null
-    const node = state.nodeInternals.get(nodeId) as
-      | (RFNode & { measured?: { width?: number; height?: number } })
-      | undefined
-    if (!node) return null
-    const [translateX, translateY, zoom] = state.transform
-    const abs = node.positionAbsolute ?? node.position
-    const width = node.width ?? node.measured?.width ?? 360
-    const height = node.height ?? node.measured?.height ?? Math.round(width * 0.85)
-    return {
-      id: nodeId,
-      left: abs.x * zoom + translateX,
-      top: abs.y * zoom + translateY,
-      width: width * zoom,
-      height: height * zoom,
-    }
-  })
-}
 
 function AspectRatioPills({
   ratios,
@@ -430,19 +392,15 @@ function SlotThumb({ slot, onInsert }: { slot: ReferenceSlot; onInsert?: (slot: 
 }
 
 const NodeGenerateBar: React.FC = () => {
-  const selectedId = useSelectedGenerateNodeId()
-  const anchor = useGenerateBarAnchor(selectedId)
+  const selectedId = useExactlySelectedNodeId(isGenerateNodeType)
   const node = useCanvasStore((state) => state.nodes.find((item) => item.id === selectedId) ?? null)
   const edges = useCanvasStore((state) => state.edges)
   const nodes = useCanvasStore((state) => state.nodes)
   const updateNode = useCanvasStore((state) => state.updateNode)
   const { send, sending } = useNodeGenerateAction(selectedId)
   const [draftPrompt, setDraftPrompt] = useState('')
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
   const mentionRef = useRef<MentionPromptInputHandle>(null)
   const prevSlotsRef = useRef<{ nodeId: string | null; slots: SlotRef[] }>({ nodeId: null, slots: [] })
-  const [barSize, setBarSize] = useState({ width: BAR_WIDTH, height: BAR_ESTIMATED_HEIGHT })
 
   const slots = useMemo(
     () => (selectedId ? getIncomingReferenceSlots(selectedId, nodes, edges) : []),
@@ -478,47 +436,13 @@ const NodeGenerateBar: React.FC = () => {
     }
   }, [draftPrompt, selectedId, slots, updateNode])
 
-  useEffect(() => {
-    const element = barRef.current
-    if (!element || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (!entry) return
-      setBarSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      })
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [selectedId])
-
   const handleModelChange = useCallback((data: Partial<CustomNode['data']>) => {
     if (!selectedId) return
     updateNode(selectedId, data)
   }, [selectedId, updateNode])
 
-  if (!selectedId || !anchor || !node) {
-    return <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20" />
-  }
-
-  const containerWidth = overlayRef.current?.clientWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1280)
-  const containerHeight = overlayRef.current?.clientHeight ?? (typeof window !== 'undefined' ? window.innerHeight : 720)
-  const spaceBelow = containerHeight - (anchor.top + anchor.height)
-  const spaceAbove = anchor.top
-  const overflowBelow = barSize.height + BAR_GAP - spaceBelow
-  // Prefer docking under the card. Flip above only when the bar would clip
-  // badly below *and* the space above is meaningfully larger.
-  const placeAbove = overflowBelow > 48 && spaceAbove > spaceBelow + 24
-  const left = Math.min(
-    Math.max(anchor.left + anchor.width / 2 - barSize.width / 2, 76),
-    Math.max(76, containerWidth - barSize.width - 16)
-  )
-  const top = placeAbove
-    ? Math.max(16, anchor.top - barSize.height - BAR_GAP)
-    : Math.min(anchor.top + anchor.height + BAR_GAP, containerHeight - 24)
-
   const handlePromptChange = (value: string) => {
+    if (!selectedId) return
     setDraftPrompt(value)
     updateNode(selectedId, { prompt: value })
   }
@@ -537,15 +461,16 @@ const NodeGenerateBar: React.FC = () => {
   }
 
   return (
-    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20">
-      <div
-        ref={barRef}
-        className="pointer-events-auto absolute nodrag nowheel nopan"
-        data-generate-bar="true"
-        style={{ left, top, width: BAR_WIDTH }}
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => event.stopPropagation()}
-      >
+    <NodeDockOverlay
+      nodeId={selectedId && node ? selectedId : null}
+      barWidth={BAR_WIDTH}
+      estimatedHeight={BAR_ESTIMATED_HEIGHT}
+      dockKey="generate"
+    >
+      {({ placeAbove }) => {
+        if (!node) return null
+        return (
+        <>
         {placeAbove ? (
           <div className="absolute left-1/2 top-full h-1.5 w-px -translate-x-1/2 bg-[hsl(var(--outline-variant))]/55" />
         ) : null}
@@ -623,8 +548,10 @@ const NodeGenerateBar: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+        </>
+        )
+      }}
+    </NodeDockOverlay>
   )
 }
 

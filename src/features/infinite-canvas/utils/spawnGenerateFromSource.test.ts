@@ -69,6 +69,19 @@ describe('spawnGenerateFromSource', () => {
     expect(isGenerateNodeType(node?.type)).toBe(false)
   })
 
+  it('persists note content without turning a selected text node into a generate entry', () => {
+    const id = useCanvasStore.getState().addNode('text', { x: 0, y: 0 })
+    useCanvasStore.getState().selectNode(id)
+    useCanvasStore.getState().updateNode(id, { content: '屋顶上的旁白' })
+
+    const { nodes } = useCanvasStore.getState()
+    const selected = nodes.filter((item) => item.selected)
+    expect(selected).toHaveLength(1)
+    expect(selected[0]?.id).toBe(id)
+    expect(selected[0]?.data.content).toBe('屋顶上的旁白')
+    expect(isGenerateNodeType(selected[0]?.type)).toBe(false)
+  })
+
   it('wires a text note into a 画面 node as a text reference slot', () => {
     const textId = useCanvasStore.getState().addNode('text', { x: 0, y: 0 }, {
       content: '夜色里的旁白',
