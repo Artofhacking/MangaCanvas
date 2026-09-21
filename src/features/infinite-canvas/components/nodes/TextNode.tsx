@@ -1,17 +1,45 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Position, NodeProps, useReactFlow } from 'reactflow';
-import { Input, message } from 'antd';
-import { Copy, FileText, Trash2 } from 'lucide-react';
+import { message } from 'antd';
+import { AlignJustify, Copy, FileText, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PlotMentionText from '@/components/PlotMentionText';
-import { mentionizePlot, seedNodeId, type PlotAsset } from '@/lib/plotMentions';
+import { seedNodeId, type PlotAsset } from '@/lib/plotMentions';
 import type { CustomNode } from '../../types';
 import { PlusHandle } from './PlusHandle';
 import { MediaPreviewCard, TEXT_NOTE_WIDTH } from './MediaPreviewCard';
+import { requestTextEditFocus } from '../../utils/textEditFocus';
 
-const { TextArea } = Input;
 const DEFAULT_TEXT_LABEL = '文本';
+
+function TextNoteEmptyState({ onWrite }: { onWrite: () => void }) {
+  return (
+    <div
+      className="flex min-h-[256px] flex-col px-7 pb-8 pt-9"
+      onClick={onWrite}
+    >
+      <div className="mb-8 flex justify-center" aria-hidden>
+        <AlignJustify className="h-7 w-7 text-[hsl(var(--on-surface-variant))]/45" strokeWidth={1.65} />
+      </div>
+      <p className="mb-3 text-[12px] leading-none text-[hsl(var(--secondary))]">尝试:</p>
+      <button
+        type="button"
+        className="nodrag nopan nowheel flex w-full items-center gap-2.5 rounded-lg py-1 text-left text-[13px] text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-low))]"
+        onClick={(event) => {
+          event.stopPropagation()
+          onWrite()
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-[hsl(var(--outline-variant))]/80 text-[hsl(var(--on-surface-variant))]">
+          <FileText className="h-2.5 w-2.5" />
+        </span>
+        自己编写内容
+      </button>
+    </div>
+  )
+}
 
 const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode, selectNode, nodes } = useCanvasStore(
@@ -24,12 +52,12 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
     }))
   );
   const { setCenter } = useReactFlow();
-  const [localContent, setLocalContent] = useState(data.content || '');
   const isActNode = id.startsWith('act_');
-  const [editingPlot, setEditingPlot] = useState(false);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || DEFAULT_TEXT_LABEL);
   const displayLabel = data.label || (isActNode ? '本幕' : DEFAULT_TEXT_LABEL);
+  const content = typeof data.content === 'string' ? data.content : '';
+  const isEmpty = content.trim().length === 0;
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -70,14 +98,6 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
     [nodes]
   )
 
-  useEffect(() => {
-    if (localContent === (data.content || '')) return;
-    const timeoutId = setTimeout(() => {
-      updateNode(id, { content: localContent });
-    }, 300);
-    return () => clearTimeout(timeoutId);
-  }, [localContent, data.content, id, updateNode]);
-
   const focusAsset = useCallback((asset: PlotAsset) => {
     const nodeId =
       nodes.find(
@@ -96,12 +116,10 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
     }
   }, [nodes, selectNode, setCenter])
 
-  const finishPlotEdit = useCallback(() => {
-    if (!isActNode) return
-    const next = mentionizePlot(localContent, plotAssets)
-    if (next !== localContent) setLocalContent(next)
-    setEditingPlot(false)
-  }, [isActNode, localContent, plotAssets])
+  const enterWrite = useCallback(() => {
+    selectNode(id)
+    requestTextEditFocus(id)
+  }, [id, selectNode])
 
   const handleDuplicate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -145,33 +163,25 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
           { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
         ]}
       >
-        <div className="flex min-h-[200px] flex-col">
-          <div className="min-h-[148px] flex-1 px-3.5 pt-3">
-            {isActNode && !editingPlot ? (
-              <div
-                className="nodrag nowheel min-h-[148px] max-h-[240px] overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--on-surface))]"
-                onClick={() => setEditingPlot(true)}
-                title="点击编辑，点 @资产 可跳转到对应节点"
-              >
-                <PlotMentionText text={localContent} assets={plotAssets} onMentionClick={focusAsset} />
-              </div>
-            ) : (
-              <TextArea
-                value={localContent}
-                onChange={(e) => setLocalContent(e.target.value)}
-                onBlur={finishPlotEdit}
-                placeholder="输入文本、旁白或便签…"
-                rows={6}
-                autoFocus={isActNode && editingPlot}
-                className="nodrag nopan nowheel !min-h-[148px] !max-h-[240px] text-sm leading-6"
-                style={{ resize: 'none', overflowY: 'auto' }}
-              />
-            )}
-          </div>
-          <div className="px-3.5 pb-2.5 pt-1 text-[11px] tabular-nums text-[hsl(var(--secondary))]">
-            {localContent.length} 字
-          </div>
-        </div>
+        {isEmpty ? (
+          <TextNoteEmptyState onWrite={enterWrite} />
+        ) : (
+          <button
+            type="button"
+            className="nodrag nowheel flex min-h-[168px] w-full flex-col px-3.5 py-3 text-left"
+            onClick={enterWrite}
+            onPointerDown={(event) => event.stopPropagation()}
+            title="在底部编辑旁白或便签"
+          >
+            <div className="max-h-[240px] overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--on-surface))]">
+              {isActNode ? (
+                <PlotMentionText text={content} assets={plotAssets} onMentionClick={focusAsset} />
+              ) : (
+                content
+              )}
+            </div>
+          </button>
+        )}
       </MediaPreviewCard>
     </div>
   );

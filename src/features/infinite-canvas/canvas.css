@@ -247,6 +247,10 @@ code {
   height: 100% !important;
 }
 
+.text-note-card.media-preview-card {
+  --media-stage: var(--surface-container-lowest);
+}
+
 .text-note-card .ant-input,
 .text-note-card textarea.ant-input,
 .text-note-card .ant-input-focused,

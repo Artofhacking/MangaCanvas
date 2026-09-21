@@ -79,6 +79,7 @@ import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
 import { hasStarterWorkflowTemplates } from './config/workflows';
 import NodeGenerateBar from './components/NodeGenerateBar';
+import TextEditBar from './components/TextEditBar';
 import ConnectDropMenu, { type ConnectDropMenuState } from './components/ConnectDropMenu';
 import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
 import { spawnGenerateFromSource } from './utils/spawnGenerateFromSource';
@@ -863,7 +864,7 @@ const CanvasInner: React.FC = () => {
     }
 
     const hit = document.elementFromPoint(point.x, point.y)
-    if (hit?.closest('.react-flow__node') || hit?.closest('[data-generate-bar]') || hit?.closest('header')) {
+    if (hit?.closest('.react-flow__node') || hit?.closest('[data-node-dock]') || hit?.closest('[data-generate-bar]') || hit?.closest('header')) {
       previewFromRef.current = null
       return
     }
@@ -1234,6 +1235,7 @@ const CanvasInner: React.FC = () => {
           <MiniMap position="bottom-right" pannable zoomable />
         </ReactFlow>
         <NodeGenerateBar />
+        <TextEditBar />
         {connectDropMenu ? (
           <ConnectDropMenu
             state={connectDropMenu}
