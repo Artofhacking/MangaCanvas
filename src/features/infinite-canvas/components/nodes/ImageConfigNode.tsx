@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Download, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Copy, Download, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
 import PreviewModal from '../PreviewModal';
+import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import { PlusHandle } from './PlusHandle';
 import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
 import {
@@ -30,6 +31,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '画面节点');
   const [showPreview, setShowPreview] = useState(false);
+  const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const hasMedia = Boolean(data.url);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -81,6 +83,15 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     message.success('下载成功');
   }, [data.url]);
 
+  const handleSaveToMaterials = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!data.url) {
+      message.info('当前节点还没有图片');
+      return;
+    }
+    setShowSaveToMaterialsModal(true);
+  }, [data.url]);
+
   return (
     <>
       <MediaPreviewCard
@@ -108,6 +119,13 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
           </>
         }
         actions={[
+          {
+            key: 'save',
+            label: '保存到我的素材',
+            icon: <FolderPlus className="h-4 w-4" />,
+            onClick: handleSaveToMaterials,
+            hidden: !hasMedia,
+          },
           { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !hasMedia },
           { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
           { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
@@ -142,12 +160,24 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         type="image"
         url={mediaUrl(data.url)}
         title={data.label || '图片预览'}
+        nodeId={id}
+        initialCategory={typeof data.sourceType === 'string' ? data.sourceType : undefined}
         params={{
           prompt: data.prompt,
           model: data.model,
           ratio: nodeAspectRatio(data),
           size: data.size,
         }}
+      />
+
+      <SaveToMaterialsModal
+        open={showSaveToMaterialsModal}
+        onClose={() => setShowSaveToMaterialsModal(false)}
+        imageUrl={mediaUrl(data.url) || undefined}
+        initialName={data.label || '图片素材'}
+        initialCategory={typeof data.sourceType === 'string' ? data.sourceType : undefined}
+        nodeId={id}
+        prompt={typeof data.prompt === 'string' ? data.prompt : undefined}
       />
     </>
   );
