@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { fitMentionPromptHeight, syncOverlayScroll } from './mentionPromptLayout'
+import {
+  fitMentionPromptHeight,
+  MENTION_PROMPT_FIELD_CLASS,
+  MENTION_PROMPT_OVERLAY_SCROLL_CLASS,
+  MENTION_PROMPT_TEXTAREA_SCROLL_CLASS,
+  MENTION_TOKEN_BROKEN_CLASS,
+  MENTION_TOKEN_MARK_CLASS,
+  MENTION_TOKEN_OK_CLASS,
+  mentionTokenShiftsLayout,
+  syncOverlayScroll,
+} from './mentionPromptLayout'
 
 describe('fitMentionPromptHeight', () => {
   it('keeps the min height when content is shorter', () => {
@@ -36,5 +46,34 @@ describe('syncOverlayScroll', () => {
     const overlay = { scrollTop: 0, scrollLeft: 0 }
     syncOverlayScroll({ scrollTop: 42, scrollLeft: 7 }, overlay)
     expect(overlay).toEqual({ scrollTop: 42, scrollLeft: 7 })
+  })
+})
+
+describe('mention prompt field metrics', () => {
+  it('resets inherited cn-keep wrap so overlay and textarea share CJK line breaks', () => {
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('[word-break:normal]')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('[line-break:auto]')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('[overflow-wrap:break-word]')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('whitespace-pre-wrap')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('leading-5')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('px-3')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('py-2.5')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('[font-family:inherit]')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('[scrollbar-gutter:stable]')
+  })
+
+  it('keeps overlay and textarea on the same scroll + gutter model', () => {
+    expect(MENTION_PROMPT_OVERLAY_SCROLL_CLASS).toContain('overflow-y-auto')
+    expect(MENTION_PROMPT_TEXTAREA_SCROLL_CLASS).toContain('overflow-y-auto')
+    expect(MENTION_PROMPT_FIELD_CLASS).toContain('[scrollbar-gutter:stable]')
+  })
+
+  it('paints mention marks without padding or weight that changes wrap width', () => {
+    const mark = `${MENTION_TOKEN_MARK_CLASS} ${MENTION_TOKEN_OK_CLASS}`
+    const broken = `${MENTION_TOKEN_MARK_CLASS} ${MENTION_TOKEN_BROKEN_CLASS}`
+    expect(mentionTokenShiftsLayout(mark)).toBe(false)
+    expect(mentionTokenShiftsLayout(broken)).toBe(false)
+    expect(mentionTokenShiftsLayout('rounded-md px-0.5 font-semibold')).toBe(true)
+    expect(mentionTokenShiftsLayout('mx-0.5 font-bold')).toBe(true)
   })
 })

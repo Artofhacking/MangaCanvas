@@ -188,3 +188,29 @@ Keep a one-line summary capsule in the prompt footer and open the settings as a 
 
 - `src/components/forms/GenerateSettingsPopover.tsx`
 - `src/components/forms/ImageGenerationForm.tsx`
+
+## Case 008: Canvas generate-bar prompt overlay drifts after long Chinese text
+
+### Symptom
+
+On a canvas 画面节点, pasting a long Chinese prompt into `MentionPromptInput` made the visible glyphs and the textarea caret diverge. Lines wrapped at different points, and mention chips looked offset or double-printed.
+
+### Root cause
+
+The field is a transparent textarea under a highlight overlay. Mention tokens used `px-0.5 font-semibold`, which changed measured wrap width versus the plain textarea text. The overlay DIV also inherited canvas `.cn-keep` (`word-break: keep-all` + `line-break: strict`) while the textarea used native wrapping, and `overflow-hidden` vs `overflow-y-auto` plus `scrollbar-gutter` reserved different content widths.
+
+### Fix
+
+Share one field metric class for overlay and textarea (same font, weight, letter-spacing, padding, line-height, white-space, word-break, overflow-wrap, line-break, scrollbar gutter). Reset inherited `cn-keep` wrap. Paint mentions with background/color only (`box-decoration-break: clone`, no horizontal padding or bold). Keep auto-grow + `syncOverlayScroll` from PR #32, but give the overlay the same `overflow-y-auto` model with an invisible scrollbar so widths stay aligned.
+
+### Why this fix fit the project
+
+- The generate bar already used the overlay highlighter; the bug was measurement mismatch, not the mention UX.
+- Canvas pages rely on `.cn-keep` for chrome labels, so the prompt field has to opt out locally rather than changing the shell.
+- Layout-neutral mention paint keeps `@n` chips readable without shifting CJK wrap.
+
+### Implementation reference
+
+- `src/features/infinite-canvas/components/MentionPromptInput.tsx`
+- `src/features/infinite-canvas/utils/mentionPromptLayout.ts`
+- `src/features/infinite-canvas/utils/mentionPromptLayout.test.ts`
