@@ -18,8 +18,6 @@ import {
   DeploymentUnitOutlined,
   UndoOutlined,
   RedoOutlined,
-  AimOutlined,
-  MinusOutlined,
   FontSizeOutlined,
   PictureOutlined,
   BgColorsOutlined,
@@ -80,6 +78,7 @@ import WorkflowPanel from './components/WorkflowPanel';
 import MaterialPanel, { MATERIAL_DRAG_MIME } from './components/MaterialPanel';
 import { hasStarterWorkflowTemplates } from './config/workflows';
 import NodeGenerateBar from './components/NodeGenerateBar';
+import { CanvasZoomControls } from './components/CanvasZoomControls';
 import TextEditBar from './components/TextEditBar';
 import ConnectDropMenu, { type ConnectDropMenuState } from './components/ConnectDropMenu';
 import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
@@ -111,7 +110,7 @@ const CanvasInner: React.FC = () => {
   }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
   const canvasPaneRef = useRef<HTMLDivElement>(null);
   useTwoFingerPan(canvasPaneRef);
   const canvasDocumentId = workflowId;
@@ -1216,6 +1215,7 @@ const CanvasInner: React.FC = () => {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultViewport={viewport}
+          // Persist RF viewport after gestures; the % label reads transform[2] live via useStore.
           onMoveEnd={(_, newViewport) => updateViewport(newViewport)}
           onPaneClick={handlePaneClick}
           fitView
@@ -1376,25 +1376,7 @@ const CanvasInner: React.FC = () => {
         )}
 
         <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-[20px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/90 p-1.5 shadow-xl shadow-black/5 backdrop-blur-md">
-          <button
-            onClick={() => fitView({ padding: 0.2 })}
-            className="rounded-xl p-2.5 text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors"
-            title="适应视图"
-          >
-            <AimOutlined style={{ fontSize: 16 }} />
-          </button>
-          <div className="h-5 w-px bg-[hsl(var(--outline-variant))]/40" />
-          <div className="flex items-center gap-1 px-2">
-            <button onClick={() => zoomOut()} className="rounded-lg p-1.5 text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors">
-              <MinusOutlined style={{ fontSize: 14 }} />
-            </button>
-            <span className="min-w-[48px] text-center text-xs font-medium text-[hsl(var(--secondary))]">
-              {Math.round(viewport.zoom * 100)}%
-            </span>
-            <button onClick={() => zoomIn()} className="rounded-lg p-1.5 text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors">
-              <PlusOutlined style={{ fontSize: 14 }} />
-            </button>
-          </div>
+          <CanvasZoomControls />
           <div className="h-5 w-px bg-[hsl(var(--outline-variant))]/40" />
           <button
             onClick={handleToggleLock}
