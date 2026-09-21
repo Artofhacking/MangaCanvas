@@ -43,6 +43,9 @@ import {
 } from '../utils/generateParams'
 import { aspectRatioIconSize } from '../utils/aspectRatio'
 import { reconcilePromptMentions, type SlotRef } from '../utils/promptMentions'
+import { creditsApi, type CreditQuote } from '@/api/creditsApi'
+import { HttpError } from '@/api/core/error'
+import { resolveProjectId } from '@/lib/session'
 import type { CustomNode, ModelConfig } from '../types'
 import MentionPromptInput, { type MentionPromptInputHandle } from './MentionPromptInput'
 import { Button } from '@/components/ui/button'
@@ -510,6 +513,8 @@ const NodeGenerateBar: React.FC = () => {
   const updateNode = useCanvasStore((state) => state.updateNode)
   const { send, sending } = useNodeGenerateAction(selectedId)
   const [draftPrompt, setDraftPrompt] = useState('')
+  const [quote, setQuote] = useState<CreditQuote | null>(null)
+  const [quoteError, setQuoteError] = useState('')
   const mentionRef = useRef<MentionPromptInputHandle>(null)
   const prevSlotsRef = useRef<{ nodeId: string | null; slots: SlotRef[] }>({ nodeId: null, slots: [] })
 
@@ -552,6 +557,55 @@ const NodeGenerateBar: React.FC = () => {
     updateNode(selectedId, data)
   }, [selectedId, updateNode])
 
+  useEffect(() => {
+    if (!node) {
+      setQuote(null)
+      return
+    }
+    const projectId = resolveProjectId()
+    const timer = window.setTimeout(() => {
+      const payload =
+        node.type === 'videoConfig'
+          ? {
+              model: String(node.data.model || 'happyhorse-1.1-t2v'),
+              modality: 'video' as const,
+              size: node.data.size,
+              resolution: node.data.resolution,
+              duration: Number(node.data.duration || 5),
+              imageCount: slots.filter((slot) => !slot.dead).length,
+              projectId,
+            }
+          : {
+              model: String(node.data.model || 'gpt-image-2'),
+              modality: 'image' as const,
+              quality: node.data.quality,
+              size: node.data.size,
+              n: 1,
+              projectId,
+            }
+      creditsApi
+        .quote(payload)
+        .then((result) => {
+          setQuote(result)
+          setQuoteError('')
+        })
+        .catch((error: unknown) => {
+          setQuote(null)
+          setQuoteError(error instanceof Error ? error.message : '估价失败')
+        })
+    }, 280)
+    return () => window.clearTimeout(timer)
+  }, [
+    node,
+    node?.data.model,
+    node?.data.quality,
+    node?.data.size,
+    node?.data.resolution,
+    node?.data.duration,
+    node?.type,
+    slots,
+  ])
+
   const handlePromptChange = (value: string) => {
     if (!selectedId) return
     setDraftPrompt(value)
@@ -566,9 +620,20 @@ const NodeGenerateBar: React.FC = () => {
     message.info('能力面板将在后续版本接入')
   }
 
+  const insufficient = Boolean(quote && (!quote.sufficient || !quote.quotaOk))
+  const blockedReason = quote && !quote.sufficient ? '积分不足' : quote && !quote.quotaOk ? (quote.message || '额度不足') : quoteError
+
   const handleSend = (event: React.MouseEvent) => {
     event.stopPropagation()
-    void send(draftPrompt)
+    if (insufficient) {
+      message.warning(blockedReason || '积分不足')
+      return
+    }
+    void send(draftPrompt).catch((error: unknown) => {
+      const code = error instanceof HttpError ? Number(error.code) : NaN
+      if (code === 2003) message.warning('积分不足')
+      else if (code === 2004) message.warning('额度不足')
+    })
   }
 
   return (
@@ -651,13 +716,18 @@ const NodeGenerateBar: React.FC = () => {
             </div>
             <DockDivider />
             <GenerateBarModelPicker node={node} onChange={handleModelChange} />
+            {quote ? (
+              <span className={`shrink-0 text-[11px] font-semibold ${insufficient ? 'text-red-600' : 'text-[hsl(var(--secondary))]'}`}>
+                {quote.credits} 积分
+              </span>
+            ) : null}
             <DockDivider />
             <button
               type="button"
               onClick={handleSend}
-              disabled={sending}
+              disabled={sending || insufficient}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50"
-              title="发送生成"
+              title={insufficient ? blockedReason || '积分不足' : '发送生成'}
             >
               <ArrowUp className={cn('h-4 w-4', sending && 'animate-pulse')} />
             </button>

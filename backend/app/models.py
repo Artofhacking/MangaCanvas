@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -279,8 +279,54 @@ class UploadedFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class BillingPriceRule(Base):
+    __tablename__ = "billing_price_rules"
+    __table_args__ = (
+        UniqueConstraint("model_id", "unit", "quality", "resolution", name="uq_billing_price_rule"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    model_id: Mapped[str] = mapped_column(String(128))
+    modality: Mapped[str] = mapped_column(String(16))
+    unit: Mapped[str] = mapped_column(String(32))
+    quality: Mapped[str] = mapped_column(String(32), default="")
+    resolution: Mapped[str] = mapped_column(String(32), default="")
+    credits_per_unit: Mapped[int] = mapped_column(Integer)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class BillingReservation(Base):
+    __tablename__ = "billing_reservations"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_billing_reservation_user_key"),
+        Index("ix_billing_reservations_expiry", "status", "expires_at"),
+        Index("ix_billing_reservations_user_status", "user_id", "status"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer)
+    organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    project_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(64))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16))
+    attempt: Mapped[int] = mapped_column(Integer, default=1)
+    amount: Mapped[int] = mapped_column(Integer)
+    model_id: Mapped[str] = mapped_column(String(128))
+    modality: Mapped[str] = mapped_column(String(16))
+    quote: Mapped[dict] = mapped_column(JSON)
+    reference_type: Mapped[str] = mapped_column(String(32))
+    ledger_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
 class BillingLedger(Base):
     __tablename__ = "billing_ledger"
+    __table_args__ = (Index("ix_billing_ledger_user_id", "user_id", "id"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     organization_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     project_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -307,7 +353,7 @@ class BillingOrganizationQuota(Base):
     __tablename__ = "billing_organization_quotas"
     organization_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     quota_percent: Mapped[float] = mapped_column(Float, default=100.0)
-    quota_limit: Mapped[int] = mapped_column(BigInteger, default=1_000_000)
+    quota_limit: Mapped[int] = mapped_column(BigInteger, default=0)
     quota_consumed: Mapped[int] = mapped_column(BigInteger, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
@@ -316,7 +362,7 @@ class BillingProjectQuota(Base):
     __tablename__ = "billing_project_quotas"
     project_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     quota_percent: Mapped[float] = mapped_column(Float, default=100.0)
-    quota_limit: Mapped[int] = mapped_column(BigInteger, default=100_000)
+    quota_limit: Mapped[int] = mapped_column(BigInteger, default=0)
     quota_consumed: Mapped[int] = mapped_column(BigInteger, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
@@ -326,6 +372,6 @@ class BillingUserProjectQuota(Base):
     project_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     quota_percent: Mapped[float] = mapped_column(Float, default=100.0)
-    quota_limit: Mapped[int] = mapped_column(BigInteger, default=10_000)
+    quota_limit: Mapped[int] = mapped_column(BigInteger, default=0)
     quota_consumed: Mapped[int] = mapped_column(BigInteger, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)

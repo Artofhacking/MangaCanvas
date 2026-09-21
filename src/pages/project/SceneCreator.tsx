@@ -35,6 +35,7 @@ import {
   withExistingAssetResult,
 } from "@/store/assetGenerationStore"
 import type { Scene } from "@/types"
+import { useCreditQuote } from "@/hooks/useCreditQuote"
 
 export interface SceneCreateData {
   name: string
@@ -171,6 +172,19 @@ export default function SceneCreator({
     notify.success("场景已保存")
   }
 
+  const { costLabel, blocked } = useCreditQuote(
+    selectedModel
+      ? {
+          model: selectedModel,
+          modality: "image",
+          quality: "medium",
+          size: "1536x1024",
+          n: 1,
+          projectId: projectId ? Number(projectId) : undefined,
+        }
+      : null
+  )
+
   const handleGenerate = () => {
     if (!sceneName.trim()) {
       notify.warning("请输入场景名称")
@@ -190,6 +204,10 @@ export default function SceneCreator({
 
     if (!projectId) {
       notify.warning("缺少项目信息，无法生成")
+      return
+    }
+    if (blocked) {
+      notify.warning(blocked)
       return
     }
 
@@ -372,6 +390,8 @@ export default function SceneCreator({
             submitting={submitting}
             onSave={handleSave}
             onGenerate={handleGenerate}
+            costLabel={costLabel}
+            blockedReason={blocked}
           />
         </div>
       </SheetContent>

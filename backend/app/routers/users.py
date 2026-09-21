@@ -16,6 +16,8 @@ def lookup_user(
     user: models.User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    if not user.role or user.role.code != "super_admin":
+        fail(1003, "禁止访问", 403)
     if not email:
         fail(1001, "参数错误：email 不能为空", 400)
     found = db.query(models.User).filter_by(email=email).first()

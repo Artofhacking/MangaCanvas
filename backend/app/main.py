@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy import inspect, text
 
+from . import billing_service
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .errors import ApiError, api_error_handler
@@ -24,9 +28,11 @@ from .routers import (
     users,
     workflows,
 )
-from .seed import seed_demo_content, seed_if_empty
+from .schema_migrate import migrate_schema
+from .seed import seed_demo_content, seed_if_empty, seed_price_rules
 
 Base.metadata.create_all(bind=engine)
+migrate_schema(engine)
 try:
     inspector = inspect(engine)
     if "episodes" in inspector.get_table_names():
@@ -39,11 +45,38 @@ except Exception:
 with SessionLocal() as db:
     seed_if_empty(db)
     seed_demo_content(db)
+    seed_price_rules(db)
     db.commit()
 
 settings.upload_dir.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="MangaCanvas API", version="2.0", redirect_slashes=False)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    stop = asyncio.Event()
+
+    async def _sweep_loop():
+        while not stop.is_set():
+            try:
+                await asyncio.to_thread(billing_service.sweep_once)
+            except Exception:
+                pass
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                continue
+
+    task = asyncio.create_task(_sweep_loop())
+    try:
+        yield
+    finally:
+        stop.set()
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="MangaCanvas API", version="2.0", redirect_slashes=False, lifespan=lifespan)
 app.add_exception_handler(ApiError, api_error_handler)
 
 

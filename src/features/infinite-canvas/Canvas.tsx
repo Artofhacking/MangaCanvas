@@ -42,6 +42,7 @@ import {
   SplitCellsOutlined,
 } from '@ant-design/icons';
 import { message, Modal, Tooltip } from 'antd';
+import CreditsBadge from '@/components/layout/CreditsBadge';
 import 'reactflow/dist/style.css';
 
 import { useCanvasStore } from './stores/canvasStore';
@@ -1160,6 +1161,7 @@ const CanvasInner: React.FC = () => {
         </nav>
         
         <div className="flex items-center gap-2">
+          <CreditsBadge />
           {allowApiKeyConfig && (
             <Tooltip title="API 设置" placement="bottom">
               <button

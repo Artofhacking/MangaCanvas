@@ -11,7 +11,8 @@ import { ChevronDown, Loader2 } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { ImageGenerationForm } from "@/components/forms/ImageGenerationForm"
 import { defaultImageGenerationConfig, type ImageGenerationConfig } from "@/lib/generateSettings"
-import { generateAssetImage } from "@/lib/generateAssetImage"
+import { generateAssetImage, aspectToSize } from "@/lib/generateAssetImage"
+import { useCreditQuote } from "@/hooks/useCreditQuote"
 import type { CharacterCreateData, CharacterEditData, Character } from "@/types"
 
 const genderOptions = [
@@ -69,6 +70,17 @@ export default function CharacterForm({
   const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>(() => defaultImageGenerationConfig())
   const initializedRef = useRef(false)
   const [submitting, setSubmitting] = useState(false)
+  const { costLabel, blocked } = useCreditQuote(
+    generationConfig.model
+      ? {
+          model: generationConfig.model,
+          modality: "image",
+          quality: "medium",
+          size: aspectToSize[generationConfig.aspectRatio || "1:1"],
+          n: 1,
+        }
+      : null
+  )
 
   useEffect(() => {
     if (initializedRef.current) return
@@ -170,6 +182,10 @@ export default function CharacterForm({
     }
     if (!generationConfig.model) {
       notify.warning("暂无可用生图模型")
+      return
+    }
+    if (blocked) {
+      notify.warning(blocked)
       return
     }
 
@@ -298,7 +314,8 @@ export default function CharacterForm({
             <Button
               type="button"
               onClick={() => void handleGenerate()}
-              disabled={submitting}
+              disabled={submitting || Boolean(blocked)}
+              title={blocked}
               className="h-12 min-w-[120px] px-8 signature-gradient text-white rounded-xl font-bold text-base border-0 disabled:opacity-60"
             >
               {submitting ? (
@@ -306,6 +323,8 @@ export default function CharacterForm({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   生成中...
                 </span>
+              ) : costLabel ? (
+                `生成 · ${costLabel}`
               ) : (
                 "生成"
               )}
@@ -315,7 +334,8 @@ export default function CharacterForm({
           <Button
             type="button"
             onClick={() => void handleGenerate()}
-            disabled={submitting}
+            disabled={submitting || Boolean(blocked)}
+            title={blocked}
             className="h-12 min-w-[120px] px-8 signature-gradient text-white rounded-xl font-bold text-base border-0 disabled:opacity-60"
           >
             {submitting ? (
@@ -323,6 +343,8 @@ export default function CharacterForm({
                 <Loader2 className="h-4 w-4 animate-spin" />
                 生成中...
               </span>
+            ) : costLabel ? (
+              `生成 · ${costLabel}`
             ) : (
               "生成"
             )}

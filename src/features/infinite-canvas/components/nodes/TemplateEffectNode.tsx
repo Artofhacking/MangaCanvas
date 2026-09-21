@@ -7,6 +7,9 @@ import { useVideoGeneration } from '../../hooks';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
 import { isCanceledError } from '@/api/core';
 import { finishGenerationJob, startGenerationJob } from '../../utils/generationJobs';
+import { creditsApi } from '@/api/creditsApi';
+import { HttpError } from '@/api/core/error';
+import { resolveProjectId } from '@/lib/session';
 import type { CustomNode } from '../../types';
 import NodeSelect from '../NodeSelect';
 
@@ -62,6 +65,8 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
 
   const [localResolution, setLocalResolution] = useState<string>(data.resolution as string || '720P');
   const [localTemplate, setLocalTemplate] = useState<string>(data.template as string || '');
+  const [quoteCredits, setQuoteCredits] = useState<number | null>(null);
+  const [quoteBlocked, setQuoteBlocked] = useState('');
 
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabel, setEditLabel] = useState(data.label || '图生视频-特效');
@@ -74,6 +79,26 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       model: 'happyhorse-1.1-i2v',
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localResolution, localTemplate]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      creditsApi
+        .quote({
+          model: 'happyhorse-1.1-i2v',
+          modality: 'video',
+          resolution: localResolution,
+          duration: 5,
+          template: localTemplate || 'hug',
+          projectId: resolveProjectId(),
+        })
+        .then((result) => {
+          setQuoteCredits(result.credits)
+          setQuoteBlocked(!result.sufficient ? '积分不足' : !result.quotaOk ? result.message || '额度不足' : '')
+        })
+        .catch(() => setQuoteCredits(null))
+    }, 280)
+    return () => window.clearTimeout(timer)
   }, [localResolution, localTemplate]);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -128,6 +153,10 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
 
   // 生成视频
   const handleGenerate = async () => {
+    if (quoteBlocked) {
+      message.warning(quoteBlocked);
+      return;
+    }
     if (!localTemplate) {
       message.warning('请选择特效模板');
       return;
@@ -195,6 +224,9 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       } else if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
         removeNode(videoNodeId);
         message.warning('请求过于频繁，请稍后重试');
+      } else if (err instanceof HttpError && Number(err.code) === 2003) {
+        removeNode(videoNodeId);
+        message.warning('积分不足');
       } else {
         updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined });
       }
@@ -305,9 +337,10 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
             type="primary"
             icon={<PlayCircleOutlined />}
             onClick={handleGenerate}
+            disabled={Boolean(quoteBlocked)}
             block
           >
-            生成视频
+            {quoteCredits != null ? `生成视频 · ${quoteCredits} 积分` : '生成视频'}
           </Button>
         </div>
       </div>

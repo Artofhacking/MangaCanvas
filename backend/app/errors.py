@@ -3,20 +3,22 @@ from fastapi.responses import JSONResponse
 
 
 class ApiError(Exception):
-    def __init__(self, code: int, message: str, http_status: int = 400):
+    def __init__(self, code: int, message: str, http_status: int = 400, headers: dict[str, str] | None = None):
         self.code = code
         self.message = message
         self.http_status = http_status
+        self.headers = headers or {}
 
 
-def fail(code: int, message: str, http_status: int = 400) -> None:
-    raise ApiError(code, message, http_status)
+def fail(code: int, message: str, http_status: int = 400, headers: dict[str, str] | None = None) -> None:
+    raise ApiError(code, message, http_status, headers)
 
 
 async def api_error_handler(_request: Request, exc: ApiError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.http_status,
         content={"code": exc.code, "message": exc.message, "data": None},
+        headers=exc.headers,
     )
 
 

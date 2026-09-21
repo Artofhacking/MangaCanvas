@@ -78,6 +78,30 @@ export const saveSession = (session: SessionState) => {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
 }
 
+export const CREDITS_CHANGE_EVENT = 'mangacanvas-credits-changed'
+
+export const applySessionCredits = (credits: number) => {
+  const current = getSession()
+  if (!current) return
+  saveSession({
+    ...current,
+    user: { ...current.user, credits },
+  })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(CREDITS_CHANGE_EVENT))
+  }
+}
+
+export const resolveProjectId = (): number | undefined => {
+  const stored = getActiveProjectId()
+  if (stored) return stored
+  if (typeof window === 'undefined') return undefined
+  const match = window.location.pathname.match(/\/project\/(\d+)/)
+  if (!match) return undefined
+  const parsed = Number(match[1])
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
 export const updateSessionUser = (user: SessionUser) => {
   const current = getSession()
   if (!current) {

@@ -28,7 +28,7 @@ import { APP_HOME_PATH } from "@/lib/appHome"
 import { useEffect, useState, useMemo, useRef } from "react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { organizationApi } from "@/api"
-import { getUserOrganizationIds } from "@/lib/session"
+import { getUserOrganizationIds, getUserRoleId, isSuperAdmin } from "@/lib/session"
 
 interface Member {
   id: number
@@ -210,6 +210,11 @@ export default function Members() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {isSuperAdmin(getUserRoleId() ?? undefined) ? (
+              <Link to="/billing">
+                <Button variant="secondary">发放积分</Button>
+              </Link>
+            ) : null}
             <Button 
               className="bg-[hsl(var(--primary))] text-white hover:opacity-90"
               onClick={() => setInviteDialogOpen(true)}

@@ -1,5 +1,7 @@
 import { appClient } from '@/api/clients/appClient'
 import { requestData } from '@/api/core/response'
+import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
+import { resolveProjectId } from '@/lib/session'
 import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import type { VideoGenerateOptions } from './types'
 
@@ -22,24 +24,29 @@ export const videoService = {
     })
     options.onProgress?.({ status: 'RUNNING' })
     try {
-    const result = await requestData<{ url: string }>(appClient, {
-      url: '/ai/videos/generations',
-      method: 'POST',
-      timeout: 600000,
-      signal: options.signal,
-      data: {
-          model: options.model,
-          prompt: options.prompt,
-          firstFrameImage: options.firstFrameImage || options.images?.[0],
-          lastFrameImage: options.lastFrameImage,
-          images: options.images,
-          imageNames: options.imageNames,
-          size: options.size,
-          resolution: options.resolution,
-          duration: options.duration,
-          template: options.template,
-        },
-      })
+      const result = await withIdempotentGenerate((idempotencyKey) =>
+        requestData<{ url: string; billing?: BillingPayload }>(appClient, {
+          url: '/ai/videos/generations',
+          method: 'POST',
+          timeout: 600000,
+          signal: options.signal,
+          headers: { 'Idempotency-Key': idempotencyKey },
+          data: {
+            model: options.model,
+            prompt: options.prompt,
+            firstFrameImage: options.firstFrameImage || options.images?.[0],
+            lastFrameImage: options.lastFrameImage,
+            images: options.images,
+            imageNames: options.imageNames,
+            size: options.size,
+            resolution: options.resolution,
+            duration: options.duration,
+            template: options.template,
+            projectId: resolveProjectId(),
+          },
+        })
+      )
+      applyBillingPayload(result.billing)
       if (!result.url) {
         options.onProgress?.({ status: 'FAILED' })
         throw new Error('生成成功但未找到视频 URL')

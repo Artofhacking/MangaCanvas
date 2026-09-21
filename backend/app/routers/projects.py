@@ -113,7 +113,7 @@ def create_project(body: ProjectCreate, user: models.User = Depends(current_user
     )
     db.add(
         models.BillingProjectQuota(
-            project_id=row.id, quota_percent=100, quota_limit=100000, quota_consumed=0
+            project_id=row.id, quota_percent=100, quota_limit=0, quota_consumed=0
         )
     )
     return ok(serialize.project(row, _stats(db, row.id)))

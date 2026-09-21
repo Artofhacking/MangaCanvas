@@ -169,17 +169,23 @@ export function AssetEditorActions({
   submitting,
   onSave,
   onGenerate,
+  costLabel,
+  blockedReason,
 }: {
   hasExisting: boolean
   submitting: boolean
   onSave: () => void
   onGenerate: () => void
+  costLabel?: string | null
+  blockedReason?: string
 }) {
   const generateLabel = submitting ? (
     <span className="inline-flex items-center gap-2">
       <Loader2 className="h-5 w-5 animate-spin" />
       生成中...
     </span>
+  ) : costLabel ? (
+    `生成 · ${costLabel}`
   ) : (
     "生成"
   )
@@ -189,7 +195,8 @@ export function AssetEditorActions({
         <Button
           type="button"
           onClick={onGenerate}
-          disabled={submitting}
+          disabled={submitting || Boolean(blockedReason)}
+          title={blockedReason}
           className="w-full h-12 signature-gradient text-white rounded-xl font-bold text-lg border-0 disabled:opacity-60"
         >
           {generateLabel}
@@ -214,7 +221,8 @@ export function AssetEditorActions({
       <Button
         type="button"
         onClick={onGenerate}
-        disabled={submitting}
+        disabled={submitting || Boolean(blockedReason)}
+        title={blockedReason}
         className="h-12 flex-1 signature-gradient rounded-xl border-0 text-base font-bold text-white disabled:opacity-60"
       >
         {generateLabel}

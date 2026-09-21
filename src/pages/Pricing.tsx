@@ -6,76 +6,68 @@ import { Link } from "react-router-dom"
 
 const plans = [
   {
-    name: "免费版",
-    price: "¥0",
-    period: "/月",
-    description: "适合个人创作者入门体验",
+    name: "图像",
+    price: "5–152",
+    period: "积分/张",
+    description: "按模型和画质计价，成功出图才扣",
     icon: Sparkles,
     features: [
-      "每月 10 次场景生成",
-      "基础角色库 (5个角色)",
-      "2GB 存储空间",
-      "基础导出格式 (PNG/JPG)",
-      "社区支持",
+      "GPT Image 2 medium：39 积分/张",
+      "万相 2.7 / 千问：20 积分/张",
+      "Pro 档：50 积分/张",
+      "失败、占位图不扣分",
     ],
-    cta: "免费开始",
+    cta: "查看账单",
     popular: false,
   },
   {
-    name: "专业版",
-    price: "¥99",
-    period: "/月",
-    description: "适合专业创作者和工作室",
+    name: "视频",
+    price: "按秒",
+    period: "计费",
+    description: "HappyHorse 与其它渠道按秒×分辨率",
     icon: Zap,
     features: [
-      "每月 200 次场景生成",
-      "无限角色库",
-      "50GB 存储空间",
-      "高清导出 (4K)",
-      "批量导出功能",
-      "优先客服支持",
-      "团队协作 (3人)",
+      "HappyHorse 5 秒 720p：600 积分（待发票校准）",
+      "时长仅 5 / 10 / 15 秒",
+      "生成失败会退回预扣",
+      "由管理员发放积分使用",
     ],
-    cta: "立即升级",
+    cta: "查看账单",
     popular: true,
   },
   {
-    name: "企业版",
-    price: "¥399",
-    period: "/月",
-    description: "适合大型团队和制片公司",
+    name: "文本",
+    price: "1–78",
+    period: "积分/次",
+    description: "润色和剧本解析按次计价",
     icon: Building2,
     features: [
-      "无限场景生成",
-      "无限角色库",
-      "无限存储空间",
-      "8K 超清导出",
-      "API 接口访问",
-      "私有部署选项",
-      "专属客户经理",
-      "团队协作 (20人)",
+      "提示词润色：1–2 积分",
+      "剧本 LLM 解析：4 或 78 积分",
+      "规则拆解不扣费",
+      "不支持支付宝 / 微信自助充值",
     ],
-    cta: "联系销售",
+    cta: "联系管理员",
     popular: false,
   },
 ]
 
 const faqs = [
   {
-    q: "可以随时取消订阅吗？",
-    a: "是的，您可以随时取消订阅，取消后将在当前计费周期结束时生效。",
+    q: "如何获得积分？",
+    a: "目前只由超级管理员发放。登录后打开「积分账单」，超管可用邮箱查找用户并充值。",
   },
   {
-    q: "免费版有使用期限吗？",
-    a: "免费版永久有效，但每月有生成次数限制。",
+    q: "失败会扣分吗？",
+    a: "不会。系统会先预扣，只有拿到真实结果才入账；失败、超时、占位图会退回。",
   },
   {
-    q: "支持哪些支付方式？",
-    a: "支持支付宝、微信支付、银联卡以及企业银行转账。",
+    q: "支持支付宝或微信支付吗？",
+    a: "v1 不支持在线支付，也没有月费套餐。",
   },
   {
-    q: "可以申请退款吗？",
-    a: "购买后 7 天内如有问题可申请退款，详情请联系客服。",
+    q: "1 积分等于多少钱？",
+    a: "内部计价单位，1 积分对应 ¥0.01 的刊例换算，不能兑现实货币。",
   },
 ]
 
@@ -106,10 +98,10 @@ export default function Pricing() {
           {/* Title */}
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-black text-[hsl(var(--on-surface))] tracking-tighter mb-6">
-              选择适合你的方案
+              按次消耗积分
             </h1>
             <p className="text-xl text-[hsl(var(--secondary))] max-w-2xl mx-auto">
-              无论你是个人创作者还是专业团队，都能找到合适的方案
+              成功才扣分。积分由管理员发放，没有月费和在线支付。
             </p>
           </div>
 
@@ -153,15 +145,17 @@ export default function Pricing() {
                   ))}
                 </ul>
 
-                <Button
-                  className={`w-full py-6 rounded-xl font-bold text-base transition-all ${
-                    plan.popular
-                      ? "signature-gradient text-white hover:opacity-90"
-                      : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]"
-                  }`}
-                >
-                  {plan.cta}
-                </Button>
+                <Link to="/billing">
+                  <Button
+                    className={`w-full py-6 rounded-xl font-bold text-base transition-all ${
+                      plan.popular
+                        ? "signature-gradient text-white hover:opacity-90"
+                        : "bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]"
+                    }`}
+                  >
+                    {plan.cta}
+                  </Button>
+                </Link>
               </Card>
             ))}
           </div>
@@ -170,15 +164,17 @@ export default function Pricing() {
           <Card className="bg-[hsl(var(--on-surface))] text-[hsl(var(--surface))] p-10 rounded-2xl mb-24">
             <div className="flex flex-col md:flex-row items-center justify-between gap-8">
               <div>
-                <h2 className="text-3xl font-black mb-3">需要更多？</h2>
+                <h2 className="text-3xl font-black mb-3">需要充值？</h2>
                 <p className="text-[hsl(var(--secondary-fixed-dim))] text-lg">
-                  我们提供定制化企业解决方案，包括私有化部署、专属培训和技术支持
+                  请联系工作室超级管理员发放积分。登录后可在「积分账单」查看余额和流水。
                 </p>
               </div>
-              <Button className="bg-white text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-high))] px-8 py-6 rounded-xl font-bold text-base flex items-center gap-2">
-                联系我们
-                <ArrowRight className="w-5 h-5" />
-              </Button>
+              <Link to="/billing">
+                <Button className="bg-white text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-high))] px-8 py-6 rounded-xl font-bold text-base flex items-center gap-2">
+                  打开账单
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
             </div>
           </Card>
 

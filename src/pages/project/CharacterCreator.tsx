@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -20,6 +20,8 @@ import {
 } from "@/store/assetGenerationStore"
 import type { Character, CharacterCreateData, CharacterEditData } from "@/types"
 import CharacterForm, { type CharacterFormValues } from "./CharacterForm"
+import { useCreditQuote } from "@/hooks/useCreditQuote"
+import { aspectToSize } from "@/lib/generateAssetImage"
 
 interface CharacterCreatorProps {
   open: boolean
@@ -42,6 +44,19 @@ export default function CharacterCreator({
   const { notify } = useFeedback()
   const isEditMode = Boolean(initialData)
   const valuesRef = useRef<CharacterFormValues | null>(null)
+  const [quoteValues, setQuoteValues] = useState<CharacterFormValues | null>(null)
+  const { costLabel, blocked } = useCreditQuote(
+    quoteValues?.model
+      ? {
+          model: quoteValues.model,
+          modality: "image",
+          quality: "medium",
+          size: aspectToSize[quoteValues.aspectRatio || "1:1"],
+          n: 1,
+          projectId: projectId ? Number(projectId) : undefined,
+        }
+      : null
+  )
   const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
     useCollapsibleTaskPanel(open)
   const allTasks = useAssetGenerationStore((state) => state.tasks)
@@ -62,6 +77,7 @@ export default function CharacterCreator({
 
   const handleValuesChange = useCallback((values: CharacterFormValues) => {
     valuesRef.current = values
+    setQuoteValues(values)
   }, [])
 
   const currentValues = () => valuesRef.current
@@ -119,6 +135,10 @@ export default function CharacterCreator({
     }
     if (!projectId) {
       notify.warning("缺少项目信息，无法生成")
+      return
+    }
+    if (blocked) {
+      notify.warning(blocked)
       return
     }
     revealTaskPanel()
@@ -201,6 +221,8 @@ export default function CharacterCreator({
             submitting={submitting}
             onSave={handleSave}
             onGenerate={handleGenerate}
+            costLabel={costLabel}
+            blockedReason={blocked}
           />
         </div>
       </SheetContent>

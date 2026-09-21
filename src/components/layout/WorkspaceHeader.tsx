@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import NotificationDrawer, { demoNotifications } from "@/components/layout/NotificationDrawer"
 import UserProfileMenu from "@/components/layout/UserProfileMenu"
+import CreditsBadge from "@/components/layout/CreditsBadge"
 import { Bell, Search } from "lucide-react"
 
 interface WorkspaceHeaderProps {
@@ -49,6 +50,8 @@ export default function WorkspaceHeader({
             </div>
 
             {actions}
+
+            <CreditsBadge />
 
             <Button
               variant="ghost"

@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import NotificationDrawer, { demoNotifications } from "@/components/layout/NotificationDrawer"
 import UserProfileMenu from "@/components/layout/UserProfileMenu"
+import CreditsBadge from "@/components/layout/CreditsBadge"
 import { Search, Bell, Star } from "lucide-react"
 
 import type { ProjectTab } from "@/types"
@@ -81,6 +82,7 @@ export default function ProjectHeader({
             </span>
           )}
         </button>
+        <CreditsBadge />
         <div className="h-4 w-[1px] bg-[hsl(var(--outline-variant))]" />
         {/* User Profile Hover Menu */}
         <UserProfileMenu />

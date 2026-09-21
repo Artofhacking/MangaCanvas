@@ -2,6 +2,7 @@
 # Publish MangaCanvas from a developer machine (local fallback).
 # Production CI uses the ECS self-hosted runner — see .github/workflows/deploy.yml.
 # Does not overwrite server backend/.env (database and API keys stay on the host).
+# nginx proxy_read_timeout is 600s; video reservation TTL is 20 min — do not treat them as equal.
 #
 #   export MANGACANVAS_SSH_KEY=/path/to/key.pem
 #   npm run deploy

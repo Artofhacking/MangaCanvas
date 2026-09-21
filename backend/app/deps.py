@@ -2,7 +2,7 @@ from fastapi import Depends, Header
 from sqlalchemy.orm import Session, joinedload
 
 from . import models
-from .db import get_db
+from .db import SessionLocal, get_db
 from .errors import fail
 from .security import decode_access_token
 
@@ -27,6 +27,41 @@ def current_user(
     if not user:
         fail(1002, "未授权", 401)
     return user
+
+
+def current_user_detached(authorization: str | None = Header(default=None)) -> models.User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        fail(1002, "未授权", 401)
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        user_id = decode_access_token(token)
+    except Exception:
+        fail(1002, "未授权", 401)
+    db = SessionLocal()
+    try:
+        user = (
+            db.query(models.User)
+            .options(joinedload(models.User.role))
+            .filter(models.User.id == user_id)
+            .first()
+        )
+        if not user:
+            fail(1002, "未授权", 401)
+        db.expunge_all()
+        return user
+    finally:
+        db.close()
+
+
+def resolve_project_detached(user: models.User, project_id: int | None, write: bool = False) -> dict | None:
+    if not project_id:
+        return None
+    db = SessionLocal()
+    try:
+        project = require_project_access(db, user, int(project_id), write=write)
+        return {"id": project.id, "organization_id": project.organization_id}
+    finally:
+        db.close()
 
 
 def org_ids_of(db: Session, user_id: int) -> list[int]:

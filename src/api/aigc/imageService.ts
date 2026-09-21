@@ -1,5 +1,7 @@
 import { appClient } from '@/api/clients/appClient'
 import { requestData } from '@/api/core/response'
+import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
+import { resolveProjectId } from '@/lib/session'
 import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import type { ImageGenerateOptions } from './types'
 
@@ -26,6 +28,7 @@ export function resolveImageReferences(
 interface BackendImageResponse {
   created: number
   data: { url?: string; b64_json?: string }[]
+  billing?: BillingPayload
 }
 
 export const persistMedia = async (url: string): Promise<string> => {
@@ -48,20 +51,25 @@ export const imageService = {
     })
     options.onProgress?.({ status: 'RUNNING' })
     try {
-    const resp = await requestData<BackendImageResponse>(appClient, {
-      url: '/ai/images/generations',
-      method: 'POST',
-      signal: options.signal,
-      data: {
-          model: options.model,
-          prompt: options.prompt,
-          n: options.n ?? 1,
-          size: options.size ?? '1024x1024',
-          quality: options.quality,
-          images: options.images,
-          negative_prompt: options.negativePrompt,
-        },
-      })
+      const resp = await withIdempotentGenerate((idempotencyKey) =>
+        requestData<BackendImageResponse & { billing?: BillingPayload }>(appClient, {
+          url: '/ai/images/generations',
+          method: 'POST',
+          signal: options.signal,
+          headers: { 'Idempotency-Key': idempotencyKey },
+          data: {
+            model: options.model,
+            prompt: options.prompt,
+            n: options.n ?? 1,
+            size: options.size ?? '1024x1024',
+            quality: options.quality,
+            images: options.images,
+            negative_prompt: options.negativePrompt,
+            projectId: resolveProjectId(),
+          },
+        })
+      )
+      applyBillingPayload(resp.billing)
       const urls = (resp.data || []).map((item) => item.url).filter((url): url is string => Boolean(url))
       options.onProgress?.({ status: urls.length ? 'SUCCEEDED' : 'FAILED' })
       if (!urls.length) {

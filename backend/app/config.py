@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     seed_password: str = "123456"
     seed_username: str = "superadmin"
     allow_registration: bool = False
+    billing_enabled: bool = False
+    billing_enforce_quotas: bool = False
+    allow_placeholder: bool = False
     upload_dir: Path = ROOT / "uploads"
     feishu_app_id: str = ""
     feishu_app_secret: str = ""

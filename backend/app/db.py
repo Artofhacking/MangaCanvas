@@ -3,8 +3,12 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import settings
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
+_is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if _is_sqlite else {}
+engine_kwargs: dict = {"connect_args": connect_args, "future": True}
+if not _is_sqlite:
+    engine_kwargs.update(pool_pre_ping=True, pool_size=10, max_overflow=20)
+engine = create_engine(settings.database_url, **engine_kwargs)
 
 
 @event.listens_for(engine, "connect")

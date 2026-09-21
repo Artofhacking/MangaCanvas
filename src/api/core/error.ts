@@ -2,15 +2,20 @@ import axios, { AxiosError } from 'axios'
 
 export class HttpError extends Error {
   status?: number
-  code?: string
+  code?: number | string
   rawMessage?: string
+  url?: string
 
-  constructor(message: string, options: { status?: number; code?: string; rawMessage?: string } = {}) {
+  constructor(
+    message: string,
+    options: { status?: number; code?: number | string; rawMessage?: string; url?: string } = {}
+  ) {
     super(message)
     this.name = 'HttpError'
     this.status = options.status
     this.code = options.code
     this.rawMessage = options.rawMessage
+    this.url = options.url
   }
 }
 
@@ -69,10 +74,12 @@ export function normalizeHttpError(
     const rawMessage = extractErrorMessage(error, fallbackMessage)
     const message = getMessage?.({ error, rawMessage, fallbackMessage }) || rawMessage
 
+    const envelopeCode = error.response?.data?.code
     return new HttpError(message, {
       status: error.response?.status,
-      code: error.code,
+      code: envelopeCode ?? error.code,
       rawMessage,
+      url: error.config?.url,
     })
   }
 

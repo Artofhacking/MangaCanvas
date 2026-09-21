@@ -10,7 +10,7 @@ from .errors import fail
 
 def require_open_registration() -> None:
     if not settings.allow_registration:
-        fail(2003, "暂不开放注册", 403)
+        fail(1003, "暂不开放注册", 403)
 
 
 def hash_password(password: str) -> str:

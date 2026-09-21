@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..db import get_db
-from ..deps import current_user, require_project_access
+from ..deps import current_user, require_org_member, require_project_access
 from ..errors import fail, ok
 from ..util import iso, now
 
@@ -16,12 +16,19 @@ class QuotaIn(BaseModel):
     quotaLimit: int | None = None
 
 
+def _remaining(limit: int, consumed: int) -> int | None:
+    if limit <= 0:
+        return None
+    return max(limit - consumed, 0)
+
+
 def _org_quota(row: models.BillingOrganizationQuota) -> dict:
     return {
         "organizationId": row.organization_id,
         "quotaPercent": row.quota_percent,
         "quotaLimit": row.quota_limit,
         "quotaConsumed": row.quota_consumed,
+        "remaining": _remaining(row.quota_limit, row.quota_consumed),
         "updatedAt": iso(row.updated_at),
     }
 
@@ -32,6 +39,7 @@ def _project_quota(row: models.BillingProjectQuota) -> dict:
         "quotaPercent": row.quota_percent,
         "quotaLimit": row.quota_limit,
         "quotaConsumed": row.quota_consumed,
+        "remaining": _remaining(row.quota_limit, row.quota_consumed),
         "updatedAt": iso(row.updated_at),
     }
 
@@ -43,6 +51,7 @@ def _user_quota(row: models.BillingUserProjectQuota) -> dict:
         "quotaPercent": row.quota_percent,
         "quotaLimit": row.quota_limit,
         "quotaConsumed": row.quota_consumed,
+        "remaining": _remaining(row.quota_limit, row.quota_consumed),
         "updatedAt": iso(row.updated_at),
     }
 
@@ -58,6 +67,7 @@ def get_enterprise(user: models.User = Depends(current_user), db: Session = Depe
         {
             "quotaLimit": row.quota_limit,
             "quotaConsumed": row.quota_consumed,
+            "remaining": _remaining(row.quota_limit, row.quota_consumed),
             "updatedAt": iso(row.updated_at),
         }
     )
@@ -77,6 +87,7 @@ def put_enterprise(body: QuotaIn, user: models.User = Depends(current_user), db:
         {
             "quotaLimit": row.quota_limit,
             "quotaConsumed": row.quota_consumed,
+            "remaining": _remaining(row.quota_limit, row.quota_consumed),
             "updatedAt": iso(row.updated_at),
         }
     )
@@ -86,9 +97,10 @@ def put_enterprise(body: QuotaIn, user: models.User = Depends(current_user), db:
 def get_org_quota(
     organization_id: int, user: models.User = Depends(current_user), db: Session = Depends(get_db)
 ):
+    require_org_member(db, user, organization_id)
     row = db.get(models.BillingOrganizationQuota, organization_id)
     if not row:
-        row = models.BillingOrganizationQuota(organization_id=organization_id)
+        row = models.BillingOrganizationQuota(organization_id=organization_id, quota_limit=0, quota_consumed=0)
         db.add(row)
         db.flush()
     return ok(_org_quota(row))
@@ -104,7 +116,7 @@ def put_org_quota(
     if not user.role or user.role.code not in ("super_admin", "admin"):
         fail(1003, "禁止访问", 403)
     row = db.get(models.BillingOrganizationQuota, organization_id) or models.BillingOrganizationQuota(
-        organization_id=organization_id
+        organization_id=organization_id, quota_limit=0, quota_consumed=0
     )
     db.add(row)
     if body.quotaPercent is not None:
@@ -123,7 +135,7 @@ def get_project_quota(
     require_project_access(db, user, project_id)
     row = db.get(models.BillingProjectQuota, project_id)
     if not row:
-        row = models.BillingProjectQuota(project_id=project_id)
+        row = models.BillingProjectQuota(project_id=project_id, quota_limit=0, quota_consumed=0)
         db.add(row)
         db.flush()
     return ok(_project_quota(row))
@@ -137,7 +149,9 @@ def put_project_quota(
     db: Session = Depends(get_db),
 ):
     require_project_access(db, user, project_id, write=True)
-    row = db.get(models.BillingProjectQuota, project_id) or models.BillingProjectQuota(project_id=project_id)
+    row = db.get(models.BillingProjectQuota, project_id) or models.BillingProjectQuota(
+        project_id=project_id, quota_limit=0, quota_consumed=0
+    )
     db.add(row)
     if body.quotaPercent is not None:
         row.quota_percent = body.quotaPercent
@@ -159,7 +173,9 @@ def get_user_quota(
         .first()
     )
     if not row:
-        row = models.BillingUserProjectQuota(project_id=project_id, user_id=user_id)
+        row = models.BillingUserProjectQuota(
+            project_id=project_id, user_id=user_id, quota_limit=0, quota_consumed=0
+        )
         db.add(row)
         db.flush()
     return ok(_user_quota(row))
@@ -180,7 +196,9 @@ def put_user_quota(
         .first()
     )
     if not row:
-        row = models.BillingUserProjectQuota(project_id=project_id, user_id=user_id)
+        row = models.BillingUserProjectQuota(
+            project_id=project_id, user_id=user_id, quota_limit=0, quota_consumed=0
+        )
         db.add(row)
     if body.quotaPercent is not None:
         row.quota_percent = body.quotaPercent

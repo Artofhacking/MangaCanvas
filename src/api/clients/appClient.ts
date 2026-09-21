@@ -28,6 +28,15 @@ export const appClient = createHttpClient({
       redirectToLogin('expired')
       return
     }
+    const url = error.url || ''
+    if (
+      /\/ai\/images\/generations/.test(url) ||
+      /\/ai\/videos\/generations/.test(url) ||
+      /\/ai\/chat\/completions/.test(url) ||
+      /\/scripts\/parse/.test(url)
+    ) {
+      return
+    }
 
     message.error(error.message)
   },

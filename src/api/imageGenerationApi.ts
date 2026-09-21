@@ -5,6 +5,8 @@
 
 import { appClient } from './clients/appClient'
 import { requestData } from './core/response'
+import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
+import { resolveProjectId } from '@/lib/session'
 
 // ==================== 类型定义 ====================
 
@@ -76,11 +78,16 @@ export interface ImageGenerationResponse {
 
 export const imageGenerationApi = {
   async generate(params: ImageGenerationRequest): Promise<ImageGenerationResponse> {
-    return requestData<ImageGenerationResponse>(appClient, {
-      url: '/ai/images/generations',
-      method: 'POST',
-      data: params,
-    })
+    const response = await withIdempotentGenerate((idempotencyKey) =>
+      requestData<ImageGenerationResponse & { billing?: BillingPayload }>(appClient, {
+        url: '/ai/images/generations',
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        data: { ...params, projectId: resolveProjectId() },
+      })
+    )
+    applyBillingPayload(response.billing)
+    return response
   },
 
   async quickGenerate(

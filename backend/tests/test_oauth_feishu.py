@@ -214,7 +214,7 @@ def test_upsert_rejects_new_user_when_registration_closed(monkeypatch):
     )
     with pytest.raises(ApiError) as exc:
         upsert_feishu_user(db, profile)
-    assert exc.value.code == 2003
+    assert exc.value.code == 1003
     assert exc.value.http_status == 403
     assert db.query(models.User).count() == 0
     db.close()

@@ -26,6 +26,7 @@ const Members = lazy(() => import("./pages/Members"))
 const ProjectDetail = lazy(() => import("./pages/project"))
 const WorkflowCanvas = lazy(() => import("./pages/project/WorkflowCanvas"))
 const Pricing = lazy(() => import("./pages/Pricing"))
+const Billing = lazy(() => import("./pages/Billing"))
 const Gallery = lazy(() => import("./pages/Gallery"))
 const Terms = lazy(() => import("./pages/Terms"))
 const Privacy = lazy(() => import("./pages/Privacy"))
@@ -457,6 +458,7 @@ function App() {
 
           <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
           <Route path="/members" element={<RequireAuth><Members /></RequireAuth>} />
+          <Route path="/billing" element={<RequireAuth><Billing /></RequireAuth>} />
           <Route path="/dashboard" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
           <Route path="/assets" element={<RequireAuth><RedirectGlobalAssets /></RequireAuth>} />
 

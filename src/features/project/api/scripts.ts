@@ -1,4 +1,7 @@
 import { toApiResponse, successResponse, errorResponse, type ApiResponse } from './shared'
+import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
+import { requestData } from '@/api'
+import { appClient } from '@/api/clients/appClient'
 
 export interface ScriptPlot {
   logline?: string
@@ -98,15 +101,20 @@ export const scriptsApi = {
     projectId: number,
     data: { text: string; title?: string; filename?: string }
   ): Promise<ApiResponse<ScriptDocument | null>> {
-    return toApiResponse<ScriptDocument>(
-      { url: `/projects/${projectId}/scripts/parse`, method: 'POST', data },
-      {} as ScriptDocument,
-      '剧本解析失败'
-    ).then((response) =>
-      response.success
-        ? successResponse(response.data)
-        : errorResponse(response.message || '剧本解析失败', null)
-    )
+    try {
+      const result = await withIdempotentGenerate((idempotencyKey) =>
+        requestData<ScriptDocument & { billing?: BillingPayload }>(appClient, {
+          url: `/projects/${projectId}/scripts/parse`,
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          data,
+        })
+      )
+      applyBillingPayload(result.billing)
+      return successResponse(result)
+    } catch (error) {
+      return errorResponse(error instanceof Error ? error.message : '剧本解析失败', null)
+    }
   },
 
   async importToProject(

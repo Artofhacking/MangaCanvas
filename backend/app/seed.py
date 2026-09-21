@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import models
@@ -576,3 +577,67 @@ def seed_demo_content(db: Session) -> None:
             ),
         ]
     )
+
+
+PRICE_RULES: list[dict] = [
+    {"model_id": "gpt-image-2", "modality": "image", "unit": "image", "quality": "low", "resolution": "", "credits_per_unit": 5},
+    {"model_id": "gpt-image-2", "modality": "image", "unit": "image", "quality": "medium", "resolution": "", "credits_per_unit": 39},
+    {"model_id": "gpt-image-2", "modality": "image", "unit": "image", "quality": "high", "resolution": "", "credits_per_unit": 152},
+    {"model_id": "gpt-image-2.5-flare", "modality": "image", "unit": "image", "quality": "low", "resolution": "", "credits_per_unit": 5},
+    {"model_id": "gpt-image-2.5-flare", "modality": "image", "unit": "image", "quality": "medium", "resolution": "", "credits_per_unit": 39},
+    {"model_id": "gpt-image-2.5-flare", "modality": "image", "unit": "image", "quality": "high", "resolution": "", "credits_per_unit": 152},
+    {"model_id": "gpt-image-2.5-sunburst", "modality": "image", "unit": "image", "quality": "low", "resolution": "", "credits_per_unit": 5},
+    {"model_id": "gpt-image-2.5-sunburst", "modality": "image", "unit": "image", "quality": "medium", "resolution": "", "credits_per_unit": 39},
+    {"model_id": "gpt-image-2.5-sunburst", "modality": "image", "unit": "image", "quality": "high", "resolution": "", "credits_per_unit": 152},
+    {"model_id": "wan2.7-image", "modality": "image", "unit": "image", "quality": "", "resolution": "", "credits_per_unit": 20},
+    {"model_id": "wan2.7-image-pro", "modality": "image", "unit": "image", "quality": "", "resolution": "", "credits_per_unit": 50},
+    {"model_id": "qwen-image-2.0", "modality": "image", "unit": "image", "quality": "", "resolution": "", "credits_per_unit": 20},
+    {"model_id": "qwen-image-2.0-pro", "modality": "image", "unit": "image", "quality": "", "resolution": "", "credits_per_unit": 50},
+    {"model_id": "wan2.6-t2i", "modality": "image", "unit": "image", "quality": "", "resolution": "", "credits_per_unit": 20},
+    {"model_id": "wan2.6-image", "modality": "image", "unit": "image", "quality": "", "resolution": "", "credits_per_unit": 20},
+    {"model_id": "happyhorse-1.1-t2v", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 120},
+    {"model_id": "happyhorse-1.1-t2v", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 200},
+    {"model_id": "happyhorse-1.1-i2v", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 120},
+    {"model_id": "happyhorse-1.1-i2v", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 200},
+    {"model_id": "happyhorse-1.1-r2v", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 120},
+    {"model_id": "happyhorse-1.1-r2v", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 200},
+    {"model_id": "doubao-seedance-2-0-260128", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 100},
+    {"model_id": "doubao-seedance-2-0-260128", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 248},
+    {"model_id": "doubao-seedance-2-0-fast-260128", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 80},
+    {"model_id": "doubao-seedance-2-0-mini-260615", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 50},
+    {"model_id": "doubao-seedance-2-5-260628", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 153},
+    {"model_id": "doubao-seedance-2-5-260628", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 378},
+    {"model_id": "MiniMax-H3", "modality": "video", "unit": "video_second", "quality": "", "resolution": "768p", "credits_per_unit": 50},
+    {"model_id": "MiniMax-H3", "modality": "video", "unit": "video_second", "quality": "", "resolution": "2k", "credits_per_unit": 80},
+    {"model_id": "MiniMax-H3-Max", "modality": "video", "unit": "video_second", "quality": "", "resolution": "768p", "credits_per_unit": 50},
+    {"model_id": "viduq3-pro", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 63},
+    {"model_id": "viduq3-pro", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 75},
+    {"model_id": "viduq3-turbo", "modality": "video", "unit": "video_second", "quality": "", "resolution": "720p", "credits_per_unit": 38},
+    {"model_id": "viduq3-turbo", "modality": "video", "unit": "video_second", "quality": "", "resolution": "1080p", "credits_per_unit": 41},
+    {"model_id": "qwen-plus", "modality": "text", "unit": "chat_request", "quality": "", "resolution": "", "credits_per_unit": 1},
+    {"model_id": "qwen-plus", "modality": "text", "unit": "script_parse", "quality": "", "resolution": "", "credits_per_unit": 4},
+    {"model_id": "grok-4.5", "modality": "text", "unit": "chat_request", "quality": "", "resolution": "", "credits_per_unit": 2},
+    {"model_id": "grok-4.5", "modality": "text", "unit": "script_parse", "quality": "", "resolution": "", "credits_per_unit": 78},
+]
+
+
+def seed_price_rules(db: Session) -> None:
+    for spec in PRICE_RULES:
+        exists = (
+            db.query(models.BillingPriceRule)
+            .filter_by(
+                model_id=spec["model_id"],
+                unit=spec["unit"],
+                quality=spec["quality"],
+                resolution=spec["resolution"],
+            )
+            .first()
+        )
+        if exists:
+            continue
+        try:
+            with db.begin_nested():
+                db.add(models.BillingPriceRule(is_active=True, **spec))
+                db.flush()
+        except IntegrityError:
+            continue

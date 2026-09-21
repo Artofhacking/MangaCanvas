@@ -22,6 +22,8 @@ import {
   withExistingAssetResult,
 } from "@/store/assetGenerationStore"
 import type { ObjectItem } from "@/types"
+import { useCreditQuote } from "@/hooks/useCreditQuote"
+import { aspectToSize } from "@/lib/generateAssetImage"
 
 export interface ObjectCreateData {
   name: string
@@ -114,6 +116,19 @@ export default function ObjectCreator({
     notify.success("物品已保存")
   }
 
+  const { costLabel, blocked } = useCreditQuote(
+    generationConfig.model
+      ? {
+          model: generationConfig.model,
+          modality: "image",
+          quality: "medium",
+          size: aspectToSize[generationConfig.aspectRatio || "1:1"],
+          n: 1,
+          projectId: projectId ? Number(projectId) : undefined,
+        }
+      : null
+  )
+
   const handleGenerate = () => {
     if (!objectName.trim()) {
       notify.warning("请输入物品名称")
@@ -129,6 +144,10 @@ export default function ObjectCreator({
     }
     if (!projectId) {
       notify.warning("缺少项目信息，无法生成")
+      return
+    }
+    if (blocked) {
+      notify.warning(blocked)
       return
     }
     revealTaskPanel()
@@ -212,6 +231,8 @@ export default function ObjectCreator({
             submitting={submitting}
             onSave={handleSave}
             onGenerate={handleGenerate}
+            costLabel={costLabel}
+            blockedReason={blocked}
           />
         </div>
       </SheetContent>

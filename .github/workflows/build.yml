@@ -30,3 +30,46 @@ jobs:
           VITE_APP_API_BASE_URL: /api/v1
       - name: Assert absolute /assets URLs
         run: npm run check:spa
+
+  backend-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Pytest (sqlite)
+        working-directory: backend
+        run: python -m pytest tests/test_pricing.py tests/test_wallet.py tests/test_image_billing.py tests/test_video_billing.py tests/test_chat_script_billing.py tests/test_quota.py tests/test_auth_register.py tests/test_oauth_feishu.py -q
+
+  wallet-mysql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: mangacanvas_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptest --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Pytest wallet on MySQL 8
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: mysql+pymysql://root:test@127.0.0.1:3306/mangacanvas_test
+        run: python -m pytest tests/test_wallet_mysql.py -q

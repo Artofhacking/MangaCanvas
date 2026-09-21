@@ -35,7 +35,7 @@ export function ImageGenerationForm({
   onChange,
   models: propModels,
   quantityOptions,
-  showQuantity = true,
+  showQuantity = false,
   disabled = false,
   directory = "objects",
 }: ImageGenerationFormProps) {

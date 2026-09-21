@@ -29,6 +29,7 @@ import {
 import { formatScriptImportToast } from "@/features/project/scriptImport"
 import { getActiveProjectId } from "@/lib/session"
 import { projectAssetsPath } from "@/lib/workspaceRoutes"
+import { useCreditQuote } from "@/hooks/useCreditQuote"
 
 const ACCEPT_EXT = [".txt", ".md"]
 const MAX_FILE_BYTES = 2 * 1024 * 1024
@@ -84,6 +85,11 @@ export default function ScriptStudio() {
   const navigate = useNavigate()
   const { notify } = useFeedback()
   const projectId = Number(id || getActiveProjectId() || 0)
+  const { costLabel, blocked } = useCreditQuote(
+    projectId
+      ? { model: "qwen-plus", modality: "text", unit: "script_parse", projectId }
+      : null
+  )
 
   const [sourceText, setSourceText] = useState("")
   const [filename, setFilename] = useState<string | null>(null)
@@ -257,6 +263,10 @@ export default function ScriptStudio() {
       notify.warning("请先上传或粘贴剧本")
       return
     }
+    if (blocked) {
+      notify.warning(blocked)
+      return
+    }
     setParsing(true)
     setExcluded(new Set())
     let parsed: ScriptDocument | null = null
@@ -379,11 +389,12 @@ export default function ScriptStudio() {
             </div>
             <Button
               onClick={() => void handleParse()}
-              disabled={parsing || !sourceText.trim()}
+              disabled={parsing || !sourceText.trim() || Boolean(blocked)}
+              title={blocked}
               className="mt-5 w-full h-12 signature-gradient text-white rounded-xl font-bold text-base border-0 hover:opacity-90 disabled:opacity-50"
             >
               {parsing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
-              {parsing ? "Agent 正在拆解…" : "一键解析剧本"}
+              {parsing ? "Agent 正在拆解…" : costLabel ? `一键解析剧本 · ${costLabel}` : "一键解析剧本"}
             </Button>
           </Card>
         </section>

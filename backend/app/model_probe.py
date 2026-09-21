@@ -278,6 +278,7 @@ VIDEO_CATALOG = [
 
 TEXT_CATALOG = [
     {"id": "qwen-plus", "name": "通义千问 Plus", "owned_by": "nexcor", "modality": "text"},
+    {"id": "grok-4.5", "name": "Grok 4.5", "owned_by": "xai", "modality": "text"},
 ]
 
 _cache: dict[str, tuple[float, list[dict]]] = {}
@@ -480,6 +481,8 @@ async def _live_ids(kind: str) -> set[str]:
         if settings.openai_api_key and nexcor_ids:
             listed = await _nexcor_listed_ids()
             live.update(model_id for model_id in nexcor_ids if model_id in listed)
+        if settings.xai_api_key:
+            live.add("grok-4.5")
         return live - down
 
     if kind == "video":
@@ -544,6 +547,8 @@ async def available_models(modality: str | None = None) -> list[dict]:
                 if item["owned_by"] == "minimax" and not (settings.minimax_enabled and settings.minimax_api_key):
                     continue
                 if item["owned_by"] == "vidu" and not (settings.vidu_enabled and settings.vidu_api_key):
+                    continue
+                if item["owned_by"] == "xai" and not settings.xai_api_key:
                     continue
                 if item["id"] not in live:
                     continue

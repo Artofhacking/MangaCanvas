@@ -132,11 +132,11 @@ export default function UserProfileMenu({
         <div className="h-px bg-[hsl(var(--outline-variant))]/20" />
 
         <button
-          onClick={() => notify.info("个人中心开发中")}
+          onClick={() => navigate("/billing")}
           className="mt-3 flex w-full items-center gap-2.5 rounded-[14px] px-3 py-2 text-left text-[13px] font-medium text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-high))]"
         >
           <User className="h-4 w-4 shrink-0" strokeWidth={2.2} />
-          <span>我的主页</span>
+          <span>积分账单</span>
         </button>
 
         {currentIdentity === "admin" || currentIdentity === "superadmin" ? (

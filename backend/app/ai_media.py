@@ -40,7 +40,18 @@ def persist_bytes(data: bytes, suffix: str) -> str:
 
 
 def persist_placeholder() -> str:
-    return persist_bytes(PLACEHOLDER_SVG.encode("utf-8"), ".svg")
+    dest_dir = settings.upload_dir / "generated"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"gen_{int(time.time() * 1000)}_{secrets.token_hex(4)}_placeholder.svg"
+    (dest_dir / filename).write_bytes(PLACEHOLDER_SVG.encode("utf-8"))
+    return _public_url(f"/static/uploads/generated/{filename}")
+
+
+def is_placeholder_url(url: str | None) -> bool:
+    if not url:
+        return False
+    name = Path(urlparse(url).path if "://" in url else url).name
+    return "_placeholder.svg" in name.lower() or name.endswith("_placeholder.svg")
 
 
 def local_file_for_url(url: str) -> Path | None:
@@ -439,6 +450,16 @@ def vidu_resolution(size: str | None, resolution: str | None) -> str:
     if "1080" in raw or "1920" in raw or res in {"1080p", "1080"}:
         return "1080p"
     return "720p"
+
+
+def require_happyhorse_duration(duration) -> int:
+    try:
+        seconds = int(duration)
+    except (TypeError, ValueError):
+        fail(1001, "duration 必须是 5、10 或 15", 400)
+    if seconds not in {5, 10, 15}:
+        fail(1001, "duration 必须是 5、10 或 15", 400)
+    return seconds
 
 
 def clamp_video_duration(duration: int, *, low: int = 5, high: int = 15) -> int:
@@ -1034,13 +1055,22 @@ def video_template_prompt(template: str | None, prompt: str | None) -> str:
     return "，".join(parts) or "让画面自然动起来，保持原图构图和画风"
 
 
-def resolve_chat_endpoint(preferred_model: str | None = None) -> tuple[str, str, str] | None:
+def billed_chat_model(preferred_model: str | None = None) -> str:
     if settings.xai_api_key:
-        return settings.xai_api_key, settings.xai_base_url, preferred_model or "grok-4.5"
+        return "grok-4.5"
+    if settings.openai_api_key or settings.dashscope_api_key:
+        return "qwen-plus"
+    return preferred_model or "qwen-plus"
+
+
+def resolve_chat_endpoint(preferred_model: str | None = None) -> tuple[str, str, str] | None:
+    billed = billed_chat_model(preferred_model)
+    if settings.xai_api_key:
+        return settings.xai_api_key, settings.xai_base_url, billed
     if settings.openai_api_key:
-        return settings.openai_api_key, settings.openai_base_url, preferred_model or "qwen-plus"
+        return settings.openai_api_key, settings.openai_base_url, billed
     if settings.dashscope_api_key:
-        return settings.dashscope_api_key, settings.dashscope_base_url, preferred_model or "qwen-plus"
+        return settings.dashscope_api_key, settings.dashscope_base_url, billed
     return None
 
 
@@ -1078,14 +1108,12 @@ async def llm_complete(
 
 async def dashscope_chat(messages: list, model: str) -> str:
     user_text = next((m.get("content") for m in reversed(messages) if isinstance(m, dict) and m.get("role") == "user"), "")
-    content, _used = await llm_complete(
-        messages,
-        model="qwen-plus" if settings.openai_api_key and not settings.xai_api_key else (model or "qwen-plus"),
-        timeout=60,
-        fail_on_error=bool(resolve_chat_endpoint()),
-    )
+    if not resolve_chat_endpoint():
+        if settings.allow_placeholder and not settings.billing_enabled:
+            return f"{user_text}，电影感，细节丰富，8K"
+        fail(3001, "未配置文本模型 API Key", 503)
+    content, _used = await llm_complete(messages, model=None, timeout=60, fail_on_error=True)
     if content:
         return content
-    if not resolve_chat_endpoint():
-        return f"{user_text}，电影感，细节丰富，8K"
-    return content
+    fail(3001, "生成结果为空", 502)
+    raise RuntimeError("unreachable")
