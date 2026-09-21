@@ -20,10 +20,13 @@ import {
   RedoOutlined,
   AimOutlined,
   MinusOutlined,
-  FileTextOutlined,
+  FontSizeOutlined,
   PictureOutlined,
   BgColorsOutlined,
   VideoCameraOutlined,
+  PlayCircleOutlined,
+  ThunderboltOutlined,
+  HighlightOutlined,
   LockOutlined,
   UnlockOutlined,
   DeleteOutlined,
@@ -784,7 +787,8 @@ const CanvasInner: React.FC = () => {
     const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
     const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
     const nodeId = addNode(type, { x: viewportCenterX - 100, y: viewportCenterY - 100 });
-    if (isGenerateNodeType(type)) {
+    // 文本是便签/旁白，可选中以便编辑，但不能作为生成入口。
+    if (isGenerateNodeType(type) || type === 'text') {
       selectNode(nodeId);
     }
     setShowNodeMenu(false);
@@ -852,6 +856,12 @@ const CanvasInner: React.FC = () => {
       return
     }
 
+    const sourceNode = nodes.find((node) => node.id === start.nodeId)
+    if (sourceNode?.type === 'text') {
+      previewFromRef.current = null
+      return
+    }
+
     const hit = document.elementFromPoint(point.x, point.y)
     if (hit?.closest('.react-flow__node') || hit?.closest('[data-generate-bar]') || hit?.closest('header')) {
       previewFromRef.current = null
@@ -867,7 +877,7 @@ const CanvasInner: React.FC = () => {
       flow: screenToFlowPosition(point),
       fromScreen: from || undefined,
     })
-  }, [isLocked, screenToFlowPosition]);
+  }, [isLocked, nodes, screenToFlowPosition]);
 
   const handleSpawnFromDrop = useCallback((type: GenerateNodeType) => {
     if (!connectDropMenu) return
@@ -928,15 +938,15 @@ const CanvasInner: React.FC = () => {
   }, []);
 
   const primaryNodeTypes = [
-    { type: 'imageConfig', name: '画面节点', icon: <BgColorsOutlined />, color: '#c2410c' },
-    { type: 'videoConfig', name: '视频节点', icon: <VideoCameraOutlined />, color: '#9a3412' },
-    { type: 'image', name: '图片节点', icon: <PictureOutlined />, color: '#ea580c' },
-    { type: 'video', name: '视频结果', icon: <VideoCameraOutlined />, color: '#b45309' },
+    { type: 'text', name: '文本', icon: <FontSizeOutlined />, color: '#ac2e00' },
+    { type: 'imageConfig', name: '画面', icon: <BgColorsOutlined />, color: '#c2410c' },
+    { type: 'videoConfig', name: '视频', icon: <VideoCameraOutlined />, color: '#9a3412' },
+    { type: 'image', name: '图片', icon: <PictureOutlined />, color: '#ea580c' },
+    { type: 'video', name: '成片', icon: <PlayCircleOutlined />, color: '#b45309' },
   ];
   const extraNodeTypes = [
-    { type: 'text', name: '旁白', icon: <FileTextOutlined />, color: '#ac2e00' },
-    { type: 'effectConfig', name: '效果配置', icon: <BgColorsOutlined />, color: '#d97706' },
-    { type: 'templateEffect', name: '视频特效', icon: <BgColorsOutlined />, color: '#b45309' },
+    { type: 'effectConfig', name: '效果', icon: <ThunderboltOutlined />, color: '#d97706' },
+    { type: 'templateEffect', name: '特效', icon: <HighlightOutlined />, color: '#b45309' },
   ];
 
   // 导出工作流
@@ -1346,7 +1356,7 @@ const CanvasInner: React.FC = () => {
             ))}
             <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
             <div className="px-3 pb-1 pt-0.5 text-[11px] font-semibold text-[hsl(var(--secondary))]">
-              可选
+              其他
             </div>
             {extraNodeTypes.map((nodeType) => (
               <button

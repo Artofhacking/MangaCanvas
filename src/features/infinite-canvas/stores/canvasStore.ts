@@ -9,7 +9,7 @@ const getNodeId = () => `node_${nodeId++}`;
 const getDefaultNodeData = (type: string): NodeData => {
   switch (type) {
     case 'text':
-      return { content: '', label: '旁白' };
+      return { content: '', label: '文本' };
     case 'imageConfig':
       return {
         prompt: '',
