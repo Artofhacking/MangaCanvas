@@ -84,6 +84,13 @@ import ConnectDropMenu, { type ConnectDropMenuState } from './components/Connect
 import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
 import { spawnGenerateFromSource } from './utils/spawnGenerateFromSource';
 import { getClientPoint, getHandlePointFromEvent, getHandleScreenPoint } from './utils/connectPreview';
+import {
+  CANVAS_INTERACTION_HINT,
+  CANVAS_INTERACTION_HINT_SHORT,
+  CANVAS_MULTI_SELECTION_KEYS,
+  CANVAS_PAN_ACTIVATION_KEY,
+  getCanvasPanOnDrag,
+} from './utils/canvasInteraction';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -1185,7 +1192,7 @@ const CanvasInner: React.FC = () => {
 
       <div 
         ref={canvasPaneRef}
-        className="flex-1 relative overflow-hidden h-full cursor-grab touch-none"
+        className="flex-1 relative overflow-hidden h-full cursor-default touch-none"
         onDragOver={handleCanvasDragOver}
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
@@ -1229,9 +1236,14 @@ const CanvasInner: React.FC = () => {
           elementsSelectable={!isLocked}
           selectionMode={SelectionMode.Partial}
           selectionOnDrag={!isLocked}
-          panOnDrag={false}
-          panActivationKeyCode="Space"
-          multiSelectionKeyCode={['Meta', 'Control']}
+          selectionKeyCode="Shift"
+          multiSelectionKeyCode={[...CANVAS_MULTI_SELECTION_KEYS]}
+          panOnDrag={getCanvasPanOnDrag(isLocked)}
+          panOnScroll
+          panOnScrollSpeed={0.9}
+          zoomOnScroll
+          zoomOnPinch
+          panActivationKeyCode={CANVAS_PAN_ACTIVATION_KEY}
         >
           {showGrid && <Background gap={20} size={1} />}
           <MiniMap position="bottom-right" pannable zoomable />
@@ -1391,10 +1403,10 @@ const CanvasInner: React.FC = () => {
           </button>
           <button
             onClick={() => {
-              message.info('左键拖拽空白区可框选节点，按住 Space 再拖拽可移动画布');
+              message.info(CANVAS_INTERACTION_HINT);
             }}
             className="p-2 rounded text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors"
-            title="左键拖拽空白区框选，按住 Space 拖动画布"
+            title={CANVAS_INTERACTION_HINT_SHORT}
           >
             <DragOutlined style={{ fontSize: 16 }} />
           </button>

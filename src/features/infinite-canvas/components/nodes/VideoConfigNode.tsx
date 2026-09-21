@@ -186,8 +186,10 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               loop
               muted={muted}
               playsInline
+              draggable={false}
               className="h-full w-full bg-black object-cover"
               poster={mediaUrl(data.thumbnail)}
+              onDragStart={(event) => event.preventDefault()}
               onCanPlay={() => {
                 videoRef.current?.play().catch(() => {});
               }}
