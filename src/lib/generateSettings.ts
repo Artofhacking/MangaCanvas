@@ -1,7 +1,7 @@
 import { getImageModel } from '@/features/infinite-canvas/config/models'
 import { listImageSizes } from '@/features/infinite-canvas/utils/generateParams'
 import { getSizeRatio, parseSizeDimensions } from '@/features/infinite-canvas/utils/aspectRatio'
-import { isI2IModel } from '@/api/aigc'
+import { resolveImageReferences } from '@/api/aigc'
 import type { ImageGenerateOptions } from '@/api/aigc/types'
 
 export const QUALITY_TIERS = [
@@ -278,13 +278,17 @@ export function buildImageGenerateOptions(input: {
   if (!resolved) {
     return { error: '当前模型不支持所选画质 / 清晰度 / 比例组合' }
   }
+  const resolvedRefs = resolveImageReferences(input.model, input.referenceImages)
+  if (resolvedRefs.error) {
+    return { error: resolvedRefs.error }
+  }
   return {
     model: input.model,
     prompt: input.prompt,
     size: resolved.size,
     quality: resolved.quality,
     n: input.settings.quantity,
-    images: isI2IModel(input.model) ? input.referenceImages : undefined,
+    images: resolvedRefs.images,
   }
 }
 
