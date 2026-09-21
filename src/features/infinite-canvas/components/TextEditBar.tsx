@@ -15,7 +15,7 @@ import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
 import { NodeDockOverlay } from './NodeDockOverlay'
 import { cn } from '@/lib/utils'
 
-const BAR_WIDTH = 560
+const BAR_WIDTH = 480
 const BAR_ESTIMATED_HEIGHT = 176
 const PLACEHOLDER = '输入旁白、对白或便签…'
 

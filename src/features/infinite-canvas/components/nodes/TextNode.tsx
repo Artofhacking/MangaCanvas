@@ -168,7 +168,7 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
         ) : (
           <button
             type="button"
-            className="nodrag nowheel flex min-h-[168px] w-full flex-col px-3.5 py-3 text-left"
+            className="nodrag nowheel flex min-h-[200px] w-full flex-col px-3.5 py-3 text-left"
             onClick={enterWrite}
             onPointerDown={(event) => event.stopPropagation()}
             title="在底部编辑旁白或便签"

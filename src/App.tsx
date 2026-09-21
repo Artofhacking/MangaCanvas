@@ -35,6 +35,9 @@ const ScriptStudio = lazy(() => import("./pages/ScriptStudio"))
 const GenerateSettingsPreview = import.meta.env.DEV
   ? lazy(() => import("./pages/dev/GenerateSettingsPreview"))
   : null
+const TextNodePreview = import.meta.env.DEV
+  ? lazy(() => import("./pages/dev/TextNodePreview"))
+  : null
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
@@ -441,6 +444,9 @@ function App() {
           <Route path="/workflow" element={<Workflow />} />
           {import.meta.env.DEV && GenerateSettingsPreview ? (
             <Route path="/dev/generate-settings" element={<GenerateSettingsPreview />} />
+          ) : null}
+          {import.meta.env.DEV && TextNodePreview ? (
+            <Route path="/dev/text-node" element={<TextNodePreview />} />
           ) : null}
 
           <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
