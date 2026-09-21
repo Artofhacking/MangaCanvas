@@ -3,7 +3,7 @@ import { displayModelName } from '@/lib/displayModelName'
 import { useModelsStore } from '@/store/modelsStore'
 import type { ModelConfig, SizeOption } from '../types'
 import { labeledSizes } from '../utils/aspectRatio'
-import { IMAGE_MODELS, VIDEO_MODELS, enabledModels, getImageModel, getVideoModel } from './models'
+import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel } from './models'
 
 export const SAFE_IMAGE_SIZE = '1024x1024'
 export const SAFE_VIDEO_SIZE = '1280*720'
@@ -270,15 +270,7 @@ export function liveModelsToPicker(
 }
 
 /** Picker source is live API ids only. An empty live list never dumps the static catalog. */
-export function resolvePickerModels<T extends { key: string; enabled?: boolean }>(
-  catalog: T[],
-  liveIds: readonly string[],
-  loading: boolean
-): T[] {
-  if (loading || liveIds.length === 0) return []
-  const set = new Set(liveIds)
-  return enabledModels(catalog).filter((item) => set.has(item.key))
-}
+export { resolvePickerModels } from './models'
 
 export function safeImageConfig(id = ''): ModelConfig {
   return {

@@ -8,8 +8,8 @@ from app.model_probe import (
     available_models,
     _cache,
     _live_ids,
+    baidu_catalog_ids,
     is_seedance_id,
-    nexcor_listed_seedance_ids,
     seedance_catalog_row,
     seedance_display_name,
 )
@@ -88,22 +88,52 @@ def test_seedance_helpers_match_known_and_unknown_ids():
     assert is_seedance_id("seedance-1.0")
     assert not is_seedance_id("happyhorse-1.1-t2v")
     assert seedance_display_name("doubao-seedance-2-0-fast-260128") == "Seedance 2.0 Fast"
+    assert seedance_display_name("doubao-seedance-2-0-mini-260615") == "Seedance 2.0 Mini"
+    assert seedance_display_name("doubao-seedance-2-5-260628") == "Seedance 2.5"
     assert seedance_display_name("seedance-preview") == "Seedance"
     catalog = seedance_catalog_row("doubao-seedance-2-5-260628")
     assert catalog["parameters"]["durations"] == [5, 10, 15]
     extra = seedance_catalog_row("seedance-1.0")
-    assert extra["owned_by"] == "nexcor"
+    assert extra["owned_by"] == "baidu"
     assert extra["parameters"]["resolutions"] == ["720P", "1080P"]
     assert extra["defaultParams"]["size"] == "1280*720"
-    assert nexcor_listed_seedance_ids({"happyhorse-1.1-t2v", "seedance-1.0", "gpt-image-2"}) == {
-        "seedance-1.0"
+    assert set(baidu_catalog_ids()) == {
+        "doubao-seedance-2-0-260128",
+        "doubao-seedance-2-0-fast-260128",
+        "doubao-seedance-2-0-mini-260615",
+        "doubao-seedance-2-5-260628",
     }
 
 
-def test_available_models_surfaces_nexcor_seedance_when_baidu_off(monkeypatch):
+def test_available_models_lists_seedance_when_baidu_on(monkeypatch):
+    _cache.clear()
+    monkeypatch.setattr("app.model_probe.settings.baidu_enabled", True)
+    monkeypatch.setattr("app.model_probe.settings.baidu_api_key", "baidu-test")
+
+    async def fake_live(kind: str) -> set[str]:
+        if kind == "video":
+            return {"happyhorse-1.1-t2v", *baidu_catalog_ids()}
+        return set()
+
+    monkeypatch.setattr("app.model_probe._live_ids", fake_live)
+    rows = asyncio.run(available_models("video"))
+    ids = [row["id"] for row in rows]
+    assert "happyhorse-1.1-t2v" in ids
+    for model_id in baidu_catalog_ids():
+        assert model_id in ids
+    seedance = next(row for row in rows if row["id"] == "doubao-seedance-2-0-260128")
+    assert seedance["name"] == "Seedance 2.0"
+    assert seedance["owned_by"] == "baidu"
+    assert seedance["isEnabled"] is True
+    assert seedance["parameters"]["resolutions"]
+    assert seedance["parameters"]["durations"]
+
+
+def test_available_models_hides_seedance_when_baidu_off_even_if_live(monkeypatch):
     _cache.clear()
     monkeypatch.setattr("app.model_probe.settings.baidu_enabled", False)
     monkeypatch.setattr("app.model_probe.settings.baidu_api_key", "")
+    monkeypatch.setattr("app.model_probe.settings.openai_api_key", "sk-test")
 
     async def fake_live(kind: str) -> set[str]:
         if kind == "video":
@@ -111,22 +141,15 @@ def test_available_models_surfaces_nexcor_seedance_when_baidu_off(monkeypatch):
         return set()
 
     monkeypatch.setattr("app.model_probe._live_ids", fake_live)
-    rows = asyncio.run(available_models("video"))
-    ids = [row["id"] for row in rows]
-    assert "happyhorse-1.1-t2v" in ids
-    assert "doubao-seedance-2-0-260128" in ids
-    assert "seedance-1.0" in ids
-    seedance = next(row for row in rows if row["id"] == "doubao-seedance-2-0-260128")
-    assert seedance["parameters"]["resolutions"]
-    assert seedance["parameters"]["durations"]
-    extra = next(row for row in rows if row["id"] == "seedance-1.0")
-    assert extra["name"] == "Seedance"
-    assert extra["isEnabled"] is True
+    ids = [row["id"] for row in asyncio.run(available_models("video"))]
+    assert ids == ["happyhorse-1.1-t2v"]
+    assert not any("seedance" in item for item in ids)
 
 
 def test_available_models_does_not_fake_seedance_when_not_live(monkeypatch):
     _cache.clear()
-    monkeypatch.setattr("app.model_probe.settings.baidu_enabled", False)
+    monkeypatch.setattr("app.model_probe.settings.baidu_enabled", True)
+    monkeypatch.setattr("app.model_probe.settings.baidu_api_key", "baidu-test")
 
     async def fake_live(kind: str) -> set[str]:
         if kind == "video":
@@ -139,8 +162,32 @@ def test_available_models_does_not_fake_seedance_when_not_live(monkeypatch):
     assert not any("seedance" in item for item in ids)
 
 
-def test_video_live_ids_include_nexcor_listed_seedance(monkeypatch):
-    async def fake_listed() -> set[str]:
+def test_video_live_ids_include_catalog_seedance_when_baidu_configured(monkeypatch):
+    async def fake_nexcor() -> set[str]:
+        return {"happyhorse-1.1-t2v", "doubao-seedance-2-0-260128", "seedance-1.0"}
+
+    async def fake_baidu() -> set[str]:
+        raise AssertionError("catalog Seedance must not depend on GET /models")
+
+    async def fake_probe(_client, model_id: str) -> bool:
+        assert "seedance" not in model_id, "seedance must not be POST-probed"
+        return False
+
+    monkeypatch.setattr("app.model_probe.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.model_probe.settings.baidu_enabled", True)
+    monkeypatch.setattr("app.model_probe.settings.baidu_api_key", "baidu-test")
+    monkeypatch.setattr("app.model_probe._nexcor_listed_ids", fake_nexcor)
+    monkeypatch.setattr("app.model_probe._baidu_listed_ids", fake_baidu)
+    monkeypatch.setattr("app.model_probe._probe_video", fake_probe)
+    live = asyncio.run(_live_ids("video"))
+    assert "happyhorse-1.1-t2v" in live
+    for model_id in baidu_catalog_ids():
+        assert model_id in live
+    assert "seedance-1.0" not in live
+
+
+def test_video_live_ids_exclude_seedance_when_baidu_off_even_with_nexcor(monkeypatch):
+    async def fake_nexcor() -> set[str]:
         return {"happyhorse-1.1-t2v", "doubao-seedance-2-0-260128", "seedance-1.0"}
 
     async def fake_probe(_client, model_id: str) -> bool:
@@ -150,10 +197,8 @@ def test_video_live_ids_include_nexcor_listed_seedance(monkeypatch):
     monkeypatch.setattr("app.model_probe.settings.openai_api_key", "sk-test")
     monkeypatch.setattr("app.model_probe.settings.baidu_enabled", False)
     monkeypatch.setattr("app.model_probe.settings.baidu_api_key", "")
-    monkeypatch.setattr("app.model_probe._nexcor_listed_ids", fake_listed)
+    monkeypatch.setattr("app.model_probe._nexcor_listed_ids", fake_nexcor)
     monkeypatch.setattr("app.model_probe._probe_video", fake_probe)
     live = asyncio.run(_live_ids("video"))
     assert "happyhorse-1.1-t2v" in live
-    assert "doubao-seedance-2-0-260128" in live
-    assert "seedance-1.0" in live
-    assert "doubao-seedance-2-5-260628" not in live
+    assert not any("seedance" in model_id for model_id in live)

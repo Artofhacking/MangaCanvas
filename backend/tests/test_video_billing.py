@@ -167,20 +167,46 @@ def test_r2v_and_persist_failure_releases(user, db, monkeypatch):
     assert row.model_id == "happyhorse-1.1-r2v"
 
 
-def test_seedance_uses_nexcor_when_baidu_disabled(user, monkeypatch):
+def test_seedance_rejected_when_baidu_off_even_with_nexcor(user, db, monkeypatch):
     monkeypatch.setattr("app.routers.ai.settings.openai_api_key", "sk-test")
     monkeypatch.setattr("app.routers.ai.settings.baidu_enabled", False)
     monkeypatch.setattr("app.routers.ai.settings.baidu_api_key", "")
+    monkeypatch.setattr("app.routers.ai.settings.billing_enabled", True)
+
+    async def fake_openai(**kwargs):
+        raise AssertionError("Seedance must not fall back to nexcor")
+
+    monkeypatch.setattr("app.routers.ai.openai_video_generate", fake_openai)
+    with pytest.raises(ApiError) as exc:
+        _run(
+            videos(
+                FakeRequest({"model": "doubao-seedance-2-0-260128", "duration": 5, "prompt": "x"}),
+                user=user,
+            )
+        )
+    assert exc.value.http_status == 503
+    db.expire_all()
+    assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 2000
+
+
+def test_seedance_uses_baidu_when_enabled(user, monkeypatch):
+    monkeypatch.setattr("app.routers.ai.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.routers.ai.settings.baidu_enabled", True)
+    monkeypatch.setattr("app.routers.ai.settings.baidu_api_key", "baidu-test")
     seen = {}
 
-    async def fake_gen(**kwargs):
+    async def fake_baidu(**kwargs):
         seen.update(kwargs)
         return "https://cdn.example/s.mp4"
+
+    async def fake_openai(**kwargs):
+        raise AssertionError("Seedance generate prefers Baidu over nexcor")
 
     async def fake_persist(url):
         return "/static/uploads/generated/s.mp4"
 
-    monkeypatch.setattr("app.routers.ai.openai_video_generate", fake_gen)
+    monkeypatch.setattr("app.routers.ai.baidu_video_generate", fake_baidu)
+    monkeypatch.setattr("app.routers.ai.openai_video_generate", fake_openai)
     monkeypatch.setattr("app.routers.ai.persist_remote_url", fake_persist)
     resp = _run(
         videos(

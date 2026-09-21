@@ -39,7 +39,7 @@ MangaCanvas 已经在为图像、视频、润色、剧本解析付上游账单�
 - 生产：阿里云 ECS `http://47.104.138.144:18999/`。Nginx 只 listen **18999**（`scripts/nginx/mangacanvas.conf`），`proxy_pass` 到 `127.0.0.1:8088`，`proxy_read_timeout 600s`。静态媒体 `/static/uploads/` 同源反代。
 - 数据库：生产 MySQL 8（`mysql+pymysql`，`pymysql==1.1.1`）；本地默认 SQLite。`create_engine` **未**设 `pool_pre_ping` / `pool_size`。
 - 鉴权：邮箱密码登录现有用户；`allow_registration=False` 时 `POST /auth/register` 403。飞书 OAuth 只登录/绑定已有用户，新飞书身份不会自动建号（`oauth.upsert_feishu_user` → `require_open_registration()`）。
-- 生成网关：nexcor OpenAI 兼容 `https://cc.nexcor.ai/v1`（`OPENAI_API_KEY` / `OPENAI_BASE_URL`）；可选 DashScope、xAI、百度 Seedance、MiniMax、Vidu。后三个渠道 `*_ENABLED` 默认 False，画布 `VIDEO_MODELS` 对应项 `enabled: false`，`/ai/models` 探测也不返回。密钥只在服务端 `backend/app/config.py`。
+- 生成网关：nexcor OpenAI 兼容 `https://cc.nexcor.ai/v1`（`OPENAI_API_KEY` / `OPENAI_BASE_URL`）；可选 DashScope、xAI、百度 Seedance、MiniMax、Vidu。后三个渠道 `*_ENABLED` 默认 False。Seedance 只走百度 AI 网关（`BAIDU_ENABLED=1` + `BAIDU_API_KEY`，`BAIDU_BASE_URL=https://ai-gateway.baidubce.com`），**不是** nexcor。开关关闭时 `/ai/models` 不返回对应行。密钥只在服务端 `backend/app/config.py`。
 
 现有**会打上游、应扣积分**的入口：
 

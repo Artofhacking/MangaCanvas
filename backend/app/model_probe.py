@@ -418,7 +418,7 @@ def seedance_catalog_row(model_id: str) -> dict:
     return {
         "id": model_id,
         "name": seedance_display_name(model_id),
-        "owned_by": "nexcor",
+        "owned_by": "baidu",
         "modality": "video",
         **_video_caps(
             sizes=WIDESCREEN_VIDEO_SIZES,
@@ -431,9 +431,8 @@ def seedance_catalog_row(model_id: str) -> dict:
     }
 
 
-def nexcor_listed_seedance_ids(listed: set[str]) -> set[str]:
-    """Any *seedance* id nexcor actually lists, including catalog misses."""
-    return {model_id for model_id in listed if is_seedance_id(model_id)}
+def baidu_catalog_ids() -> list[str]:
+    return [item["id"] for item in VIDEO_CATALOG if item["owned_by"] == "baidu"]
 
 
 async def _nexcor_listed_ids() -> set[str]:
@@ -543,14 +542,13 @@ async def _live_ids(kind: str) -> set[str]:
     if kind == "video":
         live: set[str] = set()
         nexcor_ids = [item["id"] for item in catalog if item["owned_by"] == "nexcor"]
-        baidu_ids = [item["id"] for item in catalog if item["owned_by"] == "baidu"]
+        baidu_ids = baidu_catalog_ids()
         minimax_ids = [item["id"] for item in catalog if item["owned_by"] == "minimax"]
         vidu_ids = [item["id"] for item in catalog if item["owned_by"] == "vidu"]
         timeout = httpx.Timeout(PROBE_TIMEOUT, connect=1.5)
         if settings.openai_api_key:
             listed = await _nexcor_listed_ids()
             live.update(model_id for model_id in nexcor_ids if model_id in listed)
-            live.update(nexcor_listed_seedance_ids(listed))
             missing = [model_id for model_id in nexcor_ids if model_id not in live]
             if missing:
                 async with httpx.AsyncClient(timeout=timeout) as client:
@@ -562,8 +560,9 @@ async def _live_ids(kind: str) -> set[str]:
                     if result is True:
                         live.add(model_id)
         if settings.baidu_enabled and settings.baidu_api_key and baidu_ids:
-            listed = await _baidu_listed_ids()
-            live.update(model_id for model_id in baidu_ids if model_id in listed)
+            # Catalog Seedance is generable via baidu_video_generate. Do not
+            # require nexcor /models, and never POST-probe (billed).
+            live.update(baidu_ids)
         if settings.minimax_enabled and settings.minimax_api_key and minimax_ids and await _minimax_key_live():
             live.update(minimax_ids)
         if settings.vidu_enabled and settings.vidu_api_key and vidu_ids and await _vidu_key_live():
@@ -603,9 +602,7 @@ async def available_models(modality: str | None = None) -> list[dict]:
                 if item["owned_by"] == "dashscope" and not settings.dashscope_api_key:
                     continue
                 if item["owned_by"] == "baidu" and not (settings.baidu_enabled and settings.baidu_api_key):
-                    # Seedance may also be listed on nexcor; live wins over the Baidu switch.
-                    if not (kind == "video" and is_seedance_id(item["id"]) and item["id"] in live):
-                        continue
+                    continue
                 if item["owned_by"] == "minimax" and not (settings.minimax_enabled and settings.minimax_api_key):
                     continue
                 if item["owned_by"] == "vidu" and not (settings.vidu_enabled and settings.vidu_api_key):
@@ -615,12 +612,6 @@ async def available_models(modality: str | None = None) -> list[dict]:
                 if item["id"] not in live:
                     continue
                 rows.append({**item, "status": "active", "isEnabled": True})
-            if kind == "video":
-                seen = {row["id"] for row in rows}
-                for model_id in sorted(live):
-                    if is_seedance_id(model_id) and model_id not in seen:
-                        rows.append({**seedance_catalog_row(model_id), "status": "active", "isEnabled": True})
-                        seen.add(model_id)
             _cache[kind] = (now, rows)
 
     out: list[dict] = []
