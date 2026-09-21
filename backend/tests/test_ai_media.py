@@ -3,9 +3,11 @@ import inspect
 
 from app.ai_media import (
     build_happyhorse_video_body,
+    build_nexcor_seedance_video_body,
     mention_image_roles,
     openai_video_generate,
     resolve_vidu_r2v_model,
+    resolve_video_model,
     vidu_subject_name,
     vidu_video_generate,
     video_image_data_uri,
@@ -49,6 +51,31 @@ def test_happyhorse_r2v_keeps_all_refs_and_audio():
     assert body["reference_images"] == body["images"]
     assert [item["type"] for item in body["metadata"]["input"]["media"]] == ["reference_image"] * 3
     assert "第1张参考图是老林" in body["prompt"]
+
+
+def test_seedance_nexcor_body_keeps_id_and_does_not_become_happyhorse():
+    body = build_nexcor_seedance_video_body(
+        model="doubao-seedance-2-0-260128",
+        prompt="run",
+        size="1280*720",
+        duration=5,
+        image_urls=["https://img/a.png"],
+    )
+    assert body["model"] == "doubao-seedance-2-0-260128"
+    assert body["images"] == ["https://img/a.png"]
+    assert body["metadata"]["input"]["media"][0]["type"] == "first_frame"
+    empty = build_nexcor_seedance_video_body(
+        model="seedance-1.0",
+        prompt="run",
+        size="1920*1080",
+        duration=10,
+        resolution="1080P",
+        image_urls=[],
+    )
+    assert empty["model"] == "seedance-1.0"
+    assert empty["resolution"] == "1080p"
+    assert "images" not in empty
+    assert resolve_video_model("doubao-seedance-2-0-260128", True) == "doubao-seedance-2-0-260128"
 
 
 def test_happyhorse_single_image_stays_i2v():

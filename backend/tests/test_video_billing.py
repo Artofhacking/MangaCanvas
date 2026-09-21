@@ -167,6 +167,40 @@ def test_r2v_and_persist_failure_releases(user, db, monkeypatch):
     assert row.model_id == "happyhorse-1.1-r2v"
 
 
+def test_seedance_uses_nexcor_when_baidu_disabled(user, monkeypatch):
+    monkeypatch.setattr("app.routers.ai.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.routers.ai.settings.baidu_enabled", False)
+    monkeypatch.setattr("app.routers.ai.settings.baidu_api_key", "")
+    seen = {}
+
+    async def fake_gen(**kwargs):
+        seen.update(kwargs)
+        return "https://cdn.example/s.mp4"
+
+    async def fake_persist(url):
+        return "/static/uploads/generated/s.mp4"
+
+    monkeypatch.setattr("app.routers.ai.openai_video_generate", fake_gen)
+    monkeypatch.setattr("app.routers.ai.persist_remote_url", fake_persist)
+    resp = _run(
+        videos(
+            FakeRequest(
+                {
+                    "model": "doubao-seedance-2-0-260128",
+                    "prompt": "run",
+                    "duration": 5,
+                    "resolution": "720P",
+                    "size": "1280*720",
+                }
+            ),
+            user=user,
+        )
+    )
+    data = json.loads(resp.body)
+    assert data["code"] == 0
+    assert seen["model"] == "doubao-seedance-2-0-260128"
+
+
 def test_template_requires_first_frame(user, monkeypatch):
     monkeypatch.setattr("app.routers.ai.settings.openai_api_key", "sk-test")
     with pytest.raises(ApiError) as exc:

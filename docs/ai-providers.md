@@ -11,11 +11,11 @@
 | `OPENAI_BASE_URL` | `https://cc.nexcor.ai/v1` |
 | `OPENAI_API_KEY` | 只写 `.env` |
 
-图像：`gpt-image-2`、`wan2.7-image` / `-pro`、`qwen-image-2.0` / `-pro`。视频：`happyhorse-1.1-t2v` / `happyhorse-1.1-i2v` / `happyhorse-1.1-r2v`（多参考图，原生有声）。润色：`qwen-plus`。`VIDU_ENABLED=0` 时多图生视频不再改走 Vidu。
+图像：`gpt-image-2`、`wan2.7-image` / `-pro`、`qwen-image-2.0` / `-pro`。视频：`happyhorse-1.1-t2v` / `happyhorse-1.1-i2v` / `happyhorse-1.1-r2v`（多参考图，原生有声）。若 nexcor `GET /v1/models` 列出任何 `*seedance*` id，`/ai/models` 会展示并走 nexcor `POST /video/generations`（**禁止 POST 探测 Seedance**）。润色：`qwen-plus`。`VIDU_ENABLED=0` 时多图生视频不再改走 Vidu。
 
 ## 已禁用渠道
 
-百度云 Seedance、MiniMax H3、Vidu Q3 默认关闭：画布不展示，`/ai/models` 不返回，生成接口 503。
+百度云 Seedance、MiniMax H3、Vidu Q3 默认关闭。百度开关关闭时，Seedance **仍可**因 nexcor `/models` 列出而出现；未列出则不展示、也不伪造。MiniMax / Vidu 在对应开关关闭时不进 `/ai/models`，生成 503。
 
 | 渠道 | 开关（默认 0） | 重新启用 |
 | --- | --- | --- |

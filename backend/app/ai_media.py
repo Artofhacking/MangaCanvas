@@ -368,6 +368,46 @@ def collect_video_refs(first_frame: str | None, images: list[str] | None, limit:
     return refs
 
 
+def build_nexcor_seedance_video_body(
+    *,
+    model: str,
+    prompt: str,
+    size: str,
+    duration: int,
+    resolution: str | None = None,
+    image_urls: list[str],
+    names: list[str] | None = None,
+) -> dict:
+    refs = [url for url in image_urls if url][:9]
+    resolved = resolve_video_model(model, bool(refs))
+    seconds = seedance_duration(resolved, duration)
+    text = (prompt or "cinematic motion").strip()
+    if names:
+        text = mention_image_roles(text, names)
+    body: dict = {
+        "model": resolved,
+        "prompt": text,
+        "duration": seconds,
+        "size": size,
+        "resolution": seedance_resolution(resolved, size, resolution),
+        "audio": True,
+        "generate_audio": True,
+    }
+    if not refs:
+        return body
+    media = (
+        [{"type": "reference_image", "url": url} for url in refs]
+        if len(refs) > 1
+        else [{"type": "first_frame", "url": refs[0]}]
+    )
+    body["metadata"] = {"input": {"media": media}}
+    body["images"] = refs
+    if len(refs) > 1:
+        body["reference_images"] = refs
+    body["img_url"] = refs[0]
+    return body
+
+
 def build_happyhorse_video_body(
     *,
     model: str,
@@ -661,22 +701,37 @@ async def openai_video_generate(
     first_frame: str | None = None,
     images: list[str] | None = None,
     names: list[str] | None = None,
+    resolution: str | None = None,
 ) -> str:
     if not settings.openai_api_key:
         fail(3001, "未配置视频模型 API Key", 503)
     refs = collect_video_refs(first_frame, images)
-    needs_image = "i2v" in (model or "").lower() or "r2v" in (model or "").lower()
+    needs_image = (
+        not is_seedance_model(model)
+        and ("i2v" in (model or "").lower() or "r2v" in (model or "").lower())
+    )
     if needs_image and not refs:
         fail(3001, "图生视频需要参考图片", 400)
     resolved_urls = [await video_image_ref(url) for url in refs]
-    body = build_happyhorse_video_body(
-        model=model,
-        prompt=prompt,
-        size=size,
-        duration=duration,
-        image_urls=resolved_urls,
-        names=names,
-    )
+    if is_seedance_model(model):
+        body = build_nexcor_seedance_video_body(
+            model=model,
+            prompt=prompt,
+            size=size,
+            duration=duration,
+            resolution=resolution,
+            image_urls=resolved_urls,
+            names=names,
+        )
+    else:
+        body = build_happyhorse_video_body(
+            model=model,
+            prompt=prompt,
+            size=size,
+            duration=duration,
+            image_urls=resolved_urls,
+            names=names,
+        )
     resolved = str(body.get("model") or resolve_video_model(model, bool(refs)))
     base = settings.openai_base_url.rstrip("/")
     headers = {"Authorization": f"Bearer {settings.openai_api_key}", "Content-Type": "application/json"}
