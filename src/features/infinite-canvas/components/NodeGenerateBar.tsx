@@ -56,8 +56,12 @@ import {
 import { displayModelName } from '@/lib/displayModelName'
 import { cn } from '@/lib/utils'
 
-const BAR_MIN_WIDTH = 560
-const BAR_MAX_WIDTH = 860
+/**
+ * Reserved dock width. Triggers are fixed-width pills and the frame is this
+ * wide, so model / ratio / quality / count (and the video equivalents) cannot
+ * grow or shrink the panel.
+ */
+const BAR_WIDTH = 688
 const BAR_ESTIMATED_HEIGHT = 168
 const DOCK_MENU =
   'z-[80] min-w-[10.5rem] overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl'
@@ -95,13 +99,13 @@ const DockSelectTrigger = React.forwardRef<
     title={label}
     {...props}
     className={cn(
-      'h-8 min-w-0 shrink-0 gap-1 overflow-hidden rounded-full px-2 py-0 text-[11px] font-medium text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-low))] [&_svg]:size-3',
-      wide ? 'max-w-[9.5rem]' : 'max-w-[5.75rem]',
+      'h-8 shrink-0 justify-start gap-1 overflow-hidden rounded-full px-2 py-0 text-[11px] font-medium text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-low))] [&_svg]:size-3',
+      wide ? 'w-[10.5rem]' : 'w-[5rem]',
       className
     )}
   >
     {icon ? <span className="shrink-0 text-[hsl(var(--secondary))]">{icon}</span> : null}
-    <span className="min-w-0 truncate whitespace-nowrap">{loading ? '加载模型…' : label}</span>
+    <span className="min-w-0 flex-1 truncate text-left whitespace-nowrap">{loading ? '加载模型…' : label}</span>
     {loading ? (
       <Loader2 className="h-3 w-3 shrink-0 animate-spin text-[hsl(var(--secondary))]" />
     ) : (
@@ -295,7 +299,7 @@ function GenerateBarModelPicker({
           ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <DockSelectTrigger icon={<Monitor className="h-3 w-3" />} label={videoResolution} />
+              <DockSelectTrigger className="w-[5.5rem]" icon={<Monitor className="h-3 w-3" />} label={videoResolution} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
               {availableResolutions.map((res) => (
@@ -321,7 +325,7 @@ function GenerateBarModelPicker({
           {durations.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <DockSelectTrigger icon={<Clock className="h-3 w-3" />} label={durationLabel} />
+                <DockSelectTrigger className="w-[5rem]" icon={<Clock className="h-3 w-3" />} label={durationLabel} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
                 {durations.map((item) => (
@@ -369,7 +373,7 @@ function GenerateBarModelPicker({
           {showQuality ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <DockSelectTrigger label={qualityLabel} />
+                <DockSelectTrigger className="w-[2.75rem]" label={qualityLabel} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
                 {qualities.map((item) => (
@@ -388,7 +392,7 @@ function GenerateBarModelPicker({
           {quantityOptions.length > 1 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <DockSelectTrigger icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
+                <DockSelectTrigger className="w-[4.25rem]" icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
                 {quantityOptions.map((qty) => (
@@ -634,9 +638,8 @@ const NodeGenerateBar: React.FC = () => {
   return (
     <NodeDockOverlay
       nodeId={selectedId && node ? selectedId : null}
-      barWidth={BAR_MIN_WIDTH}
-      maxWidth={BAR_MAX_WIDTH}
-      fitContent
+      barWidth={BAR_WIDTH}
+      maxWidth={BAR_WIDTH}
       estimatedHeight={BAR_ESTIMATED_HEIGHT}
       dockKey="generate"
     >
@@ -649,7 +652,7 @@ const NodeGenerateBar: React.FC = () => {
         ) : null}
         <div
           className={cn(
-            'border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/96 p-3 backdrop-blur-md',
+            'w-full min-w-0 border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/96 p-3 backdrop-blur-md',
             placeAbove
               ? 'rounded-[24px] shadow-[0_18px_50px_rgba(42,28,24,0.12)]'
               : 'rounded-[22px] shadow-[0_10px_28px_rgba(42,28,24,0.10)]'
@@ -692,34 +695,41 @@ const NodeGenerateBar: React.FC = () => {
             }
           />
 
-          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
+          <div className="mt-2 flex min-w-0 items-center gap-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleCastClick}
+                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
+                >
+                  <Users className="h-3 w-3" />
+                  角色库
+                </button>
+              </div>
+              <DockDivider />
+              <GenerateBarModelPicker node={node} onChange={handleModelChange} />
+            </div>
             <div className="flex shrink-0 items-center gap-1.5">
+              <span
+                className={cn(
+                  'inline-flex w-[4.5rem] shrink-0 items-center justify-end whitespace-nowrap text-[11px] font-semibold tabular-nums',
+                  insufficient ? 'text-red-600' : 'text-[hsl(var(--secondary))]'
+                )}
+              >
+                {quote ? `${quote.credits} 积分` : ''}
+              </span>
+              <DockDivider />
               <button
                 type="button"
-                onClick={handleCastClick}
-                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
+                onClick={handleSend}
+                disabled={sending || insufficient}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50"
+                title={insufficient ? blockedReason || '积分不足' : '发送生成'}
               >
-                <Users className="h-3 w-3" />
-                角色库
+                <ArrowUp className={cn('h-4 w-4', sending && 'animate-pulse')} />
               </button>
             </div>
-            <DockDivider />
-            <GenerateBarModelPicker node={node} onChange={handleModelChange} />
-            {quote ? (
-              <span className={`shrink-0 text-[11px] font-semibold ${insufficient ? 'text-red-600' : 'text-[hsl(var(--secondary))]'}`}>
-                {quote.credits} 积分
-              </span>
-            ) : null}
-            <DockDivider />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={sending || insufficient}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50"
-              title={insufficient ? blockedReason || '积分不足' : '发送生成'}
-            >
-              <ArrowUp className={cn('h-4 w-4', sending && 'animate-pulse')} />
-            </button>
           </div>
         </div>
         </>

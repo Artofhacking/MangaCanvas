@@ -64,6 +64,7 @@ export function NodeDockOverlay({
           left,
           top,
           width: fitContent ? 'max-content' : barWidth,
+          minWidth: fitContent ? undefined : barWidth,
           maxWidth,
         }}
         onPointerDown={(event) => event.stopPropagation()}
