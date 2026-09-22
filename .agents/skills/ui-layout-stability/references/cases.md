@@ -214,3 +214,28 @@ Share one field metric class for overlay and textarea (same font, weight, letter
 - `src/features/infinite-canvas/components/MentionPromptInput.tsx`
 - `src/features/infinite-canvas/utils/mentionPromptLayout.ts`
 - `src/features/infinite-canvas/utils/mentionPromptLayout.test.ts`
+
+## Case 009: Generate dock width jumps when option labels change
+
+### Symptom
+
+On a canvas 画面节点 or 视频节点, the prompt dock under the card (reference strip, prompt, and the 角色库 / model / ratio / quality / count / credits / send row) changed width when the user picked another model, ratio, quality, or count. The panel recentered because its width was part of the dock position.
+
+### Root cause
+
+`NodeDockOverlay` sized the generate bar with `width: max-content`. The select triggers were hug-content pills, so a longer model name, ratio (`1:1` vs `21:9`), quality, count, resolution, or duration changed the toolbar's intrinsic width and the outer frame followed. `min-width` on the bar was only an initial estimate and was not applied while `fitContent` was set.
+
+### Fix
+
+Lock the generate dock to a reserved width (`BAR_WIDTH`) and give each trigger a fixed pill width with a truncated label. Credits use a reserved tabular slot, and the send button stays in a non-shrinking trailing group. Image and video share the same bar, so both stay stable when optional controls appear or disappear.
+
+### Why this fix fit the project
+
+- The dock is already a single Lib-style one-line pill row; the bug was the frame hugging those labels.
+- A reserved width matches the existing `barWidth` positioning model instead of introducing a new measurement pass.
+- Dropdowns stay on the portaled `DropdownMenu`, so opening a menu still does not participate in layout.
+
+### Implementation reference
+
+- `src/features/infinite-canvas/components/NodeGenerateBar.tsx`
+- `src/features/infinite-canvas/components/NodeDockOverlay.tsx`
