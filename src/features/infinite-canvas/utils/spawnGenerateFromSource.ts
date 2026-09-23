@@ -1,5 +1,6 @@
 import { useCanvasStore } from '../stores/canvasStore'
 import type { GenerateNodeType } from './generateSlots'
+import { requestTextEditFocus } from './textEditFocus'
 import type { NodeData } from '../types'
 
 export function spawnGenerateFromSource(
@@ -30,5 +31,21 @@ export function spawnGenerateFromSource(
   const id = addNode(type, position, data)
   addEdgeManually({ source: sourceId, target: id })
   selectNode(id)
+  return id
+}
+
+/** Create an empty text note linked from the source node and focus its edit bar. */
+export function spawnTextNoteFromSource(
+  sourceId: string,
+  position: { x: number; y: number }
+): string | null {
+  const { nodes, addNode, addEdgeManually, selectNode } = useCanvasStore.getState()
+  const source = nodes.find((node) => node.id === sourceId)
+  if (!source) return null
+
+  const id = addNode('text', position)
+  addEdgeManually({ source: sourceId, target: id, targetHandle: 'left' })
+  selectNode(id)
+  requestTextEditFocus(id)
   return id
 }

@@ -80,9 +80,9 @@ import { hasStarterWorkflowTemplates } from './config/workflows';
 import NodeGenerateBar from './components/NodeGenerateBar';
 import { CanvasZoomControls } from './components/CanvasZoomControls';
 import TextEditBar from './components/TextEditBar';
-import ConnectDropMenu, { type ConnectDropMenuState } from './components/ConnectDropMenu';
-import { isGenerateNodeType, type GenerateNodeType } from './utils/generateSlots';
-import { spawnGenerateFromSource } from './utils/spawnGenerateFromSource';
+import ConnectDropMenu, { type ConnectDropChoice, type ConnectDropMenuState } from './components/ConnectDropMenu';
+import { isGenerateNodeType } from './utils/generateSlots';
+import { spawnGenerateFromSource, spawnTextNoteFromSource } from './utils/spawnGenerateFromSource';
 import { getClientPoint, getHandlePointFromEvent, getHandleScreenPoint } from './utils/connectPreview';
 import {
   CANVAS_INTERACTION_HINT,
@@ -887,12 +887,17 @@ const CanvasInner: React.FC = () => {
     })
   }, [isLocked, nodes, screenToFlowPosition]);
 
-  const handleSpawnFromDrop = useCallback((type: GenerateNodeType) => {
+  const handleSpawnFromDrop = useCallback((type: ConnectDropChoice) => {
     if (!connectDropMenu) return
-    spawnGenerateFromSource(connectDropMenu.sourceId, type, {
+    const position = {
       x: connectDropMenu.flow.x + 24,
       y: connectDropMenu.flow.y - 40,
-    })
+    }
+    if (type === 'text') {
+      spawnTextNoteFromSource(connectDropMenu.sourceId, position)
+    } else {
+      spawnGenerateFromSource(connectDropMenu.sourceId, type, position)
+    }
     clearConnectPreview()
   }, [clearConnectPreview, connectDropMenu]);
 

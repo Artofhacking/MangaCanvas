@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useCanvasStore } from '../stores/canvasStore'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from './generateSlots'
 import { resolveMentionsForSend } from './promptMentions'
-import { spawnGenerateFromSource } from './spawnGenerateFromSource'
+import { spawnGenerateFromSource, spawnTextNoteFromSource } from './spawnGenerateFromSource'
+import { consumePendingTextEditFocus } from './textEditFocus'
 
 describe('spawnGenerateFromSource', () => {
   beforeEach(() => {
@@ -57,6 +58,38 @@ describe('spawnGenerateFromSource', () => {
     expect(resolved).toBe('keep lighting @1')
     expect(inputs.prompt).toBe('keep lighting @1')
     expect(inputs.refImages).toEqual(['https://example.com/ref.png'])
+  })
+
+  it('creates a linked text note from the source without a generate node', () => {
+    const sourceId = useCanvasStore.getState().addNode('image', { x: 0, y: 0 }, {
+      url: 'https://example.com/ref.png',
+      label: '图片节点',
+    })
+
+    const id = spawnTextNoteFromSource(sourceId, { x: 320, y: 80 })
+    expect(id).toBeTruthy()
+
+    const { nodes, edges } = useCanvasStore.getState()
+    const spawned = nodes.find((node) => node.id === id)
+    expect(spawned?.type).toBe('text')
+    expect(spawned?.data.label).toBe('文本')
+    expect(spawned?.data.content).toBe('')
+    expect(spawned?.selected).toBe(true)
+    expect(isGenerateNodeType(spawned?.type)).toBe(false)
+    expect(nodes.filter((node) => isGenerateNodeType(node.type))).toHaveLength(0)
+    expect(edges).toEqual([
+      expect.objectContaining({
+        source: sourceId,
+        target: id,
+        targetHandle: 'left',
+      }),
+    ])
+    expect(consumePendingTextEditFocus(id!)).toBe(true)
+  })
+
+  it('does not spawn a text note when the source is missing', () => {
+    expect(spawnTextNoteFromSource('missing', { x: 0, y: 0 })).toBeNull()
+    expect(useCanvasStore.getState().nodes).toHaveLength(0)
   })
 
   it('creates a 文本 note that is not a generation entry', () => {
