@@ -50,6 +50,7 @@ interface CharacterFormProps {
   onCancel?: () => void
   hideActions?: boolean
   onValuesChange?: (values: CharacterFormValues) => void
+  promptLocked?: boolean
 }
 
 export default function CharacterForm({
@@ -59,6 +60,7 @@ export default function CharacterForm({
   onCancel,
   hideActions = false,
   onValuesChange,
+  promptLocked = false,
 }: CharacterFormProps) {
   const { notify } = useFeedback()
   const isEditMode = mode === 'edit' && initialData != null
@@ -292,6 +294,7 @@ export default function CharacterForm({
         value={generationConfig}
         onChange={setGenerationConfig}
         directory="characters"
+        promptLocked={promptLocked}
       />
 
       {hideActions ? null : <div className="flex items-center justify-end gap-3 pt-2">

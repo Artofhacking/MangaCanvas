@@ -31,6 +31,7 @@ interface AssetDetailDialogProps {
   prompt?: string
   assetId?: number
   onOpenCanvas?: () => void
+  extra?: ReactNode
 }
 
 export default function AssetDetailDialog({
@@ -45,6 +46,7 @@ export default function AssetDetailDialog({
   prompt,
   assetId,
   onOpenCanvas,
+  extra,
 }: AssetDetailDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,6 +104,7 @@ export default function AssetDetailDialog({
                   {prompt?.trim() || "暂无提示词"}
                 </p>
               </div>
+              {extra ? <div className="pt-4">{extra}</div> : null}
             </div>
 
             <div className="mt-6 pt-4 border-t border-[hsl(var(--outline-variant))]/30 flex items-center justify-between gap-3 text-xs text-[hsl(var(--secondary))]">

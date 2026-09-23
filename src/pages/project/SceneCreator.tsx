@@ -34,6 +34,8 @@ import {
   useAssetGenerationStore,
   withExistingAssetResult,
 } from "@/store/assetGenerationStore"
+import ShapingPanel from "@/features/project/ShapingPanel"
+import { normalizeShapingStatus } from "@/features/project/shaping"
 import type { Scene } from "@/types"
 import { useCreditQuote } from "@/hooks/useCreditQuote"
 
@@ -60,6 +62,8 @@ interface SceneCreatorProps {
   initialData?: Scene | null
   mode?: 'create' | 'edit' | 'generate'
   projectId?: number | null
+  onSetPromptLock?: (locked: boolean) => Promise<void>
+  lockingPrompt?: boolean
 }
 
 export default function SceneCreator({ 
@@ -68,6 +72,8 @@ export default function SceneCreator({
   onUpdate, 
   initialData, 
   projectId,
+  onSetPromptLock,
+  lockingPrompt = false,
 }: SceneCreatorProps) {
   const { notify } = useFeedback()
   const { models: imageModels, loading: modelsLoading, error: modelsError, refetch } = useImageModels()
@@ -87,6 +93,9 @@ export default function SceneCreator({
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
   const setCover = useAssetGenerationStore((state) => state.setCover)
+  const shapingStatus = normalizeShapingStatus(initialData?.shapingStatus)
+  const promptLocked = shapingStatus !== "unset"
+  const coverLocked = shapingStatus === "final"
   const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
     useCollapsibleTaskPanel(open)
 
@@ -204,6 +213,10 @@ export default function SceneCreator({
 
     if (!projectId) {
       notify.warning("缺少项目信息，无法生成")
+      return
+    }
+    if (coverLocked) {
+      notify.warning("已定妆，换定妆前请先解锁")
       return
     }
     if (blocked) {
@@ -343,15 +356,28 @@ export default function SceneCreator({
                   </p>
                 </div>
 
+                {initialData ? (
+                  <ShapingPanel
+                    status={shapingStatus}
+                    prompt={initialData.description}
+                    busy={lockingPrompt}
+                    onLock={onSetPromptLock ? () => void onSetPromptLock(true) : undefined}
+                    onUnlock={onSetPromptLock ? () => void onSetPromptLock(false) : undefined}
+                  />
+                ) : null}
                 <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-1 text-[hsl(var(--on-surface))]">
                     <span className="text-red-500">*</span> 提示词
                     <HelpCircle className="w-4 h-4 text-[hsl(var(--secondary))]" />
+                    {promptLocked ? (
+                      <span className="text-xs font-normal text-[hsl(var(--secondary))]">已锁定，改之前请先解锁</span>
+                    ) : null}
                   </label>
                   <div className="rounded-2xl border border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))]">
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
+                      disabled={promptLocked}
                       placeholder="输入文字，描述你想生成的场景，包括空间构成、时间氛围、光线、材质、镜头语言等。"
                       className="min-h-[110px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none"
                     />
@@ -375,7 +401,13 @@ export default function SceneCreator({
               tasks={tasks}
               highlight={highlightTasks}
               panelRef={taskPanelRef}
-              onSetCover={(task, url) => setCover(task.id, url)}
+              onSetCover={
+                coverLocked
+                  ? () => {
+                      throw new Error("已定妆，换定妆前请先解锁")
+                    }
+                  : (task, url) => setCover(task.id, url)
+              }
             />
           ) : null}
         </div>
@@ -391,7 +423,7 @@ export default function SceneCreator({
             onSave={handleSave}
             onGenerate={handleGenerate}
             costLabel={costLabel}
-            blockedReason={blocked}
+            blockedReason={coverLocked ? "已定妆，换定妆前请先解锁" : blocked}
           />
         </div>
       </SheetContent>

@@ -23,8 +23,9 @@ import {
   STORYBOARD_STATUS_LABEL,
   storyboardUsesReferenceImages,
 } from "@/features/project/storyboard"
+import { evaluateStoryboardGate, storyboardDependencyAssets } from "@/features/project/shaping"
 import { useProjectStore } from "@/store/projectStore"
-import type { Character, Episode, Scene, StoryboardShot } from "@/types"
+import type { Character, Episode, ObjectItem, Scene, StoryboardShot } from "@/types"
 import { ChevronDown, ChevronUp, Clapperboard, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react"
 
 interface EpisodeStoryboardProps {
@@ -32,6 +33,7 @@ interface EpisodeStoryboardProps {
   episode: Episode
   characters: Character[]
   scenes: Scene[]
+  objects?: ObjectItem[]
   onEpisodeChange: (episode: Episode) => void
 }
 
@@ -47,6 +49,7 @@ export default function EpisodeStoryboard({
   episode,
   characters,
   scenes,
+  objects = [],
   onEpisodeChange,
 }: EpisodeStoryboardProps) {
   const { notify } = useFeedback()
@@ -65,7 +68,22 @@ export default function EpisodeStoryboard({
     setShots(episode.storyboard || [])
   }, [episode.id])
 
-  const catalog = useMemo(() => ({ characters, scenes }), [characters, scenes])
+  const catalog = useMemo(() => ({ characters, scenes, objects }), [characters, objects, scenes])
+  const gate = useMemo(
+    () =>
+      evaluateStoryboardGate(
+        storyboardDependencyAssets({
+          episodeCharacterIds: episode.characterIds,
+          episodeSceneIds: episode.sceneIds,
+          episodeObjectIds: episode.objectIds,
+          shots,
+          characters,
+          scenes,
+          objects,
+        })
+      ),
+    [characters, episode.characterIds, episode.objectIds, episode.sceneIds, objects, scenes, shots]
+  )
   const modelIds = imageModels.map((model) => model.id)
   const busy = shots.some((shot) => shot.status === "generating")
 
@@ -122,6 +140,10 @@ export default function EpisodeStoryboard({
   const generateShot = async (shotId: string) => {
     const shot = shotsRef.current.find((item) => item.id === shotId)
     if (!shot) return
+    if (gate.blocked) {
+      notify.warning(gate.blockedMessage || "先锁定提示词或定妆")
+      return
+    }
     if (!shot.prompt.trim()) {
       notify.warning("请先填写画面说明")
       return
@@ -169,7 +191,7 @@ export default function EpisodeStoryboard({
         <div>
           <h3 className="text-lg font-bold text-[hsl(var(--on-surface))]">分镜表</h3>
           <p className="mt-1 text-sm text-[hsl(var(--secondary))]">
-            一行一镜。关联角色/场景会写入 prompt；参考图仅在图生图模型（wan2.6-image）生效。
+            一行一镜。已定妆的角色、场景和道具会带定妆图；半定型只写入锁定的提示词。参考图仅在图生图模型（wan2.6-image）生效。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -190,6 +212,17 @@ export default function EpisodeStoryboard({
           </Button>
         </div>
       </div>
+
+      {gate.blockedMessage ? (
+        <div className="mb-4 rounded-xl bg-[hsl(var(--surface-container-high))] px-4 py-3 text-sm text-[hsl(var(--on-surface))]">
+          {gate.blockedMessage}
+        </div>
+      ) : null}
+      {gate.semiHint ? (
+        <div className="mb-4 rounded-xl bg-[hsl(var(--primary))]/10 px-4 py-3 text-sm text-[hsl(var(--primary))]">
+          {gate.semiHint}
+        </div>
+      ) : null}
 
       {shots.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl bg-[hsl(var(--surface-container-low))] px-6 py-16 text-center">
@@ -386,9 +419,14 @@ export default function EpisodeStoryboard({
                       <div className="flex flex-col gap-2">
                         <Button
                           size="sm"
-                          disabled={shot.status === "generating"}
+                          disabled={shot.status === "generating" || gate.blocked}
+                          title={gate.blockedMessage || undefined}
                           onClick={() => void generateShot(shot.id)}
-                          className="h-9 rounded-lg signature-gradient border-0 text-white"
+                          className={`h-9 rounded-lg border-0 disabled:cursor-not-allowed ${
+                            gate.blocked
+                              ? "bg-[hsl(var(--surface-container-highest))] text-[hsl(var(--on-surface-variant))]"
+                              : "signature-gradient text-white"
+                          }`}
                         >
                           {shot.imageUrl ? (
                             <>

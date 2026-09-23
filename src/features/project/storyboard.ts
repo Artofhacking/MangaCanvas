@@ -1,5 +1,6 @@
 import { isI2IModel } from '@/api/aigc'
-import type { Character, Scene, StoryboardShot, StoryboardShotStatus } from '@/types'
+import type { Character, ObjectItem, Scene, StoryboardShot, StoryboardShotStatus } from '@/types'
+import { generationCover, lockedPromptLine } from '@/features/project/shaping'
 
 const STATUSES: StoryboardShotStatus[] = ['empty', 'generating', 'ready', 'failed']
 
@@ -111,33 +112,41 @@ export function shotsFromEpisodeScript(
   })
 }
 
-export function collectShotReferenceImages(
-  shot: StoryboardShot,
-  catalog: { characters: Character[]; scenes: Scene[] }
-): string[] {
+type StoryboardCatalog = {
+  characters: Character[]
+  scenes: Scene[]
+  objects?: ObjectItem[]
+}
+
+function shotAssets(shot: StoryboardShot, catalog: StoryboardCatalog) {
+  const characters = shot.characterIds
+    .map((id) => catalog.characters.find((item) => item.id === id))
+    .filter((item): item is Character => Boolean(item))
+  const scene = shot.sceneId ? catalog.scenes.find((item) => item.id === shot.sceneId) : undefined
+  const objects = (catalog.objects || []).filter((item) => item.name && shot.prompt.includes(item.name))
+  return { characters, scene, objects }
+}
+
+export function collectShotReferenceImages(shot: StoryboardShot, catalog: StoryboardCatalog): string[] {
+  const { characters, scene, objects } = shotAssets(shot, catalog)
   const images: string[] = []
-  for (const id of shot.characterIds) {
-    const image = catalog.characters.find((item) => item.id === id)?.image
-    if (image && !images.includes(image)) images.push(image)
-  }
-  if (shot.sceneId) {
-    const image = catalog.scenes.find((item) => item.id === shot.sceneId)?.image
+  for (const asset of [...characters, ...(scene ? [scene] : []), ...objects]) {
+    const image = generationCover(asset)
     if (image && !images.includes(image)) images.push(image)
   }
   return images
 }
 
-export function buildShotPrompt(
-  shot: StoryboardShot,
-  catalog: { characters: Character[]; scenes: Scene[] }
-): string {
-  const names = shot.characterIds
-    .map((id) => catalog.characters.find((item) => item.id === id)?.name)
-    .filter(Boolean)
-  const sceneName = shot.sceneId ? catalog.scenes.find((item) => item.id === shot.sceneId)?.name : undefined
+export function buildShotPrompt(shot: StoryboardShot, catalog: StoryboardCatalog): string {
+  const { characters, scene, objects } = shotAssets(shot, catalog)
+  const names = characters.map((item) => item.name).filter(Boolean)
+  const constraints = [...characters, ...(scene ? [scene] : []), ...objects]
+    .map((item) => lockedPromptLine(item))
+    .filter((line): line is string => Boolean(line))
   const extras = [
     names.length ? `角色：${names.join('、')}` : '',
-    sceneName ? `场景：${sceneName}` : '',
+    scene?.name ? `场景：${scene.name}` : '',
+    constraints.length ? `定型约束：\n${constraints.join('\n')}` : '',
   ].filter(Boolean)
   return [shot.prompt.trim(), ...extras].filter(Boolean).join('\n')
 }

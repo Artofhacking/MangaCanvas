@@ -234,6 +234,7 @@ export default function EpisodeDetail() {
               episode={episode}
               characters={catalog.characters}
               scenes={catalog.scenes}
+              objects={catalog.objects}
               onEpisodeChange={setEpisode}
             />
           ) : null}

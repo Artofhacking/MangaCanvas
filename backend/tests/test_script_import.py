@@ -201,20 +201,24 @@ def test_import_empty_body_persists_text_assets_without_media(client, ids, Sessi
     assert characters["苏晚"]["description"] == "短发年轻女性，眼神警觉"
     assert characters["苏晚"]["role"] == "support"
     assert all(not item["avatar"] for item in characters.values())
+    assert all(item["shapingStatus"] == "unset" and item["promptLocked"] is False for item in characters.values())
 
     assert "城南诊所" in scenes["夜诊所"]["description"]
     assert "铁门，冷白灯" in scenes["夜诊所"]["description"]
     assert "废弃钟楼内部，月光从破窗进来" in scenes["废弃钟楼"]["description"]
     assert all(not item["image"] for item in scenes.values())
     assert all(item["status"] == "draft" for item in scenes.values())
+    assert all(item["shapingStatus"] == "unset" for item in scenes.values())
 
     assert objects["铁钥匙"]["description"] == "黄铜旧钥匙"
     assert objects["黑伞"]["description"] == "湿透的黑伞"
     assert objects["白大褂"]["type"] == "clothing"
     assert all(not item["image"] for item in objects.values())
+    assert all(item["shapingStatus"] == "unset" for item in objects.values())
 
     assert "钥匙在我这儿" in episodes["第01集 别开门"]["description"]
     assert {item["name"] for item in episodes["第01集 别开门"]["characters"]} == {"林深", "苏晚"}
+    assert all(item["shapingStatus"] == "unset" for item in episodes["第01集 别开门"]["characters"])
     assert {item["name"] for item in episodes["第01集 别开门"]["scenes"]} == {"夜诊所"}
     assert {item["name"] for item in episodes["第01集 别开门"]["objects"]} == {"铁钥匙", "白大褂"}
     assert "她长得像我妈" in episodes["第02集 钟声"]["description"]

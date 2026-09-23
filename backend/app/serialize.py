@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from . import models
+from .shaping import shaping_payload
 from .util import iso, rewrite_media_tree, rewrite_stored_media_url
 
 
@@ -89,6 +90,7 @@ def character(row: models.Character) -> dict:
         "usageCount": row.usage_count,
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),
+        **shaping_payload(row),
     }
 
 
@@ -113,6 +115,7 @@ def scene(row: models.Scene) -> dict:
         "usageCount": row.usage_count,
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),
+        **shaping_payload(row),
     }
 
 
@@ -134,6 +137,7 @@ def obj(row: models.ProjectObject) -> dict:
         "sourceNodeId": row.source_node_id,
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),
+        **shaping_payload(row),
     }
 
 
@@ -211,11 +215,23 @@ def episode(db: Session, row: models.Episode) -> dict:
                 "name": c.name,
                 "image": rewrite_stored_media_url(c.avatar),
                 "role": "主角" if c.role == "main" else "配角",
+                **shaping_payload(c),
             }
             for c in chars
         ],
-        "scenes": [{"id": s.id, "name": s.name, "image": rewrite_stored_media_url(s.image)} for s in scenes],
-        "objects": [{"id": o.id, "name": o.name, "image": rewrite_stored_media_url(o.image), "type": o.type} for o in objects],
+        "scenes": [
+            {"id": s.id, "name": s.name, "image": rewrite_stored_media_url(s.image), **shaping_payload(s)} for s in scenes
+        ],
+        "objects": [
+            {
+                "id": o.id,
+                "name": o.name,
+                "image": rewrite_stored_media_url(o.image),
+                "type": o.type,
+                **shaping_payload(o),
+            }
+            for o in objects
+        ],
         "sceneCount": len(scenes),
         "storyboard": rewrite_media_tree(normalize_storyboard(getattr(row, "storyboard", None))),
         "createdAt": iso(row.created_at),

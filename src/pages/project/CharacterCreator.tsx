@@ -19,6 +19,8 @@ import {
   withExistingAssetResult,
 } from "@/store/assetGenerationStore"
 import type { Character, CharacterCreateData, CharacterEditData } from "@/types"
+import ShapingPanel from "@/features/project/ShapingPanel"
+import { normalizeShapingStatus } from "@/features/project/shaping"
 import CharacterForm, { type CharacterFormValues } from "./CharacterForm"
 import { useCreditQuote } from "@/hooks/useCreditQuote"
 import { aspectToSize } from "@/lib/generateAssetImage"
@@ -31,6 +33,8 @@ interface CharacterCreatorProps {
   initialData?: Character | null
   mode?: "create" | "edit"
   projectId?: number | null
+  onSetPromptLock?: (locked: boolean) => Promise<void>
+  lockingPrompt?: boolean
 }
 
 export default function CharacterCreator({
@@ -40,6 +44,8 @@ export default function CharacterCreator({
   initialData,
   mode = "create",
   projectId,
+  onSetPromptLock,
+  lockingPrompt = false,
 }: CharacterCreatorProps) {
   const { notify } = useFeedback()
   const isEditMode = Boolean(initialData)
@@ -74,6 +80,9 @@ export default function CharacterCreator({
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
   const setCover = useAssetGenerationStore((state) => state.setCover)
+  const shapingStatus = normalizeShapingStatus(initialData?.shapingStatus)
+  const promptLocked = shapingStatus !== "unset"
+  const coverLocked = shapingStatus === "final"
 
   const handleValuesChange = useCallback((values: CharacterFormValues) => {
     valuesRef.current = values
@@ -137,6 +146,10 @@ export default function CharacterCreator({
       notify.warning("缺少项目信息，无法生成")
       return
     }
+    if (coverLocked) {
+      notify.warning("已定妆，换定妆前请先解锁")
+      return
+    }
     if (blocked) {
       notify.warning(blocked)
       return
@@ -194,10 +207,22 @@ export default function CharacterCreator({
               panelOpen ? "w-[52%] border-r border-[hsl(var(--outline-variant))]/15" : "w-full"
             }`}
           >
+            {initialData ? (
+              <div className="mb-6">
+                <ShapingPanel
+                  status={shapingStatus}
+                  prompt={initialData.description}
+                  busy={lockingPrompt}
+                  onLock={onSetPromptLock ? () => void onSetPromptLock(true) : undefined}
+                  onUnlock={onSetPromptLock ? () => void onSetPromptLock(false) : undefined}
+                />
+              </div>
+            ) : null}
             <CharacterForm
               mode={mode}
               initialData={initialData}
               hideActions
+              promptLocked={promptLocked}
               onValuesChange={handleValuesChange}
             />
           </div>
@@ -206,7 +231,13 @@ export default function CharacterCreator({
               tasks={tasks}
               highlight={highlightTasks}
               panelRef={taskPanelRef}
-              onSetCover={(task, url) => setCover(task.id, url)}
+              onSetCover={
+                coverLocked
+                  ? () => {
+                      throw new Error("已定妆，换定妆前请先解锁")
+                    }
+                  : (task, url) => setCover(task.id, url)
+              }
             />
           ) : null}
         </div>
@@ -222,7 +253,7 @@ export default function CharacterCreator({
             onSave={handleSave}
             onGenerate={handleGenerate}
             costLabel={costLabel}
-            blockedReason={blocked}
+            blockedReason={coverLocked ? "已定妆，换定妆前请先解锁" : blocked}
           />
         </div>
       </SheetContent>

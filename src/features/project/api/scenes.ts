@@ -89,6 +89,23 @@ export const scenesApi = {
     )
   },
 
+  async setPromptLock(projectId: number, id: number, locked: boolean): Promise<ApiResponse<Scene | null>> {
+    return toApiResponse<SceneDTO | null>(
+      {
+        url: `/projects/${projectId}/scenes/${id}/prompt-lock`,
+        method: 'POST',
+        data: { locked },
+      },
+      null,
+      locked ? '锁定提示词失败' : '解锁提示词失败',
+      (result) => (result ? (mapScene(result) as unknown as SceneDTO) : null)
+    ).then((response) =>
+      response.success
+        ? successResponse((response.data as unknown as Scene | null) ?? null)
+        : errorResponse(response.message || (locked ? '锁定提示词失败' : '解锁提示词失败'), null)
+    )
+  },
+
   async delete(projectId: number, id: number): Promise<ApiResponse<boolean>> {
     return toApiResponse<true>(
       {

@@ -21,6 +21,8 @@ import {
   useAssetGenerationStore,
   withExistingAssetResult,
 } from "@/store/assetGenerationStore"
+import ShapingPanel from "@/features/project/ShapingPanel"
+import { normalizeShapingStatus } from "@/features/project/shaping"
 import type { ObjectItem } from "@/types"
 import { useCreditQuote } from "@/hooks/useCreditQuote"
 import { aspectToSize } from "@/lib/generateAssetImage"
@@ -48,6 +50,8 @@ interface ObjectCreatorProps {
   initialData?: ObjectItem | null
   mode?: "create" | "edit"
   projectId?: number | null
+  onSetPromptLock?: (locked: boolean) => Promise<void>
+  lockingPrompt?: boolean
 }
 
 export default function ObjectCreator({
@@ -56,6 +60,8 @@ export default function ObjectCreator({
   onUpdate,
   initialData,
   projectId,
+  onSetPromptLock,
+  lockingPrompt = false,
 }: ObjectCreatorProps) {
   const { notify } = useFeedback()
   const [objectName, setObjectName] = useState("")
@@ -77,6 +83,9 @@ export default function ObjectCreator({
   const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
   const startGeneration = useAssetGenerationStore((state) => state.start)
   const setCover = useAssetGenerationStore((state) => state.setCover)
+  const shapingStatus = normalizeShapingStatus(initialData?.shapingStatus)
+  const promptLocked = shapingStatus !== "unset"
+  const coverLocked = shapingStatus === "final"
 
   const resetForm = () => {
     setObjectName("")
@@ -146,6 +155,10 @@ export default function ObjectCreator({
       notify.warning("缺少项目信息，无法生成")
       return
     }
+    if (coverLocked) {
+      notify.warning("已定妆，换定妆前请先解锁")
+      return
+    }
     if (blocked) {
       notify.warning(blocked)
       return
@@ -209,14 +222,34 @@ export default function ObjectCreator({
                 className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
               />
             </div>
-            <ImageGenerationForm directory="objects" value={generationConfig} onChange={setGenerationConfig} />
+            {initialData ? (
+              <ShapingPanel
+                status={shapingStatus}
+                prompt={initialData.description}
+                busy={lockingPrompt}
+                onLock={onSetPromptLock ? () => void onSetPromptLock(true) : undefined}
+                onUnlock={onSetPromptLock ? () => void onSetPromptLock(false) : undefined}
+              />
+            ) : null}
+            <ImageGenerationForm
+              directory="objects"
+              value={generationConfig}
+              onChange={setGenerationConfig}
+              promptLocked={promptLocked}
+            />
           </div>
           {panelOpen ? (
             <GenerationTaskPanel
               tasks={tasks}
               highlight={highlightTasks}
               panelRef={taskPanelRef}
-              onSetCover={(task, url) => setCover(task.id, url)}
+              onSetCover={
+              coverLocked
+                ? () => {
+                    throw new Error("已定妆，换定妆前请先解锁")
+                  }
+                : (task, url) => setCover(task.id, url)
+            }
             />
           ) : null}
         </div>
@@ -232,7 +265,7 @@ export default function ObjectCreator({
             onSave={handleSave}
             onGenerate={handleGenerate}
             costLabel={costLabel}
-            blockedReason={blocked}
+            blockedReason={coverLocked ? "已定妆，换定妆前请先解锁" : blocked}
           />
         </div>
       </SheetContent>

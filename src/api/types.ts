@@ -124,6 +124,10 @@ export interface CharacterDTO {
   sourceNodeId?: string | null
   usageCount?: number
   aspectRatio?: string | null
+  promptLocked?: boolean
+  promptLockedAt?: string | null
+  hasCover?: boolean
+  shapingStatus?: 'unset' | 'semi' | 'final'
   createdAt?: string
   updatedAt?: string
 }
@@ -147,6 +151,10 @@ export interface SceneDTO {
   sourceNodeId?: string | null
   usageCount?: number
   aspectRatio?: string | null
+  promptLocked?: boolean
+  promptLockedAt?: string | null
+  hasCover?: boolean
+  shapingStatus?: 'unset' | 'semi' | 'final'
   createdAt?: string
   updatedAt?: string
 }
@@ -167,6 +175,10 @@ export interface ObjectDTO {
   sourceWorkflowId?: string | null
   sourceNodeId?: string | null
   aspectRatio?: string | null
+  promptLocked?: boolean
+  promptLockedAt?: string | null
+  hasCover?: boolean
+  shapingStatus?: 'unset' | 'semi' | 'final'
   createdAt?: string
   updatedAt?: string
 }
@@ -177,6 +189,9 @@ export interface EpisodeRelationRef {
   image?: string | null
   role?: string | null
   type?: string | null
+  shapingStatus?: 'unset' | 'semi' | 'final'
+  promptLocked?: boolean
+  hasCover?: boolean
 }
 
 export interface EpisodeDTO {

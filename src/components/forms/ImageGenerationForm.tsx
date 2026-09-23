@@ -25,6 +25,7 @@ interface ImageGenerationFormProps {
   quantityOptions?: number[]
   showQuantity?: boolean
   disabled?: boolean
+  promptLocked?: boolean
   directory?: UploadDirectory
 }
 
@@ -37,6 +38,7 @@ export function ImageGenerationForm({
   quantityOptions,
   showQuantity = false,
   disabled = false,
+  promptLocked = false,
   directory = "objects",
 }: ImageGenerationFormProps) {
   const { notify } = useFeedback()
@@ -184,6 +186,9 @@ export function ImageGenerationForm({
       <div className="space-y-2">
         <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
           <span className="mr-1 text-red-500">*</span>提示词
+          {promptLocked ? (
+            <span className="ml-2 text-xs font-normal text-[hsl(var(--secondary))]">已锁定，改之前请先解锁</span>
+          ) : null}
         </label>
         <input
           type="file"
@@ -213,7 +218,7 @@ export function ImageGenerationForm({
             placeholder={
               uploading ? "正在上传..." : "上传参考图、输入文字，描述你想生成的图片。"
             }
-            disabled={uploading || disabled}
+            disabled={uploading || disabled || promptLocked}
             className="min-h-[132px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none disabled:opacity-50"
           />
 

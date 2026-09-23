@@ -8,7 +8,7 @@ import type {
   ProjectMemberDTO,
   SceneDTO,
 } from '@/api/types'
-import type { Character, Episode, ObjectItem, Scene } from '@/types'
+import type { Character, Episode, ObjectItem, Scene, ShapingStatus } from '@/types'
 import { normalizeStoryboard } from '@/features/project/storyboard'
 
 const relativeTime = (iso?: string) => {
@@ -36,6 +36,9 @@ const relativeTime = (iso?: string) => {
 }
 
 const fallbackImage = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&h=400&fit=crop'
+
+const mapShaping = (status?: ShapingStatus | null): ShapingStatus =>
+  status === 'semi' || status === 'final' ? status : 'unset'
 
 export const mapProjectCard = (project: ProjectDTO) => ({
   id: project.id,
@@ -73,17 +76,20 @@ export const mapEpisode = (episode: EpisodeDTO): Episode => ({
     name: item.name,
     image: item.image || undefined,
     role: item.role || undefined,
+    shapingStatus: mapShaping(item.shapingStatus),
   })),
   scenes: (episode.scenes || []).map((item) => ({
     id: item.id,
     name: item.name,
     image: item.image || undefined,
+    shapingStatus: mapShaping(item.shapingStatus),
   })),
   objects: (episode.objects || []).map((item) => ({
     id: item.id,
     name: item.name,
     image: item.image || undefined,
     type: item.type || undefined,
+    shapingStatus: mapShaping(item.shapingStatus),
   })),
   characterIds: episode.characters?.map((item) => item.id) ?? [],
   sceneIds: episode.scenes?.map((item) => item.id) ?? [],
@@ -103,6 +109,9 @@ export const mapScene = (scene: SceneDTO): Scene => ({
   model: scene.modelId || undefined,
   description: scene.description || undefined,
   aspectRatio: scene.aspectRatio || undefined,
+  shapingStatus: mapShaping(scene.shapingStatus),
+  promptLocked: Boolean(scene.promptLocked),
+  promptLockedAt: scene.promptLockedAt || undefined,
 })
 
 export const mapCharacter = (character: CharacterDTO): Character => ({
@@ -119,6 +128,9 @@ export const mapCharacter = (character: CharacterDTO): Character => ({
   model: character.modelId || undefined,
   description: character.description || undefined,
   aspectRatio: character.aspectRatio || undefined,
+  shapingStatus: mapShaping(character.shapingStatus),
+  promptLocked: Boolean(character.promptLocked),
+  promptLockedAt: character.promptLockedAt || undefined,
 })
 
 const objectTypeMap: Record<ObjectDTO['type'], ObjectItem['type']> = {
@@ -140,6 +152,9 @@ export const mapObject = (object: ObjectDTO): ObjectItem => ({
   description: object.description || undefined,
   genMethod: object.genMethod || undefined,
   aspectRatio: object.aspectRatio || undefined,
+  shapingStatus: mapShaping(object.shapingStatus),
+  promptLocked: Boolean(object.promptLocked),
+  promptLockedAt: object.promptLockedAt || undefined,
 })
 
 export const mapMember = (member: ProjectMemberDTO) => ({

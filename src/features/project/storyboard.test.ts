@@ -67,6 +67,8 @@ describe('collectShotReferenceImages / prompt', () => {
         role: '主角' as const,
         style: '',
         scenes: 0,
+        description: '黑发少年',
+        shapingStatus: 'final' as const,
       },
     ],
     scenes: [
@@ -78,11 +80,13 @@ describe('collectShotReferenceImages / prompt', () => {
         status: 'in-use' as const,
         modified: '',
         code: 'SC_002',
+        description: '雾气',
+        shapingStatus: 'final' as const,
       },
     ],
   }
 
-  it('collects linked character and scene images', () => {
+  it('collects finalized character and scene covers', () => {
     expect(
       collectShotReferenceImages(
         { ...createStoryboardShot(1), characterIds: [1], sceneId: 2 },
@@ -91,10 +95,20 @@ describe('collectShotReferenceImages / prompt', () => {
     ).toEqual(['https://cdn.example/qingyu.png', 'https://cdn.example/hill.png'])
   })
 
-  it('appends 角色/场景 names to the generate prompt', () => {
+  it('keeps semi assets as locked prompt text and skips their covers', () => {
+    const semiCatalog = {
+      ...catalog,
+      scenes: [{ ...catalog.scenes[0], shapingStatus: 'semi' as const, hasImage: false }],
+    }
     expect(
-      buildShotPrompt({ ...createStoryboardShot(1, '拔剑'), characterIds: [1], sceneId: 2 }, catalog)
-    ).toBe('拔剑\n角色：青羽\n场景：后山')
+      collectShotReferenceImages(
+        { ...createStoryboardShot(1), characterIds: [1], sceneId: 2 },
+        semiCatalog
+      )
+    ).toEqual(['https://cdn.example/qingyu.png'])
+    expect(
+      buildShotPrompt({ ...createStoryboardShot(1, '拔剑'), characterIds: [1], sceneId: 2 }, semiCatalog)
+    ).toBe('拔剑\n角色：青羽\n场景：后山\n定型约束：\n青羽：黑发少年\n后山：雾气')
   })
 })
 

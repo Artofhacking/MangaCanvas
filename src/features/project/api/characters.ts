@@ -90,6 +90,23 @@ export const charactersApi = {
     )
   },
 
+  async setPromptLock(projectId: number, id: number, locked: boolean): Promise<ApiResponse<Character | null>> {
+    return toApiResponse<CharacterDTO | null>(
+      {
+        url: `/projects/${projectId}/characters/${id}/prompt-lock`,
+        method: 'POST',
+        data: { locked },
+      },
+      null,
+      locked ? '锁定提示词失败' : '解锁提示词失败',
+      (result) => (result ? (mapCharacter(result) as unknown as CharacterDTO) : null)
+    ).then((response) =>
+      response.success
+        ? successResponse((response.data as unknown as Character | null) ?? null)
+        : errorResponse(response.message || (locked ? '锁定提示词失败' : '解锁提示词失败'), null)
+    )
+  },
+
   async delete(projectId: number, id: number): Promise<ApiResponse<boolean>> {
     return toApiResponse<true>(
       {

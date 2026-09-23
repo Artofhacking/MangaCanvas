@@ -118,6 +118,8 @@ class Character(Base):
     source_workflow_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_node_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
+    prompt_locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    prompt_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
@@ -141,6 +143,8 @@ class Scene(Base):
     source_workflow_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_node_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
+    prompt_locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    prompt_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
@@ -161,6 +165,8 @@ class ProjectObject(Base):
     creation_mode: Mapped[str] = mapped_column(String(16), default="quick")
     source_workflow_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_node_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    prompt_locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    prompt_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
