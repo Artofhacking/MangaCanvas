@@ -49,7 +49,8 @@ import { useThemeStore } from './stores/themeStore';
 import { getAllProjects } from './utils/indexedDB';
 import { workflowsApi } from '@/features/project/api/workflows';
 import { projectApi } from '@/api/projectApi';
-import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, type WorkflowSeedAsset } from '@/lib/workflows';
+import { dominantAssetNode } from '@/lib/assetSeed';
+import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
 import {
@@ -123,24 +124,9 @@ const CanvasInner: React.FC = () => {
   const canvasDocumentId = workflowId;
 
   const toEpisodeSeedAssets = (episode?: Episode | null): WorkflowSeedAsset[] => [
-    ...(episode?.characters || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      category: 'character' as const,
-    })),
-    ...(episode?.scenes || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      category: 'scene' as const,
-    })),
-    ...(episode?.objects || []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      category: 'object' as const,
-    })),
+    ...(episode?.characters || []).map((item) => toWorkflowSeedAsset(item, 'character')),
+    ...(episode?.scenes || []).map((item) => toWorkflowSeedAsset(item, 'scene')),
+    ...(episode?.objects || []).map((item) => toWorkflowSeedAsset(item, 'object')),
   ];
 
   const {
@@ -802,26 +788,38 @@ const CanvasInner: React.FC = () => {
     setShowNodeMenu(false);
   };
 
-  const createImageNodeFromMaterial = useCallback(
+  const createNodeFromMaterial = useCallback(
     (item: CanvasMaterialItem, position?: { x: number; y: number }) => {
-      if (!item.cover) {
-        message.info('该素材暂不支持插入到图片节点');
-        return;
-      }
-
       const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
       const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
       const targetPosition = position || { x: viewportCenterX - 140, y: viewportCenterY - 100 };
+      const seeded = dominantAssetNode(
+        {
+          name: item.title,
+          prompt: item.prompt,
+          image: item.cover,
+          video: item.video,
+          mediaType: item.mediaType,
+          hasImage: item.hasImage,
+          hasVideo: item.hasVideo,
+        },
+        targetPosition,
+        'material',
+      );
+      if (!seeded) {
+        message.info('该素材没有可放入画布的图片、视频或提示词');
+        return false;
+      }
 
-      addNode('image', targetPosition, {
-        url: item.cover,
-        thumbnail: item.cover,
-        label: item.title,
+      addNode(seeded.type, targetPosition, {
+        ...seeded.data,
+        thumbnail: seeded.type === 'image' && typeof seeded.data.url === 'string' ? seeded.data.url : undefined,
         loading: false,
         sourceType: item.category,
         sourceAssetId: item.id,
         sourceLibrary: item.library,
       });
+      return true;
     },
     [addNode, viewport]
   );
@@ -902,9 +900,9 @@ const CanvasInner: React.FC = () => {
   }, [clearConnectPreview, connectDropMenu]);
 
   const handleMaterialSelect = useCallback((item: CanvasMaterialItem) => {
-    createImageNodeFromMaterial(item);
+    if (!createNodeFromMaterial(item)) return;
     message.success(`已将“${item.title}”插入画布`);
-  }, [createImageNodeFromMaterial]);
+  }, [createNodeFromMaterial]);
 
   const handleCanvasDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (isLocked || !event.dataTransfer.types.includes(MATERIAL_DRAG_MIME)) return;
@@ -929,12 +927,12 @@ const CanvasInner: React.FC = () => {
     try {
       const item = JSON.parse(raw) as CanvasMaterialItem;
       const flowPosition = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      createImageNodeFromMaterial(item, { x: flowPosition.x - 140, y: flowPosition.y - 100 });
+      if (!createNodeFromMaterial(item, { x: flowPosition.x - 140, y: flowPosition.y - 100 })) return;
       message.success(`已将“${item.title}”拖入画布`);
     } catch {
       message.error('素材读取失败');
     }
-  }, [createImageNodeFromMaterial, isLocked, screenToFlowPosition]);
+  }, [createNodeFromMaterial, isLocked, screenToFlowPosition]);
 
   useEffect(() => {
     const clearCanvasMaterialDragState = () => {

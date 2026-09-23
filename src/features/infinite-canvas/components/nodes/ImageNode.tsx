@@ -10,6 +10,7 @@ import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CanvasMaterialItem, CustomNode } from '../../types';
 import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
 import { mediaUrl } from '@/lib/mediaUrl';
+import { resolveAssetMedia } from '@/lib/assetSeed';
 import { PlusHandle } from './PlusHandle';
 import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
 import {
@@ -138,11 +139,23 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   }, [duplicateNode, id]);
 
   const applyMaterialToNode = useCallback((item: CanvasMaterialItem) => {
-    if (!item.cover) return;
+    const resolved = resolveAssetMedia({
+      name: item.title,
+      prompt: item.prompt,
+      image: item.cover,
+      video: item.video,
+      mediaType: item.mediaType,
+      hasImage: item.hasImage,
+      hasVideo: item.hasVideo,
+    });
+    if (resolved.kind !== 'image' || !resolved.imageUrl) {
+      message.info('这个素材没有可放入图片节点的封面');
+      return;
+    }
     updateNode(id, {
-      url: item.cover,
-      thumbnail: item.cover,
-      label: item.title,
+      url: resolved.imageUrl,
+      thumbnail: resolved.imageUrl,
+      label: resolved.label || item.title,
       loading: false,
       sourceType: item.category,
       sourceAssetId: item.id,

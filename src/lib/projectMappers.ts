@@ -8,8 +8,9 @@ import type {
   ProjectMemberDTO,
   SceneDTO,
 } from '@/api/types'
-import type { Character, Episode, ObjectItem, Scene, ShapingStatus } from '@/types'
+import type { Character, Episode, EpisodeRelationItem, ObjectItem, Scene, ShapingStatus } from '@/types'
 import { normalizeStoryboard } from '@/features/project/storyboard'
+import { PLACEHOLDER_COVER_URL } from '@/lib/assetSeed'
 
 const relativeTime = (iso?: string) => {
   if (!iso) {
@@ -35,10 +36,32 @@ const relativeTime = (iso?: string) => {
   return `${weeks} 周前`
 }
 
-const fallbackImage = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&h=400&fit=crop'
+const fallbackImage = PLACEHOLDER_COVER_URL
 
 const mapShaping = (status?: ShapingStatus | null): ShapingStatus =>
   status === 'semi' || status === 'final' ? status : 'unset'
+
+const mapRelation = (
+  item: {
+    id: number
+    name: string
+    image?: string | null
+    description?: string | null
+    role?: string | null
+    type?: string | null
+    shapingStatus?: ShapingStatus | null
+    hasCover?: boolean
+  },
+  extra?: Pick<EpisodeRelationItem, 'role' | 'type'>,
+): EpisodeRelationItem => ({
+  id: item.id,
+  name: item.name,
+  image: item.image || undefined,
+  description: item.description || undefined,
+  hasImage: typeof item.hasCover === 'boolean' ? item.hasCover : Boolean(item.image),
+  shapingStatus: mapShaping(item.shapingStatus),
+  ...extra,
+})
 
 export const mapProjectCard = (project: ProjectDTO) => ({
   id: project.id,
@@ -71,26 +94,13 @@ export const mapEpisode = (episode: EpisodeDTO): Episode => ({
   hasImage: Boolean(episode.coverImage),
   description: episode.description || undefined,
   progress: episode.progress ?? 0,
-  characters: (episode.characters || []).map((item) => ({
-    id: item.id,
-    name: item.name,
-    image: item.image || undefined,
-    role: item.role || undefined,
-    shapingStatus: mapShaping(item.shapingStatus),
-  })),
-  scenes: (episode.scenes || []).map((item) => ({
-    id: item.id,
-    name: item.name,
-    image: item.image || undefined,
-    shapingStatus: mapShaping(item.shapingStatus),
-  })),
-  objects: (episode.objects || []).map((item) => ({
-    id: item.id,
-    name: item.name,
-    image: item.image || undefined,
-    type: item.type || undefined,
-    shapingStatus: mapShaping(item.shapingStatus),
-  })),
+  characters: (episode.characters || []).map((item) =>
+    mapRelation(item, { role: item.role || undefined }),
+  ),
+  scenes: (episode.scenes || []).map((item) => mapRelation(item)),
+  objects: (episode.objects || []).map((item) =>
+    mapRelation(item, { type: item.type || undefined }),
+  ),
   characterIds: episode.characters?.map((item) => item.id) ?? [],
   sceneIds: episode.scenes?.map((item) => item.id) ?? [],
   objectIds: episode.objects?.map((item) => item.id) ?? [],

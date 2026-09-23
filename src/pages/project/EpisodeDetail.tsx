@@ -6,6 +6,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useEffect, useMemo, useState } from "react"
 import { projectApi } from "@/api/projectApi"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
+import { seedOptionsFromLaunch, toCanvasLaunchSource, toWorkflowSeedAsset } from "@/lib/workflows"
 import { projectEpisodePath } from "@/lib/workspaceRoutes"
 import type { Character, Episode, EpisodeRelationItem, ObjectItem, Scene } from "@/types"
 import PlotMentionText from "@/components/PlotMentionText"
@@ -96,6 +97,21 @@ export default function EpisodeDetail() {
 
   const episodeReturnTo = projectId && episodeId ? projectEpisodePath(projectId, episodeId) : undefined
 
+  const relationSeed = (item: EpisodeRelationItem, category: "character" | "scene" | "object") => {
+    const catalogItem = (
+      category === "character" ? catalog.characters : category === "scene" ? catalog.scenes : catalog.objects
+    ).find((asset) => asset.id === item.id)
+    return toWorkflowSeedAsset(
+      {
+        ...item,
+        image: item.image ?? catalogItem?.image,
+        description: item.description || catalogItem?.description,
+        hasImage: item.hasImage ?? catalogItem?.hasImage,
+      },
+      category,
+    )
+  }
+
   const openCanvas = async () => {
     if (!projectId || !episodeId || !episode) return
     await launchWorkflow({
@@ -107,24 +123,9 @@ export default function EpisodeDetail() {
       returnTo: episodeReturnTo,
       from: "episode",
       relatedAssets: [
-        ...relatedCharacters.map((item) => ({
-          id: item.id,
-          name: item.name,
-          image: item.image,
-          category: "character" as const,
-        })),
-        ...relatedScenes.map((item) => ({
-          id: item.id,
-          name: item.name,
-          image: item.image,
-          category: "scene" as const,
-        })),
-        ...relatedObjects.map((item) => ({
-          id: item.id,
-          name: item.name,
-          image: item.image,
-          category: "object" as const,
-        })),
+        ...relatedCharacters.map((item) => relationSeed(item, "character")),
+        ...relatedScenes.map((item) => relationSeed(item, "scene")),
+        ...relatedObjects.map((item) => relationSeed(item, "object")),
       ],
     })
   }
@@ -447,28 +448,40 @@ export default function EpisodeDetail() {
                 icon={column.icon}
                 title={column.title}
                 empty={column.empty}
-                items={column.items.map((item) => ({
-                  id: item.id,
-                  name: item.name,
-                  image: item.image,
-                  kind: column.kind,
-                  statusLine: episodeAssetStatusLine({
-                    shapingStatus: item.shapingStatus,
-                    prompt: assetPrompt(column.kind, item.id),
-                  }),
-                  onClick: () => {
-                    if (!projectId) return
-                    void launchWorkflow({
-                      projectId,
-                      sourceType: column.kind,
-                      sourceName: item.name,
-                      sourceAssetId: item.id,
-                      seedImage: item.image,
-                      returnTo: episodeReturnTo,
-                      from: "episode",
-                    })
-                  },
-                }))}
+                items={column.items.map((item) => {
+                  const seeded = relationSeed(item, column.kind)
+                  return {
+                    id: item.id,
+                    name: item.name,
+                    image: item.image,
+                    kind: column.kind,
+                    statusLine: episodeAssetStatusLine({
+                      shapingStatus: item.shapingStatus,
+                      prompt: seeded.prompt || assetPrompt(column.kind, item.id),
+                    }),
+                    onClick: () => {
+                      if (!projectId) return
+                      void launchWorkflow({
+                        projectId,
+                        sourceType: column.kind,
+                        ...seedOptionsFromLaunch(
+                          toCanvasLaunchSource({
+                            id: seeded.id,
+                            name: seeded.name,
+                            image: seeded.image,
+                            description: seeded.prompt,
+                            video: seeded.video,
+                            mediaType: seeded.mediaType,
+                            hasImage: seeded.hasImage,
+                            hasVideo: seeded.hasVideo,
+                          }),
+                        ),
+                        returnTo: episodeReturnTo,
+                        from: "episode",
+                      })
+                    },
+                  }
+                })}
                 footer={
                   column.kind === "object" ? (
                     <div className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-4">

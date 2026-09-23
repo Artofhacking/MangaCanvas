@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { projectApi } from '@/api/projectApi';
 import type { CanvasMaterialItem } from '../types';
 import { mediaUrl } from '@/lib/mediaUrl';
+import { resolveAssetMedia } from '@/lib/assetSeed';
 
 interface MaterialPanelProps {
   visible: boolean;
@@ -27,6 +28,33 @@ const categoryTabs: Array<{ key: CategoryTab; label: string }> = [
 ];
 
 const MATERIAL_DRAG_MIME = 'application/x-mangacanvas-material';
+
+function toMaterialItem(
+  item: { id: number; name: string; image?: string; description?: string; hasImage?: boolean },
+  meta: Pick<CanvasMaterialItem, 'library' | 'category' | 'subtitle' | 'status'>,
+): CanvasMaterialItem | null {
+  const resolved = resolveAssetMedia({
+    name: item.name,
+    prompt: item.description,
+    image: item.image,
+    hasImage: item.hasImage,
+  });
+  if (resolved.kind === 'none') return null;
+  return {
+    id: `${meta.category}-${item.id}`,
+    library: meta.library,
+    category: meta.category,
+    title: item.name,
+    subtitle: meta.subtitle,
+    status: meta.status,
+    cover: resolved.imageUrl,
+    video: resolved.videoUrl,
+    prompt: resolved.prompt || undefined,
+    mediaType: resolved.kind,
+    hasImage: resolved.kind === 'image',
+    hasVideo: resolved.kind === 'video',
+  };
+}
 
 const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelectMaterial }) => {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -65,35 +93,32 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
       projectApi.objects.getAll(numericProjectId),
     ]).then(([characters, scenes, objects]) => {
       if (cancelled) return;
-      const next: CanvasMaterialItem[] = [
-        ...(characters.data || []).map((item) => ({
-          id: `character-${item.id}`,
-          library: 'subjects' as const,
-          category: 'character' as const,
-          title: item.name,
-          subtitle: item.role,
-          status: item.role,
-          cover: item.image,
-        })),
-        ...(scenes.data || []).map((item) => ({
-          id: `scene-${item.id}`,
-          library: 'materials' as const,
-          category: 'scene' as const,
-          title: item.name,
-          subtitle: item.status === 'in-use' ? '使用中' : '草稿',
-          status: item.status,
-          cover: item.image,
-        })),
-        ...(objects.data || []).map((item) => ({
-          id: `object-${item.id}`,
-          library: 'materials' as const,
-          category: 'object' as const,
-          title: item.name,
-          subtitle: item.type,
-          status: item.status,
-          cover: item.image,
-        })),
-      ];
+      const next = [
+        ...(characters.data || []).map((item) =>
+          toMaterialItem(item, {
+            library: 'subjects',
+            category: 'character',
+            subtitle: item.role,
+            status: item.role,
+          }),
+        ),
+        ...(scenes.data || []).map((item) =>
+          toMaterialItem(item, {
+            library: 'materials',
+            category: 'scene',
+            subtitle: item.status === 'in-use' ? '使用中' : '草稿',
+            status: item.status,
+          }),
+        ),
+        ...(objects.data || []).map((item) =>
+          toMaterialItem(item, {
+            library: 'materials',
+            category: 'object',
+            subtitle: item.type,
+            status: item.status,
+          }),
+        ),
+      ].filter((item): item is CanvasMaterialItem => Boolean(item));
       setItems(next);
       setLoading(false);
     });
@@ -106,7 +131,7 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
     return items.filter((item) => {
       if (activeLibrary === 'subjects' && item.category !== 'character') return false;
       if (activeCategory !== 'all' && item.category !== activeCategory) return false;
-      return Boolean(item.cover);
+      return true;
     });
   }, [activeCategory, activeLibrary, items]);
 
@@ -136,7 +161,6 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
   }, [activeCategory, activeLibrary]);
 
   const handleItemDragStart = (event: React.DragEvent<HTMLButtonElement>, item: CanvasMaterialItem) => {
-    if (!item.cover) return;
     event.dataTransfer.setData(MATERIAL_DRAG_MIME, JSON.stringify(item));
     event.dataTransfer.effectAllowed = 'copy';
   };
@@ -204,13 +228,19 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
                   key={item.id}
                   className="group cursor-grab text-left active:cursor-grabbing"
                   title={`${item.title} · ${item.subtitle}`}
-                  onClick={() => item.cover && onSelectMaterial(item)}
-                  draggable={Boolean(item.cover)}
+                  onClick={() => onSelectMaterial(item)}
+                  draggable
                   onDragStart={(event) => handleItemDragStart(event, item)}
                 >
                   <div className="overflow-hidden rounded-2xl border border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-low))] transition-all group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--outline-variant))]/30 group-hover:shadow-md">
                     <div className="aspect-square overflow-hidden bg-[hsl(var(--surface-container-high))]">
-                      <img src={mediaUrl(item.cover)} alt={item.title} className="h-full w-full object-cover" />
+                      {item.mediaType === 'image' && item.cover ? (
+                        <img src={mediaUrl(item.cover)} alt={item.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[11px] font-medium text-[hsl(var(--secondary))]">
+                          {item.mediaType === 'video' ? '视频' : '文本'}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="px-0.5 pt-1">

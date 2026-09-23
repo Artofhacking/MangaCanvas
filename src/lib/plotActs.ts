@@ -1,3 +1,4 @@
+import { dominantAssetNode, isMissingMediaUrl } from './assetSeed'
 import { mentionizePlot, mentionedAssets, plotNeedsMentions, seedNodeId, type PlotAsset } from './plotMentions'
 import type { CanvasGraph, OpenWorkflowOptions, WorkflowSeedAsset } from './workflows'
 
@@ -213,7 +214,7 @@ export function hasGeneratedCanvasWork(canvas?: { nodes?: Array<{ id?: string; t
 
 export function shouldRebuildEpisodeCanvas(
   canvas?: {
-    nodes?: Array<{ id?: string; type?: string; data?: { content?: string; value?: string; label?: string; sourceType?: string; sourceAssetId?: string } }>
+    nodes?: Array<{ id?: string; type?: string; data?: { content?: string; value?: string; label?: string; url?: string; sourceType?: string; sourceAssetId?: string } }>
   } | null
 ) {
   if (isLegacyEpisodeCanvas(canvas)) return true
@@ -221,6 +222,9 @@ export function shouldRebuildEpisodeCanvas(
   const acts = nodes.filter((node) => String(node.id || '').startsWith('act_') && node.type === 'text')
   if (!acts.length) return true
   if (hasGeneratedCanvasWork(canvas)) return false
+  if (nodes.some((node) => String(node.id || '').startsWith('seed_') && node.type === 'image' && isMissingMediaUrl(node.data?.url))) {
+    return true
+  }
   if (acts.some((node) => estimateActSeconds(String(node.data?.content || node.data?.value || '')) > VIDEO_ACT_SECONDS + 0.25)) {
     return true
   }
@@ -244,11 +248,15 @@ export function buildEpisodePlotCanvas(options: OpenWorkflowOptions): CanvasGrap
   const nodes: CanvasGraph['nodes'] = []
   const edges: CanvasGraph['edges'] = []
 
-  characters.forEach((character, index) => {
-    nodes.push(assetImageNode(character, { x: 40, y: 48 + index * 320 }))
+  let characterRow = 0
+  characters.forEach((character) => {
+    const node = placeAssetNode(nodes, character, { x: 40, y: 48 + characterRow * 320 })
+    if (node) characterRow += 1
   })
-  objects.forEach((object, index) => {
-    nodes.push(assetImageNode(object, { x: 40, y: 48 + characters.length * 320 + index * 260 }))
+  let objectRow = 0
+  objects.forEach((object) => {
+    const node = placeAssetNode(nodes, object, { x: 40, y: 48 + characterRow * 320 + objectRow * 260 })
+    if (node) objectRow += 1
   })
 
   const plotActs = acts.length ? acts : [{ index: 1, name: '第一幕', heading: '', summary: (options.seedPrompt || '').trim() }]
@@ -269,15 +277,11 @@ export function buildEpisodePlotCanvas(options: OpenWorkflowOptions): CanvasGrap
     }
     mentionedAssets(summary, assets).forEach((asset) => {
       const nodeId = seedNodeId(asset)
+      const position = asset.category === 'scene' ? { x: actX, y: actY + 358 } : { x: 40, y: 48 }
+      if (!placeAssetNode(nodes, asset, position)) return
       if (asset.category === 'scene') {
-        if (!nodes.some((node) => node.id === nodeId)) {
-          nodes.push(assetImageNode(asset, { x: actX, y: actY + 358 }))
-        }
         edges.push({ id: `act_${act.index}_${asset.category}_${asset.id}`, source: actId, target: nodeId })
         return
-      }
-      if (!nodes.some((node) => node.id === nodeId)) {
-        nodes.push(assetImageNode(asset, { x: 40, y: 48 }))
       }
       edges.push({
         id: `${asset.category}_${asset.id}_act_${act.index}`,
@@ -288,9 +292,7 @@ export function buildEpisodePlotCanvas(options: OpenWorkflowOptions): CanvasGrap
     const scene = matchSceneAsset({ ...act, summary, name: label }, scenes)
     if (scene) {
       const sceneId = seedNodeId(scene)
-      if (!nodes.some((node) => node.id === sceneId)) {
-        nodes.push(assetImageNode(scene, { x: actX, y: actY + 358 }))
-      }
+      if (!placeAssetNode(nodes, scene, { x: actX, y: actY + 358 })) return
       if (!edges.some((edge) => edge.id === `act_${act.index}_scene_${scene.id}`)) {
         edges.push({ id: `act_${act.index}_scene_${scene.id}`, source: actId, target: sceneId })
       }
@@ -304,18 +306,26 @@ export function buildEpisodePlotCanvas(options: OpenWorkflowOptions): CanvasGrap
   }
 }
 
-function assetImageNode(asset: WorkflowSeedAsset | PlotAsset, position: { x: number; y: number }) {
-  return {
-    id: seedNodeId(asset),
-    type: 'image' as const,
+function placeAssetNode(
+  nodes: CanvasGraph['nodes'],
+  asset: WorkflowSeedAsset | PlotAsset,
+  position: { x: number; y: number },
+) {
+  const id = seedNodeId(asset)
+  const existing = nodes.find((node) => node.id === id)
+  if (existing) return existing
+  const node = dominantAssetNode(
+    asset,
     position,
-    data: {
-      label: asset.name,
-      url: asset.image || '',
+    id,
+    {
       sourceType: asset.category,
       sourceAssetId: String(asset.id),
     },
-  }
+  )
+  if (!node) return null
+  nodes.push(node)
+  return node
 }
 
 function matchSceneAsset(act: PlotAct, scenes: WorkflowSeedAsset[]) {

@@ -24,6 +24,7 @@ import Sidebar from "@/components/layout/Sidebar"
 import ProjectHeader from "@/components/layout/ProjectHeader"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
+import { seedOptionsFromLaunch, toWorkflowSeedAsset } from "@/lib/workflows"
 import { projectAssetsPath, type WorkflowCanvasEntry } from "@/lib/workspaceRoutes"
 import { useProjectStore } from "@/store/projectStore"
 
@@ -287,33 +288,17 @@ export default function ProjectDetail() {
         ? assets.episodes.find((item) => item.id === source.id)
         : undefined
 
+    const launchSeed = seedOptionsFromLaunch(source)
     launchWorkflow({
       projectId,
       sourceType,
-      sourceName: source?.name,
-      sourceAssetId: source?.id,
-      seedImage: source?.image,
-      seedPrompt: source?.description || episode?.description,
+      ...launchSeed,
+      seedPrompt: launchSeed.seedPrompt || episode?.description,
       relatedAssets: episode
         ? [
-            ...(episode.characters || []).map((item) => ({
-              id: item.id,
-              name: item.name,
-              image: item.image,
-              category: "character" as const,
-            })),
-            ...(episode.scenes || []).map((item) => ({
-              id: item.id,
-              name: item.name,
-              image: item.image,
-              category: "scene" as const,
-            })),
-            ...(episode.objects || []).map((item) => ({
-              id: item.id,
-              name: item.name,
-              image: item.image,
-              category: "object" as const,
-            })),
+            ...(episode.characters || []).map((item) => toWorkflowSeedAsset(item, "character")),
+            ...(episode.scenes || []).map((item) => toWorkflowSeedAsset(item, "scene")),
+            ...(episode.objects || []).map((item) => toWorkflowSeedAsset(item, "object")),
           ]
         : undefined,
       forceNew: !source?.id,

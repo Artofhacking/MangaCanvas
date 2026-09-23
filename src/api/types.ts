@@ -187,6 +187,7 @@ export interface EpisodeRelationRef {
   id: number
   name: string
   image?: string | null
+  description?: string | null
   role?: string | null
   type?: string | null
   shapingStatus?: 'unset' | 'semi' | 'final'
