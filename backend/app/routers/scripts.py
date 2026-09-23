@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import time
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
@@ -24,6 +26,7 @@ from ..script_agent import (
 from ..util import now, paginate
 
 router = APIRouter(prefix="/projects/{project_id}/scripts")
+logger = logging.getLogger(__name__)
 
 
 class ScriptParseIn(BaseModel):
@@ -59,6 +62,28 @@ def _existing_name_map(rows, attr: str = "name") -> dict[str, object]:
         if key:
             mapping[key] = row
     return mapping
+
+
+def _asset_text(*parts: object, limit: int = 4000) -> str | None:
+    chunks: list[str] = []
+    for part in parts:
+        text = str(part or "").strip()
+        if text and text not in chunks:
+            chunks.append(text)
+    if not chunks:
+        return None
+    return "\n".join(chunks)[:limit]
+
+
+def _scene_text(item: dict) -> str | None:
+    parts: list[str] = []
+    for key in ("location", "time", "description", "prompt"):
+        text = str(item.get(key) or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    if not parts:
+        return None
+    return " / ".join(parts)[:4000]
 
 
 def _match_ids(names: list, mapping: dict[str, object]) -> list[int]:
@@ -308,19 +333,13 @@ async def parse_project_script(
             billing_service.release(reservation.id, reservation.attempt, reason="finally")
 
 
-@router.post("/{script_id}/import")
-def import_script(
-    project_id: int,
-    script_id: int,
+def _import_parsed_script(
+    project: models.Project,
+    row: models.ScriptDocument,
     body: ScriptImportIn,
-    user: models.User = Depends(current_user),
-    db: Session = Depends(get_db),
+    project_id: int,
+    db: Session,
 ):
-    project = require_project_access(db, user, project_id, write=True)
-    row = db.query(models.ScriptDocument).filter_by(id=script_id, project_id=project_id).first()
-    if not row:
-        fail(1004, "剧本不存在", 404)
-
     stored = _payload_of(row)
     characters_in = body.characters if body.characters is not None else stored["characters"]
     scenes_in = body.scenes if body.scenes is not None else stored["scenes"]
@@ -356,7 +375,7 @@ def import_script(
             role=role or "main",
             gender=gender,
             age_group=age_group,
-            description=str(item.get("description") or item.get("personality") or "")[:4000] or None,
+            description=_asset_text(item.get("description"), item.get("prompt"), item.get("personality")),
             creation_mode="quick",
         )
         db.add(character)
@@ -372,12 +391,11 @@ def import_script(
         if body.skipExisting and key in existing_scenes:
             skipped["scenes"] += 1
             continue
-        description_parts = [str(item.get("location") or "").strip(), str(item.get("time") or "").strip(), str(item.get("description") or "").strip()]
         scene = models.Scene(
             organization_id=project.organization_id,
             project_id=project_id,
             name=name[:128],
-            description=" / ".join(part for part in description_parts if part) or None,
+            description=_scene_text(item),
             status="draft",
             creation_mode="quick",
         )
@@ -400,7 +418,7 @@ def import_script(
             project_id=project_id,
             name=name[:128],
             type=prop_type or "prop",
-            description=str(item.get("description") or "")[:4000] or None,
+            description=_asset_text(item.get("description"), item.get("prompt")),
             status="draft",
             creation_mode="quick",
         )
@@ -424,7 +442,12 @@ def import_script(
             project_id=project_id,
             name=name[:128],
             code=code[:64],
-            description=str(item.get("summary") or item.get("description") or "")[:MAX_EPISODE_SUMMARY] or None,
+            description=_asset_text(
+                item.get("summary"),
+                item.get("description"),
+                item.get("prompt"),
+                limit=MAX_EPISODE_SUMMARY,
+            ),
             status="draft",
             creation_mode="quick",
         )
@@ -453,3 +476,24 @@ def import_script(
             "skipped": skipped,
         }
     )
+
+
+@router.post("/{script_id}/import")
+def import_script(
+    project_id: int,
+    script_id: int,
+    body: ScriptImportIn,
+    user: models.User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    project = require_project_access(db, user, project_id, write=True)
+    row = db.query(models.ScriptDocument).filter_by(id=script_id, project_id=project_id).first()
+    if not row:
+        fail(1004, "剧本不存在", 404)
+    try:
+        return _import_parsed_script(project, row, body, project_id, db)
+    except ApiError:
+        raise
+    except Exception as exc:
+        logger.exception("script import failed project=%s script=%s", project_id, script_id)
+        fail(5000, f"写入项目资产失败: {exc}", 500)

@@ -1,10 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy import inspect, text
@@ -12,7 +11,7 @@ from sqlalchemy import inspect, text
 from . import billing_service
 from .config import settings
 from .db import Base, SessionLocal, engine
-from .errors import ApiError, api_error_handler
+from .errors import ApiError, api_error_handler, unhandled_exception_handler, validation_error_handler
 from .routers import (
     ai,
     assets,
@@ -81,14 +80,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="MangaCanvas API", version="2.0", redirect_slashes=False, lifespan=lifespan)
 app.add_exception_handler(ApiError, api_error_handler)
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_handler(_request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=400,
-        content={"code": 1001, "message": f"参数错误：{exc.errors()[0].get('msg', 'invalid')}", "data": None},
-    )
+app.add_exception_handler(RequestValidationError, validation_error_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
