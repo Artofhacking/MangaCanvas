@@ -90,6 +90,23 @@ export const objectsApi = {
     )
   },
 
+  async setPromptLock(projectId: number, id: number, locked: boolean): Promise<ApiResponse<ObjectItem | null>> {
+    return toApiResponse<ObjectDTO | null>(
+      {
+        url: `/projects/${projectId}/objects/${id}/prompt-lock`,
+        method: 'POST',
+        data: { locked },
+      },
+      null,
+      locked ? '锁定提示词失败' : '解锁提示词失败',
+      (result) => (result ? (mapObject(result) as unknown as ObjectDTO) : null)
+    ).then((response) =>
+      response.success
+        ? successResponse((response.data as unknown as ObjectItem | null) ?? null)
+        : errorResponse(response.message || (locked ? '锁定提示词失败' : '解锁提示词失败'), null)
+    )
+  },
+
   async delete(projectId: number, id: number): Promise<ApiResponse<boolean>> {
     return toApiResponse<true>(
       {

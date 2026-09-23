@@ -16,7 +16,27 @@ def _add_mysql_index(engine: Engine, ddl: str) -> None:
             pass
 
 
+_PROMPT_LOCK_TABLES = ("characters", "scenes", "project_objects")
+
+
+def ensure_prompt_lock_columns(engine: Engine) -> None:
+    """Add prompt lock columns on existing databases. Fresh create_all already has them."""
+    inspector = inspect(engine)
+    dialect = engine.dialect.name
+    locked_type = "BOOLEAN NOT NULL DEFAULT 0" if dialect == "sqlite" else "TINYINT(1) NOT NULL DEFAULT 0"
+    for table in _PROMPT_LOCK_TABLES:
+        if table not in inspector.get_table_names():
+            continue
+        columns = {column["name"] for column in inspector.get_columns(table)}
+        with engine.begin() as connection:
+            if "prompt_locked" not in columns:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN prompt_locked {locked_type}"))
+            if "prompt_locked_at" not in columns:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN prompt_locked_at DATETIME NULL"))
+
+
 def migrate_schema(engine: Engine) -> None:
+    ensure_prompt_lock_columns(engine)
     inspector = inspect(engine)
     dialect = engine.dialect.name
     if "billing_project_quotas" in inspector.get_table_names():

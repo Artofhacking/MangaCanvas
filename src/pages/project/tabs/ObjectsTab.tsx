@@ -12,6 +12,7 @@ import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, ObjectItem, ObjectType } from "@/types"
 import { useState } from "react"
+import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
 import ObjectCreator from "../ObjectCreator"
 import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
 import AssetQuickCreateCard from "./AssetQuickCreateCard"
@@ -47,13 +48,18 @@ export default function ObjectsTab({
   onToggleSelect,
 }: ObjectsTabProps) {
   const objects = useProjectStore((state) => objectsProp ?? state.assets.objects)
-  const { updateObject, deleteObject } = useProjectStore()
+  const { updateObject, deleteObject, setObjectPromptLock } = useProjectStore()
   const { confirm, notify } = useFeedback()
   
   const [editObject, setEditObject] = useState<ObjectItem | null>(null)
   const [creatorOpen, setCreatorOpen] = useState(false)
   const [selectedObject, setSelectedObject] = useState<ObjectItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [lockingPrompt, setLockingPrompt] = useState(false)
+  const selectedObjectLive = selectedObject
+    ? objects.find((item) => item.id === selectedObject.id) ?? selectedObject
+    : null
+  const editObjectLive = editObject ? objects.find((item) => item.id === editObject.id) ?? editObject : null
 
   const handleAddNew = () => {
     if (onAddNew) {
@@ -103,6 +109,20 @@ export default function ObjectsTab({
     notify.info("无限画布创作模式正在接入物品工作流")
   }
 
+  const handleSetPromptLock = async (object: ObjectItem, locked: boolean) => {
+    if (!projectId) return
+    setLockingPrompt(true)
+    const updated = await setObjectPromptLock(projectId, object.id, locked)
+    setLockingPrompt(false)
+    if (!updated) {
+      notify.error(useProjectStore.getState().error || (locked ? "锁定提示词失败" : "解锁失败"))
+      return
+    }
+    setSelectedObject(updated)
+    setEditObject((current) => (current?.id === updated.id ? updated : current))
+    notify.success(locked ? "提示词已锁定" : "已解锁，回到还没定")
+  }
+
   const handleCardClick = (object: ObjectItem) => {
     if (batchMode) {
       onToggleSelect?.(object.id)
@@ -148,6 +168,7 @@ export default function ObjectsTab({
                   使用中
                 </Badge>
               )}
+              <ShapingBadge status={object.shapingStatus} />
             </div>
             {batchMode ? (
               <button
@@ -232,56 +253,68 @@ export default function ObjectsTab({
       <AssetDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        image={selectedObject?.image}
-        name={selectedObject?.name ?? ""}
+        image={selectedObjectLive?.image}
+        name={selectedObjectLive?.name ?? ""}
         badge={
-          selectedObject ? (
+          selectedObjectLive ? (
             <span className="flex items-center gap-1.5">
-              <AssetDetailBadge className={`${typeColors[selectedObject.type]} text-white`}>
-                {selectedObject.type}
+              <AssetDetailBadge className={`${typeColors[selectedObjectLive.type]} text-white`}>
+                {selectedObjectLive.type}
               </AssetDetailBadge>
-              {selectedObject.status === "in-use" ? (
+              {selectedObjectLive.status === "in-use" ? (
                 <AssetDetailBadge className="bg-[hsl(var(--primary))] text-white">使用中</AssetDetailBadge>
               ) : null}
+              <ShapingBadge status={selectedObjectLive.shapingStatus} />
             </span>
           ) : undefined
         }
         metas={
-          selectedObject
+          selectedObjectLive
             ? [
                 {
                   icon: <MapPin className="w-4 h-4" />,
                   label: "关联场景",
-                  value: selectedObject.scene,
+                  value: selectedObjectLive.scene,
                 },
                 {
                   icon: <Clock className="w-4 h-4" />,
                   label: "最近修改",
-                  value: selectedObject.modified,
+                  value: selectedObjectLive.modified,
                 },
-                ...(selectedObject.model
+                ...(selectedObjectLive.model
                   ? [
                       {
                         icon: <Settings className="w-4 h-4" />,
                         label: "生成模型",
-                        value: selectedObject.model,
+                        value: selectedObjectLive.model,
                       },
                     ]
                   : []),
               ]
             : []
         }
-        aspectRatio={selectedObject?.aspectRatio}
-        prompt={selectedObject?.description}
-        assetId={selectedObject?.id}
+        aspectRatio={selectedObjectLive?.aspectRatio}
+        prompt={selectedObjectLive?.description}
+        assetId={selectedObjectLive?.id}
+        extra={
+          selectedObjectLive ? (
+            <ShapingPanel
+              status={selectedObjectLive.shapingStatus}
+              prompt={selectedObjectLive.description}
+              busy={lockingPrompt}
+              onLock={() => void handleSetPromptLock(selectedObjectLive, true)}
+              onUnlock={() => void handleSetPromptLock(selectedObjectLive, false)}
+            />
+          ) : undefined
+        }
         onOpenCanvas={
-          selectedObject
+          selectedObjectLive
             ? () =>
                 handleOpenCanvas({
-                  id: selectedObject.id,
-                  name: selectedObject.name,
-                  image: selectedObject.image,
-                  description: selectedObject.description,
+                  id: selectedObjectLive.id,
+                  name: selectedObjectLive.name,
+                  image: selectedObjectLive.image,
+                  description: selectedObjectLive.description,
                 })
             : undefined
         }
@@ -292,9 +325,11 @@ export default function ObjectsTab({
         open={creatorOpen}
         onOpenChange={setCreatorOpen}
         onUpdate={handleUpdate}
-        initialData={editObject}
-        mode={editObject ? 'edit' : 'create'}
+        initialData={editObjectLive}
+        mode={editObjectLive ? 'edit' : 'create'}
         projectId={projectId}
+        lockingPrompt={lockingPrompt}
+        onSetPromptLock={editObjectLive ? (locked) => handleSetPromptLock(editObjectLive, locked) : undefined}
       />
     </div>
   )

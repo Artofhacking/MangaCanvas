@@ -11,6 +11,7 @@ import { Trash2, Check, Sparkles, Image, Settings, MoreHorizontal } from "lucide
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
+import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
 import CharacterCreator from "../CharacterCreator"
 import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
 import AssetQuickCreateCard from "./AssetQuickCreateCard"
@@ -38,7 +39,7 @@ export default function CharactersTab({
   onToggleSelect,
 }: CharactersTabProps) {
   const characters = useProjectStore((state) => charactersProp ?? state.assets.characters)
-  const { deleteCharacter, updateCharacter, createCharacter } = useProjectStore()
+  const { deleteCharacter, updateCharacter, createCharacter, setCharacterPromptLock } = useProjectStore()
   const { confirm, notify } = useFeedback()
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -46,6 +47,13 @@ export default function CharactersTab({
   // Creator state
   const [editCharacter, setEditCharacter] = useState<Character | null>(null)
   const [creatorOpen, setCreatorOpen] = useState(false)
+  const [lockingPrompt, setLockingPrompt] = useState(false)
+  const selectedCharacterLive = selectedCharacter
+    ? characters.find((item) => item.id === selectedCharacter.id) ?? selectedCharacter
+    : null
+  const editCharacterLive = editCharacter
+    ? characters.find((item) => item.id === editCharacter.id) ?? editCharacter
+    : null
 
   const handleDelete = async (id: number, event?: { stopPropagation: () => void }) => {
     event?.stopPropagation()
@@ -111,6 +119,20 @@ export default function CharactersTab({
     notify.info("无限画布创作模式正在接入角色工作流")
   }
 
+  const handleSetPromptLock = async (character: Character, locked: boolean) => {
+    if (!projectId) return
+    setLockingPrompt(true)
+    const updated = await setCharacterPromptLock(projectId, character.id, locked)
+    setLockingPrompt(false)
+    if (!updated) {
+      notify.error(useProjectStore.getState().error || (locked ? "锁定提示词失败" : "解锁失败"))
+      return
+    }
+    setSelectedCharacter(updated)
+    setEditCharacter((current) => (current?.id === updated.id ? updated : current))
+    notify.success(locked ? "提示词已锁定" : "已解锁，回到还没定")
+  }
+
   const handleCardClick = (character: Character) => {
     if (batchMode) {
       onToggleSelect?.(character.id)
@@ -156,6 +178,7 @@ export default function CharactersTab({
               >
                 {character.role}
               </Badge>
+              <ShapingBadge status={character.shapingStatus} />
             </div>
             {batchMode && (
               <button
@@ -237,57 +260,71 @@ export default function CharactersTab({
       <AssetDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        image={selectedCharacter?.image}
-        name={selectedCharacter?.name ?? ""}
+        image={selectedCharacterLive?.image}
+        name={selectedCharacterLive?.name ?? ""}
         badge={
-          selectedCharacter ? (
-            <AssetDetailBadge
-              className={
-                selectedCharacter.role === "主角"
-                  ? "bg-[hsl(var(--primary))] text-white"
-                  : "bg-[hsl(var(--secondary))] text-white"
-              }
-            >
-              {selectedCharacter.role}
-            </AssetDetailBadge>
+          selectedCharacterLive ? (
+            <span className="flex items-center gap-1.5">
+              <AssetDetailBadge
+                className={
+                  selectedCharacterLive.role === "主角"
+                    ? "bg-[hsl(var(--primary))] text-white"
+                    : "bg-[hsl(var(--secondary))] text-white"
+                }
+              >
+                {selectedCharacterLive.role}
+              </AssetDetailBadge>
+              <ShapingBadge status={selectedCharacterLive.shapingStatus} />
+            </span>
           ) : undefined
         }
         metas={
-          selectedCharacter
+          selectedCharacterLive
             ? [
                 {
                   icon: <Sparkles className="w-4 h-4" />,
                   label: "风格",
-                  value: selectedCharacter.style,
+                  value: selectedCharacterLive.style,
                 },
                 {
                   icon: <Image className="w-4 h-4" />,
                   label: "关联场景",
-                  value: `${selectedCharacter.scenes} 个场景`,
+                  value: `${selectedCharacterLive.scenes} 个场景`,
                 },
-                ...(selectedCharacter.model
+                ...(selectedCharacterLive.model
                   ? [
                       {
                         icon: <Settings className="w-4 h-4" />,
                         label: "生成模型",
-                        value: selectedCharacter.model,
+                        value: selectedCharacterLive.model,
                       },
                     ]
                   : []),
               ]
             : []
         }
-        aspectRatio={selectedCharacter?.aspectRatio}
-        prompt={selectedCharacter?.description}
-        assetId={selectedCharacter?.id}
+        aspectRatio={selectedCharacterLive?.aspectRatio}
+        prompt={selectedCharacterLive?.description}
+        assetId={selectedCharacterLive?.id}
+        extra={
+          selectedCharacterLive ? (
+            <ShapingPanel
+              status={selectedCharacterLive.shapingStatus}
+              prompt={selectedCharacterLive.description}
+              busy={lockingPrompt}
+              onLock={() => void handleSetPromptLock(selectedCharacterLive, true)}
+              onUnlock={() => void handleSetPromptLock(selectedCharacterLive, false)}
+            />
+          ) : undefined
+        }
         onOpenCanvas={
-          selectedCharacter
+          selectedCharacterLive
             ? () =>
                 handleOpenCanvas({
-                  id: selectedCharacter.id,
-                  name: selectedCharacter.name,
-                  image: selectedCharacter.image,
-                  description: selectedCharacter.description,
+                  id: selectedCharacterLive.id,
+                  name: selectedCharacterLive.name,
+                  image: selectedCharacterLive.image,
+                  description: selectedCharacterLive.description,
                 })
             : undefined
         }
@@ -299,9 +336,13 @@ export default function CharactersTab({
         onOpenChange={setCreatorOpen}
         onCreate={handleCreate}
         onUpdate={handleUpdate}
-        initialData={editCharacter}
-        mode={editCharacter ? 'edit' : 'create'}
+        initialData={editCharacterLive}
+        mode={editCharacterLive ? 'edit' : 'create'}
         projectId={projectId}
+        lockingPrompt={lockingPrompt}
+        onSetPromptLock={
+          editCharacterLive ? (locked) => handleSetPromptLock(editCharacterLive, locked) : undefined
+        }
       />
     </div>
   )

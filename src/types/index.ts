@@ -7,6 +7,9 @@
 
 export type EntityStatus = 'draft' | 'in-progress' | 'completed' | 'in-use' | 'archived'
 
+/** 资产定型：未锁提示词 / 已锁尚无封面 / 已锁且有定妆封面 */
+export type ShapingStatus = 'unset' | 'semi' | 'final'
+
 export type CharacterRole = '主角' | '配角'
 
 export type ObjectType = '武器' | '道具' | '服装' | '场景装饰' | 'AI生成' | '上传'
@@ -24,6 +27,7 @@ export interface EpisodeRelationItem {
   image?: string
   role?: string
   type?: string
+  shapingStatus?: ShapingStatus
 }
 
 export type StoryboardShotStatus = 'empty' | 'generating' | 'ready' | 'failed'
@@ -87,6 +91,9 @@ export interface Scene {
   model?: string
   description?: string
   aspectRatio?: string
+  shapingStatus?: ShapingStatus
+  promptLocked?: boolean
+  promptLockedAt?: string
 }
 
 export interface SceneCreateData {
@@ -122,6 +129,9 @@ export interface Character {
   aspectRatio?: string
   seed?: string
   seedMode?: 'random' | 'fixed'
+  shapingStatus?: ShapingStatus
+  promptLocked?: boolean
+  promptLockedAt?: string
 }
 
 export interface CharacterCreateData {
@@ -162,6 +172,9 @@ export interface ObjectItem {
   genMethod?: string
   model?: string
   aspectRatio?: string
+  shapingStatus?: ShapingStatus
+  promptLocked?: boolean
+  promptLockedAt?: string
 }
 
 export interface ObjectCreateData {

@@ -12,6 +12,7 @@ import { useProjectStore } from "@/store/projectStore"
 import { useAssetGenerationStore } from "@/store/assetGenerationStore"
 import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
+import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
 import SceneCreator from "../SceneCreator"
 import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
 import AssetQuickCreateCard from "./AssetQuickCreateCard"
@@ -38,7 +39,7 @@ export default function ScenesTab({
   onToggleSelect,
 }: ScenesTabProps) {
   const scenes = useProjectStore((state) => scenesProp ?? state.assets.scenes)
-  const { deleteScene, updateScene } = useProjectStore()
+  const { deleteScene, updateScene, setScenePromptLock } = useProjectStore()
   const generationTasks = useAssetGenerationStore((state) => state.tasks)
   const { confirm, notify } = useFeedback()
   
@@ -46,6 +47,11 @@ export default function ScenesTab({
   const [creatorOpen, setCreatorOpen] = useState(false)
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [lockingPrompt, setLockingPrompt] = useState(false)
+  const selectedSceneLive = selectedScene
+    ? scenes.find((item) => item.id === selectedScene.id) ?? selectedScene
+    : null
+  const editSceneLive = editScene ? scenes.find((item) => item.id === editScene.id) ?? editScene : null
 
   const handleDelete = async (id: number) => {
     const confirmed = await confirm({
@@ -111,6 +117,20 @@ export default function ScenesTab({
     notify.info("无限画布创作模式正在接入场景工作流")
   }
 
+  const handleSetPromptLock = async (scene: Scene, locked: boolean) => {
+    if (!projectId) return
+    setLockingPrompt(true)
+    const updated = await setScenePromptLock(projectId, scene.id, locked)
+    setLockingPrompt(false)
+    if (!updated) {
+      notify.error(useProjectStore.getState().error || (locked ? "锁定提示词失败" : "解锁失败"))
+      return
+    }
+    setSelectedScene(updated)
+    setEditScene((current) => (current?.id === updated.id ? updated : current))
+    notify.success(locked ? "提示词已锁定" : "已解锁，回到还没定")
+  }
+
   const handleCardClick = (scene: Scene) => {
     if (batchMode) {
       onToggleSelect?.(scene.id)
@@ -170,6 +190,7 @@ export default function ScenesTab({
                     ? "使用中"
                     : "草稿"}
               </Badge>
+              <ShapingBadge status={scene.shapingStatus} />
             </div>
             {batchMode && (
               <button
@@ -258,51 +279,65 @@ export default function ScenesTab({
       <AssetDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        image={selectedScene?.image}
-        name={selectedScene?.name ?? ""}
+        image={selectedSceneLive?.image}
+        name={selectedSceneLive?.name ?? ""}
         badge={
-          selectedScene ? (
-            <AssetDetailBadge className={sceneStatusClass(selectedScene)}>
-              {sceneStatusLabel(selectedScene)}
-            </AssetDetailBadge>
+          selectedSceneLive ? (
+            <span className="flex items-center gap-1.5">
+              <AssetDetailBadge className={sceneStatusClass(selectedSceneLive)}>
+                {sceneStatusLabel(selectedSceneLive)}
+              </AssetDetailBadge>
+              <ShapingBadge status={selectedSceneLive.shapingStatus} />
+            </span>
           ) : undefined
         }
         metas={
-          selectedScene
+          selectedSceneLive
             ? [
                 {
                   icon: <Clock className="w-4 h-4" />,
                   label: "最近修改",
-                  value: selectedScene.modified,
+                  value: selectedSceneLive.modified,
                 },
                 {
                   icon: <Hash className="w-4 h-4" />,
                   label: "场景编号",
-                  value: selectedScene.code,
+                  value: selectedSceneLive.code,
                 },
-                ...(selectedScene.model
+                ...(selectedSceneLive.model
                   ? [
                       {
                         icon: <Settings className="w-4 h-4" />,
                         label: "生成模型",
-                        value: selectedScene.model,
+                        value: selectedSceneLive.model,
                       },
                     ]
                   : []),
               ]
             : []
         }
-        aspectRatio={selectedScene?.aspectRatio}
-        prompt={selectedScene?.description}
-        assetId={selectedScene?.id}
+        aspectRatio={selectedSceneLive?.aspectRatio}
+        prompt={selectedSceneLive?.description}
+        assetId={selectedSceneLive?.id}
+        extra={
+          selectedSceneLive ? (
+            <ShapingPanel
+              status={selectedSceneLive.shapingStatus}
+              prompt={selectedSceneLive.description}
+              busy={lockingPrompt}
+              onLock={() => void handleSetPromptLock(selectedSceneLive, true)}
+              onUnlock={() => void handleSetPromptLock(selectedSceneLive, false)}
+            />
+          ) : undefined
+        }
         onOpenCanvas={
-          selectedScene
+          selectedSceneLive
             ? () =>
                 handleOpenCanvas({
-                  id: selectedScene.id,
-                  name: selectedScene.name,
-                  image: selectedScene.image,
-                  description: selectedScene.description,
+                  id: selectedSceneLive.id,
+                  name: selectedSceneLive.name,
+                  image: selectedSceneLive.image,
+                  description: selectedSceneLive.description,
                 })
             : undefined
         }
@@ -313,9 +348,11 @@ export default function ScenesTab({
         open={creatorOpen}
         onOpenChange={setCreatorOpen}
         onUpdate={handleUpdate}
-        initialData={editScene}
+        initialData={editSceneLive}
         projectId={projectId}
-        mode={editScene ? (isDraftScene(editScene) ? "generate" : "edit") : "create"}
+        mode={editSceneLive ? (isDraftScene(editSceneLive) ? "generate" : "edit") : "create"}
+        lockingPrompt={lockingPrompt}
+        onSetPromptLock={editSceneLive ? (locked) => handleSetPromptLock(editSceneLive, locked) : undefined}
       />
     </div>
   )

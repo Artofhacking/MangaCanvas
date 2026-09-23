@@ -57,12 +57,15 @@ interface ProjectActions {
   duplicateEpisode: (projectId: number, id: number) => Promise<Episode | null>
   createScene: (projectId: number, data: SceneCreateData) => Promise<Scene | null>
   updateScene: (projectId: number, id: number, data: Partial<Scene>) => Promise<Scene | null>
+  setScenePromptLock: (projectId: number, id: number, locked: boolean) => Promise<Scene | null>
   deleteScene: (projectId: number, id: number) => Promise<boolean>
   createCharacter: (projectId: number, data: CharacterCreateData) => Promise<Character | null>
   updateCharacter: (projectId: number, id: number, data: Partial<Character>) => Promise<Character | null>
+  setCharacterPromptLock: (projectId: number, id: number, locked: boolean) => Promise<Character | null>
   deleteCharacter: (projectId: number, id: number) => Promise<boolean>
   createObject: (projectId: number, data: ObjectCreateData) => Promise<ObjectItem | null>
   updateObject: (projectId: number, id: number, data: Partial<ObjectItem>) => Promise<ObjectItem | null>
+  setObjectPromptLock: (projectId: number, id: number, locked: boolean) => Promise<ObjectItem | null>
   deleteObject: (projectId: number, id: number) => Promise<boolean>
   bulkDelete: (projectId: number, type: keyof ProjectState['assets'], ids: number[]) => Promise<void>
   reset: () => void
@@ -336,6 +339,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     return updatedScene
   },
 
+  setScenePromptLock: async (projectId, id, locked) => {
+    const response = await projectApi.scenes.setPromptLock(projectId, id, locked)
+    if (!response.success || !response.data) {
+      set({ error: response.message || (locked ? '锁定提示词失败' : '解锁提示词失败') })
+      return null
+    }
+    const updatedScene = response.data
+    set((state) => ({
+      error: null,
+      assets: {
+        ...state.assets,
+        scenes: replaceAsset<Scene>(state.assets.scenes, updatedScene),
+      },
+    }))
+    return updatedScene
+  },
+
   deleteScene: async (projectId, id) => {
     const response = await projectApi.scenes.delete(projectId, id)
     if (!response.success) {
@@ -385,6 +405,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     return updatedCharacter
   },
 
+  setCharacterPromptLock: async (projectId, id, locked) => {
+    const response = await projectApi.characters.setPromptLock(projectId, id, locked)
+    if (!response.success || !response.data) {
+      set({ error: response.message || (locked ? '锁定提示词失败' : '解锁提示词失败') })
+      return null
+    }
+    const updatedCharacter = response.data
+    set((state) => ({
+      error: null,
+      assets: {
+        ...state.assets,
+        characters: replaceAsset<Character>(state.assets.characters, updatedCharacter),
+      },
+    }))
+    return updatedCharacter
+  },
+
   deleteCharacter: async (projectId, id) => {
     const response = await projectApi.characters.delete(projectId, id)
     if (!response.success) {
@@ -426,6 +463,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const updatedObject = response.data
 
     set((state) => ({
+      assets: {
+        ...state.assets,
+        objects: replaceAsset<ObjectItem>(state.assets.objects, updatedObject),
+      },
+    }))
+    return updatedObject
+  },
+
+  setObjectPromptLock: async (projectId, id, locked) => {
+    const response = await projectApi.objects.setPromptLock(projectId, id, locked)
+    if (!response.success || !response.data) {
+      set({ error: response.message || (locked ? '锁定提示词失败' : '解锁提示词失败') })
+      return null
+    }
+    const updatedObject = response.data
+    set((state) => ({
+      error: null,
       assets: {
         ...state.assets,
         objects: replaceAsset<ObjectItem>(state.assets.objects, updatedObject),

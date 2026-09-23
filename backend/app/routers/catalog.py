@@ -7,6 +7,7 @@ from .. import models, serialize
 from ..db import get_db
 from ..deps import current_user, require_project_access
 from ..errors import fail, ok
+from ..shaping import ensure_cover_change, ensure_description_change, lock_prompt, unlock_prompt
 from ..util import now, paginate
 
 router = APIRouter(prefix="/projects/{project_id}")
@@ -79,6 +80,10 @@ class RelationsIn(BaseModel):
     characterIds: list[int] | None = None
     sceneIds: list[int] | None = None
     objectIds: list[int] | None = None
+
+
+class PromptLockIn(BaseModel):
+    locked: bool
 
 
 def _check_creation(mode: str | None, workflow_id: str | None, node_id: str | None) -> tuple[str, str | None, str | None]:
@@ -193,11 +198,32 @@ def update_character(
         "modelId": "model_id",
         "seed": "seed",
     }
+    ensure_description_change(row, body.description)
+    ensure_cover_change(row, body.avatar)
     for field, attr in mapping.items():
         value = getattr(body, field)
         if value is not None:
             setattr(row, attr, value)
     row.updated_at = now()
+    return ok(serialize.character(row))
+
+
+@router.post("/characters/{character_id}/prompt-lock")
+def set_character_prompt_lock(
+    project_id: int,
+    character_id: int,
+    body: PromptLockIn,
+    user: models.User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    require_project_access(db, user, project_id, write=True)
+    row = db.query(models.Character).filter_by(id=character_id, project_id=project_id).first()
+    if not row:
+        fail(1004, "角色不存在", 404)
+    if body.locked:
+        lock_prompt(row)
+    else:
+        unlock_prompt(row)
     return ok(serialize.character(row))
 
 
@@ -295,11 +321,32 @@ def update_scene(
         "referenceImages": "reference_images",
         "seed": "seed",
     }
+    ensure_description_change(row, body.description)
+    ensure_cover_change(row, body.image)
     for field, attr in mapping.items():
         value = getattr(body, field)
         if value is not None:
             setattr(row, attr, value)
     row.updated_at = now()
+    return ok(serialize.scene(row))
+
+
+@router.post("/scenes/{scene_id}/prompt-lock")
+def set_scene_prompt_lock(
+    project_id: int,
+    scene_id: int,
+    body: PromptLockIn,
+    user: models.User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    require_project_access(db, user, project_id, write=True)
+    row = db.query(models.Scene).filter_by(id=scene_id, project_id=project_id).first()
+    if not row:
+        fail(1004, "场景不存在", 404)
+    if body.locked:
+        lock_prompt(row)
+    else:
+        unlock_prompt(row)
     return ok(serialize.scene(row))
 
 
@@ -391,11 +438,32 @@ def update_object(
         "genMethod": "gen_method",
         "referenceImages": "reference_images",
     }
+    ensure_description_change(row, body.description)
+    ensure_cover_change(row, body.image)
     for field, attr in mapping.items():
         value = getattr(body, field)
         if value is not None:
             setattr(row, attr, value)
     row.updated_at = now()
+    return ok(serialize.obj(row))
+
+
+@router.post("/objects/{object_id}/prompt-lock")
+def set_object_prompt_lock(
+    project_id: int,
+    object_id: int,
+    body: PromptLockIn,
+    user: models.User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    require_project_access(db, user, project_id, write=True)
+    row = db.query(models.ProjectObject).filter_by(id=object_id, project_id=project_id).first()
+    if not row:
+        fail(1004, "物品不存在", 404)
+    if body.locked:
+        lock_prompt(row)
+    else:
+        unlock_prompt(row)
     return ok(serialize.obj(row))
 
 

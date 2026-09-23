@@ -43,7 +43,7 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Pytest (sqlite)
         working-directory: backend
-        run: python -m pytest tests/test_pricing.py tests/test_wallet.py tests/test_image_billing.py tests/test_video_billing.py tests/test_chat_script_billing.py tests/test_quota.py tests/test_auth_register.py tests/test_oauth_feishu.py tests/test_openai_size.py tests/test_model_probe.py tests/test_ai_media.py tests/test_script_import.py -q
+        run: python -m pytest tests/test_pricing.py tests/test_wallet.py tests/test_image_billing.py tests/test_video_billing.py tests/test_chat_script_billing.py tests/test_quota.py tests/test_auth_register.py tests/test_oauth_feishu.py tests/test_openai_size.py tests/test_model_probe.py tests/test_ai_media.py tests/test_script_import.py tests/test_shaping.py -q
 
   wallet-mysql:
     runs-on: ubuntu-latest
