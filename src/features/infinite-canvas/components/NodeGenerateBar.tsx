@@ -40,6 +40,7 @@ import {
   parseVideoSize,
 } from '../utils/generateParams'
 import { aspectRatioIconSize } from '../utils/aspectRatio'
+import { resolveGenerateBarModelNotice } from '../utils/generateBarModelNotice'
 import { reconcilePromptMentions, type SlotRef } from '../utils/promptMentions'
 import { creditsApi, type CreditQuote } from '@/api/creditsApi'
 import { HttpError } from '@/api/core/error'
@@ -132,12 +133,23 @@ function GenerateBarModelPicker({
   onChange: (data: Partial<CustomNode['data']>) => void
 }) {
   const isVideo = node.type === 'videoConfig'
-  const { models: liveImageModels, loading: imageLoading, error: imageError } = useImageModels()
-  const { models: liveVideoModels, loading: videoLoading, error: videoError } = useVideoModels()
+  const {
+    models: liveImageModels,
+    loading: imageLoading,
+    error: imageError,
+    isLoaded: imageLoaded,
+  } = useImageModels()
+  const {
+    models: liveVideoModels,
+    loading: videoLoading,
+    error: videoError,
+    isLoaded: videoLoaded,
+  } = useVideoModels()
   const liveModels = isVideo ? liveVideoModels : liveImageModels
   const liveIds = liveModels.map((item) => item.id)
   const loading = isVideo ? videoLoading : imageLoading
   const error = isVideo ? videoError : imageError
+  const loaded = isVideo ? videoLoaded : imageLoaded
   const pickerModels = useMemo(
     () => liveModelsToPicker(liveModels, isVideo ? 'video' : 'image', loading),
     [isVideo, liveModels, loading]
@@ -146,19 +158,20 @@ function GenerateBarModelPicker({
   const toastedRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (loading) return
-    if (error) {
-      if (toastedRef.current !== toastKey) {
-        toastedRef.current = toastKey
-        message.error(isVideo ? '视频模型列表加载失败' : '图片模型列表加载失败')
-      }
+    const notice = resolveGenerateBarModelNotice({
+      loading,
+      isLoaded: loaded,
+      error,
+      modelCount: liveModels.length,
+    })
+    if (!notice || toastedRef.current === toastKey) return
+    toastedRef.current = toastKey
+    if (notice === 'load-error') {
+      message.error(isVideo ? '视频模型列表加载失败' : '图片模型列表加载失败')
       return
     }
-    if (liveModels.length === 0 && toastedRef.current !== toastKey) {
-      toastedRef.current = toastKey
-      message.warning(isVideo ? '当前没有可用的视频模型' : '当前没有可用的图片模型')
-    }
-  }, [error, isVideo, liveModels.length, loading, toastKey])
+    message.warning(isVideo ? '当前没有可用的视频模型' : '当前没有可用的图片模型')
+  }, [error, isVideo, liveModels.length, loaded, loading, toastKey])
 
   const currentKey = remapModelId(
     typeof node.data.model === 'string' ? node.data.model : undefined,
