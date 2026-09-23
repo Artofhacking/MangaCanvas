@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { ImageIcon, Video } from 'lucide-react'
+import { FileText, ImageIcon, Video } from 'lucide-react'
 import type { GenerateNodeType } from '../utils/generateSlots'
 import { buildScreenBezier } from '../utils/connectPreview'
+
+export type ConnectDropChoice = GenerateNodeType | 'text'
 
 export interface ConnectDropMenuState {
   sourceId: string
@@ -11,7 +13,7 @@ export interface ConnectDropMenuState {
 }
 
 export const CONNECT_DROP_MENU_WIDTH = 220
-export const CONNECT_DROP_MENU_HEIGHT = 140
+export const CONNECT_DROP_MENU_HEIGHT = 200
 
 export function getConnectDropMenuPosition(screen: { x: number; y: number }) {
   const maxX = typeof window !== 'undefined' ? window.innerWidth - CONNECT_DROP_MENU_WIDTH - 12 : screen.x
@@ -29,7 +31,7 @@ export function getConnectDropMenuLineTarget(screen: { x: number; y: number }) {
 
 const ConnectDropMenu: React.FC<{
   state: ConnectDropMenuState
-  onSelect: (type: GenerateNodeType) => void
+  onSelect: (type: ConnectDropChoice) => void
   onClose: () => void
 }> = ({ state, onSelect, onClose }) => {
   const position = getConnectDropMenuPosition(state.screen)
@@ -103,6 +105,19 @@ const ConnectDropMenu: React.FC<{
           <span>
             <span className="block font-semibold">视频</span>
             <span className="block text-[11px] text-[hsl(var(--secondary))]">打开底部生成栏生视频</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelect('text')}
+          className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-low))]"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[hsl(var(--surface-container-low))] text-[hsl(var(--primary))]">
+            <FileText className="h-4 w-4" />
+          </span>
+          <span>
+            <span className="block font-semibold">文本</span>
+            <span className="block text-[11px] text-[hsl(var(--secondary))]">新建文本节点并引用该节点</span>
           </span>
         </button>
       </div>
