@@ -10,6 +10,7 @@ import { Check, Trash2, MoreHorizontal, MapPin, Clock, Settings } from "lucide-r
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 
 import { useProjectStore } from "@/store/projectStore"
+import { toCanvasLaunchSource } from "@/lib/workflows"
 import type { CanvasLaunchSource, ObjectItem, ObjectType } from "@/types"
 import { useState } from "react"
 import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
@@ -189,12 +190,7 @@ export default function ObjectsTab({
                     size="sm"
                     onClick={(event) => {
                       event.stopPropagation()
-                      handleOpenCanvas({
-                        id: object.id,
-                        name: object.name,
-                        image: object.image,
-                        description: object.description,
-                      })
+                      handleOpenCanvas(toCanvasLaunchSource(object))
                     }}
                     className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                   >
@@ -310,12 +306,7 @@ export default function ObjectsTab({
         onOpenCanvas={
           selectedObjectLive
             ? () =>
-                handleOpenCanvas({
-                  id: selectedObjectLive.id,
-                  name: selectedObjectLive.name,
-                  image: selectedObjectLive.image,
-                  description: selectedObjectLive.description,
-                })
+                handleOpenCanvas(toCanvasLaunchSource(selectedObjectLive))
             : undefined
         }
       />

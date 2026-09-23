@@ -10,6 +10,7 @@ import {
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import { useAssetGenerationStore } from "@/store/assetGenerationStore"
+import { toCanvasLaunchSource } from "@/lib/workflows"
 import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
 import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
@@ -211,12 +212,7 @@ export default function ScenesTab({
                   size="sm"
                   onClick={(event) => {
                     event.stopPropagation()
-                    handleOpenCanvas({
-                      id: scene.id,
-                      name: scene.name,
-                      image: scene.image,
-                      description: scene.description,
-                    })
+                    handleOpenCanvas(toCanvasLaunchSource(scene))
                   }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
@@ -333,12 +329,7 @@ export default function ScenesTab({
         onOpenCanvas={
           selectedSceneLive
             ? () =>
-                handleOpenCanvas({
-                  id: selectedSceneLive.id,
-                  name: selectedSceneLive.name,
-                  image: selectedSceneLive.image,
-                  description: selectedSceneLive.description,
-                })
+                handleOpenCanvas(toCanvasLaunchSource(selectedSceneLive))
             : undefined
         }
       />

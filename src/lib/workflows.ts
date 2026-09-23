@@ -1,6 +1,7 @@
 import { workflowsApi } from '@/features/project/api/workflows'
-import type { WorkflowSourceType } from '@/types'
-import { buildEpisodePlotCanvas, isLegacyEpisodeCanvas, shouldRebuildEpisodeCanvas } from './plotActs'
+import type { CanvasLaunchSource, WorkflowSourceType } from '@/types'
+import { openAssetSeedNodes, resolveAssetMedia, dominantAssetNode } from './assetSeed'
+import { buildEpisodePlotCanvas, hasGeneratedCanvasWork, isLegacyEpisodeCanvas, shouldRebuildEpisodeCanvas } from './plotActs'
 
 export { isLegacyEpisodeCanvas, shouldRebuildEpisodeCanvas }
 
@@ -29,6 +30,11 @@ export type WorkflowSeedAsset = {
   id: number
   name: string
   image?: string
+  video?: string
+  prompt?: string
+  mediaType?: string
+  hasImage?: boolean
+  hasVideo?: boolean
   category: 'character' | 'scene' | 'object'
 }
 
@@ -38,9 +44,77 @@ export type OpenWorkflowOptions = {
   sourceName?: string
   sourceAssetId?: number
   seedImage?: string
+  seedVideo?: string
   seedPrompt?: string
+  seedMediaType?: string
+  seedHasImage?: boolean
+  seedHasVideo?: boolean
   relatedAssets?: WorkflowSeedAsset[]
   forceNew?: boolean
+}
+
+export function toCanvasLaunchSource(asset: {
+  id: number
+  name: string
+  image?: string
+  description?: string
+  video?: string
+  mediaType?: string
+  hasImage?: boolean
+  hasVideo?: boolean
+}): CanvasLaunchSource {
+  return {
+    id: asset.id,
+    name: asset.name,
+    image: asset.image,
+    description: asset.description,
+    video: asset.video,
+    mediaType: asset.mediaType,
+    hasImage: asset.hasImage,
+    hasVideo: asset.hasVideo,
+  }
+}
+
+export function toWorkflowSeedAsset(
+  item: {
+    id: number
+    name: string
+    image?: string | null
+    description?: string | null
+    prompt?: string | null
+    video?: string | null
+    mediaType?: string | null
+    hasImage?: boolean
+    hasCover?: boolean
+    hasVideo?: boolean
+  },
+  category: WorkflowSeedAsset['category'],
+): WorkflowSeedAsset {
+  const prompt = (item.prompt || item.description || '').trim()
+  return {
+    id: item.id,
+    name: item.name,
+    image: item.image || undefined,
+    video: item.video || undefined,
+    prompt: prompt || undefined,
+    mediaType: item.mediaType || undefined,
+    hasImage: item.hasImage ?? item.hasCover,
+    hasVideo: item.hasVideo,
+    category,
+  }
+}
+
+export function seedOptionsFromLaunch(source?: CanvasLaunchSource | null) {
+  return {
+    sourceName: source?.name,
+    sourceAssetId: source?.id,
+    seedImage: source?.image,
+    seedVideo: source?.video,
+    seedPrompt: source?.description,
+    seedMediaType: source?.mediaType,
+    seedHasImage: source?.hasImage,
+    seedHasVideo: source?.hasVideo,
+  }
 }
 
 export type CanvasGraph = {
@@ -83,59 +157,66 @@ export const normalizeCanvasData = (canvasData?: {
   }
 }
 
+const seedMediaInput = (options: OpenWorkflowOptions) => ({
+  name: options.sourceName,
+  prompt: options.seedPrompt,
+  image: options.seedImage,
+  video: options.seedVideo,
+  mediaType: options.seedMediaType,
+  hasImage: options.seedHasImage,
+  hasVideo: options.seedHasVideo,
+})
+
+export function shouldRepairAssetSeedCanvas(
+  canvas?: { nodes?: Array<{ id?: string; type?: string; data?: Record<string, unknown> }> } | null,
+  options?: OpenWorkflowOptions,
+) {
+  if (!options || options.sourceType === 'episode' || options.sourceType === 'blank') return false
+  if (hasGeneratedCanvasWork(canvas)) return false
+  const nodes = canvas?.nodes || []
+  if (!nodes.length) return false
+  if (nodes.some((node) => !String(node.id || '').startsWith('seed_'))) return false
+
+  const resolved = resolveAssetMedia(seedMediaInput(options))
+  const types = new Set(nodes.map((node) => node.type))
+  if (resolved.kind === 'text' || resolved.kind === 'none') {
+    return types.has('image') || types.has('video')
+  }
+  if (resolved.kind === 'video') return !types.has('video')
+  return !nodes.some((node) => node.type === 'image' && String(node.data?.url || '') === resolved.imageUrl)
+}
+
 export const buildSeedCanvas = (options: OpenWorkflowOptions): CanvasGraph => {
   if (options.sourceType === 'episode') {
     return buildEpisodePlotCanvas(options)
   }
 
-  const nodes: CanvasGraph['nodes'] = []
-  const edges: CanvasGraph['edges'] = []
-  let x = 80
-
-  if (options.seedPrompt) {
-    nodes.push({
-      id: 'seed_prompt',
-      type: 'text',
-      position: { x, y: 80 },
-      data: { label: '提示词', content: options.seedPrompt },
-    })
-    x += 360
+  const sourceExtra = {
+    sourceType: options.sourceType,
+    sourceAssetId: options.sourceAssetId ? String(options.sourceAssetId) : undefined,
   }
+  const primary = openAssetSeedNodes(seedMediaInput(options), sourceExtra)
+  const nodes: CanvasGraph['nodes'] = [...primary.nodes]
+  const edges: CanvasGraph['edges'] = [...primary.edges]
 
-  if (options.seedImage) {
-    nodes.push({
-      id: 'seed_image',
-      type: 'image',
-      position: { x, y: 40 },
-      data: {
-        label: options.sourceName || '参考图',
-        url: options.seedImage,
-        sourceType: options.sourceType,
-        sourceAssetId: options.sourceAssetId ? String(options.sourceAssetId) : undefined,
+  let placed = 0
+  for (const asset of options.relatedAssets || []) {
+    const node = dominantAssetNode(
+      asset,
+      {
+        x: 80 + (placed % 4) * 280,
+        y: 360 + Math.floor(placed / 4) * 240,
       },
-    })
-    if (options.seedPrompt) {
-      edges.push({ id: 'seed_edge', source: 'seed_prompt', target: 'seed_image' })
-    }
-  }
-
-  (options.relatedAssets || []).forEach((asset, index) => {
-    if (!asset.image) return
-    nodes.push({
-      id: `seed_${asset.category}_${asset.id}`,
-      type: 'image',
-      position: {
-        x: 80 + (index % 4) * 280,
-        y: 360 + Math.floor(index / 4) * 240,
-      },
-      data: {
-        label: asset.name,
-        url: asset.image,
+      `seed_${asset.category}_${asset.id}`,
+      {
         sourceType: asset.category,
         sourceAssetId: String(asset.id),
       },
-    })
-  })
+    )
+    if (!node) continue
+    nodes.push(node)
+    placed += 1
+  }
 
   return {
     nodes,
@@ -164,7 +245,10 @@ export const openOrCreateWorkflow = async (
       )
       if (hit) {
         const current = normalizeCanvasData(hit.canvasData)
-        if (options.sourceType === 'episode' && shouldRebuildEpisodeCanvas(current)) {
+        const rebuild =
+          (options.sourceType === 'episode' && shouldRebuildEpisodeCanvas(current)) ||
+          shouldRepairAssetSeedCanvas(current, options)
+        if (rebuild) {
           const canvasData = buildSeedCanvas(options)
           const updated = await workflowsApi.update(numericProjectId, hit.id, { canvasData })
           return {

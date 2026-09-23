@@ -214,19 +214,28 @@ def episode(db: Session, row: models.Episode) -> dict:
                 "id": c.id,
                 "name": c.name,
                 "image": rewrite_stored_media_url(c.avatar),
+                "description": c.description,
                 "role": "主角" if c.role == "main" else "配角",
                 **shaping_payload(c),
             }
             for c in chars
         ],
         "scenes": [
-            {"id": s.id, "name": s.name, "image": rewrite_stored_media_url(s.image), **shaping_payload(s)} for s in scenes
+            {
+                "id": s.id,
+                "name": s.name,
+                "image": rewrite_stored_media_url(s.image),
+                "description": s.description,
+                **shaping_payload(s),
+            }
+            for s in scenes
         ],
         "objects": [
             {
                 "id": o.id,
                 "name": o.name,
                 "image": rewrite_stored_media_url(o.image),
+                "description": o.description,
                 "type": o.type,
                 **shaping_payload(o),
             }

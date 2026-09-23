@@ -25,6 +25,10 @@ export interface EpisodeRelationItem {
   id: number
   name: string
   image?: string
+  description?: string
+  video?: string
+  mediaType?: string
+  hasImage?: boolean
   role?: string
   type?: string
   shapingStatus?: ShapingStatus
@@ -67,7 +71,11 @@ export type CanvasLaunchSource = {
   id: number
   name: string
   image?: string
+  video?: string
   description?: string
+  mediaType?: string
+  hasImage?: boolean
+  hasVideo?: boolean
 }
 
 export interface EpisodeCreateData {

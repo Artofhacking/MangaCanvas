@@ -10,6 +10,7 @@ import { useState } from "react"
 import { Trash2, Check, Sparkles, Image, Settings, MoreHorizontal } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
+import { toCanvasLaunchSource } from "@/lib/workflows"
 import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
 import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
 import CharacterCreator from "../CharacterCreator"
@@ -199,12 +200,7 @@ export default function CharactersTab({
                   size="sm"
                   onClick={(event) => {
                     event.stopPropagation()
-                    handleOpenCanvas({
-                      id: character.id,
-                      name: character.name,
-                      image: character.image,
-                      description: character.description,
-                    })
+                    handleOpenCanvas(toCanvasLaunchSource(character))
                   }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
@@ -320,12 +316,7 @@ export default function CharactersTab({
         onOpenCanvas={
           selectedCharacterLive
             ? () =>
-                handleOpenCanvas({
-                  id: selectedCharacterLive.id,
-                  name: selectedCharacterLive.name,
-                  image: selectedCharacterLive.image,
-                  description: selectedCharacterLive.description,
-                })
+                handleOpenCanvas(toCanvasLaunchSource(selectedCharacterLive))
             : undefined
         }
       />

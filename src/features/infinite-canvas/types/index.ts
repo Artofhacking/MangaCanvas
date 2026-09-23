@@ -38,6 +38,11 @@ export interface CanvasMaterialItem {
   subtitle: string;
   status: string;
   cover?: string;
+  video?: string;
+  prompt?: string;
+  mediaType?: string;
+  hasImage?: boolean;
+  hasVideo?: boolean;
 }
 
 export interface CustomNode {
