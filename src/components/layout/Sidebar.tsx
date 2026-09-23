@@ -16,9 +16,10 @@ import {
   ScrollText,
   Shield,
   Star,
+  Clapperboard,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import ApiSettings from "@/features/infinite-canvas/components/ApiSettings"
 import ProjectCreator from "@/pages/ProjectCreator"
 import {
@@ -28,14 +29,26 @@ import {
 } from "@/lib/session"
 import { useProjectsStore, refreshProjects } from "@/store/projectsStore"
 import { projectsApi } from "@/api"
+import { episodesApi } from "@/api/projectApi"
 import {
   projectAssetsPath,
   projectDashboardPath,
+  projectEpisodePath,
   projectScriptPath,
   projectSettingsPath,
   switchProjectPath,
 } from "@/lib/workspaceRoutes"
+import {
+  episodeIdFromPath,
+  formatEpisodeNavLabel,
+  isProjectFavoritesPath,
+  resolveProjectSidebarSection,
+  sortEpisodesForNav,
+} from "@/lib/sidebarNav"
+import { useProjectStore } from "@/store/projectStore"
+import type { Episode } from "@/types"
 import { APP_HOME_PATH } from "@/lib/appHome"
+import { cn } from "@/lib/utils"
 
 const getProjectIdFromPath = (pathname: string) => {
   const matched = pathname.match(/^\/project\/(\d+)/)
@@ -90,24 +103,87 @@ export default function Sidebar() {
     }, 300)
   }
 
-  const projectNav = activeProjectId
-    ? [
-        { icon: LayoutGrid, label: "工作台", href: projectDashboardPath(activeProjectId) },
-        { icon: ScrollText, label: "剧本", href: projectScriptPath(activeProjectId) },
-        { icon: Box, label: "资产", href: projectAssetsPath(activeProjectId) },
-      ]
-    : []
+  const sidebarSection = resolveProjectSidebarSection(location.pathname)
+  const isFavoritesPath = isProjectFavoritesPath(location.pathname)
+  const currentEpisodeId = episodeIdFromPath(location.pathname)
+  const onEpisodeRoute = currentEpisodeId != null
+  const [episodesExpanded, setEpisodesExpanded] = useState(true)
+  const previousOnEpisodeRoute = useRef(false)
+  const fetchGeneration = useRef(0)
+  const storeEpisodes = useProjectStore((state) => state.assets.episodes)
+  const initializedProjectId = useProjectStore((state) => state.initializedProjectId)
+  const storeError = useProjectStore((state) => state.error)
+  const [episodeNav, setEpisodeNav] = useState<{
+    projectId: number | null
+    episodes: Episode[]
+    ready: boolean
+    failed: boolean
+  }>({ projectId: null, episodes: [], ready: false, failed: false })
 
-  const isWorkbenchPath =
-    /^\/project\/\d+\/dashboard$/.test(location.pathname) ||
-    /\/workflows\//.test(location.pathname) ||
-    /\/episode\/\d+\/canvas$/.test(location.pathname)
-  const isScriptPath = /\/project\/\d+\/script(?:\/|$)/.test(location.pathname)
-  const isAssetsPath =
-    /\/project\/\d+\/assets(?:\/|$)/.test(location.pathname) ||
-    /\/project\/\d+\/episode\/\d+(?:\/|$)/.test(location.pathname)
-  const isSettingsPath = /\/project\/\d+\/(settings|permissions)(?:\/|$)/.test(location.pathname)
-  const isFavoritesPath = /\/project\/\d+\/assets\/favorites(?:\/|$)/.test(location.pathname)
+  useEffect(() => {
+    if (onEpisodeRoute && !previousOnEpisodeRoute.current) {
+      setEpisodesExpanded(true)
+    }
+    previousOnEpisodeRoute.current = onEpisodeRoute
+  }, [onEpisodeRoute])
+
+  useEffect(() => {
+    setEpisodesExpanded(true)
+  }, [activeProjectId])
+
+  useEffect(() => {
+    if (!inProjectShell || activeProjectId == null) return
+    if (initializedProjectId !== activeProjectId || storeError) return
+    fetchGeneration.current += 1
+    setEpisodeNav({
+      projectId: activeProjectId,
+      episodes: storeEpisodes,
+      ready: true,
+      failed: false,
+    })
+  }, [activeProjectId, inProjectShell, initializedProjectId, storeEpisodes, storeError])
+
+  useEffect(() => {
+    if (!inProjectShell || activeProjectId == null) {
+      setEpisodeNav({ projectId: null, episodes: [], ready: false, failed: false })
+      return
+    }
+
+    const generation = ++fetchGeneration.current
+    const projectId = activeProjectId
+    let cancelled = false
+    void episodesApi.getAll(projectId).then((response) => {
+      if (cancelled || fetchGeneration.current !== generation) return
+      setEpisodeNav((current) => {
+        const kept = !response.success && current.projectId === projectId ? current.episodes : []
+        const episodes = response.success ? response.data || [] : kept
+        return {
+          projectId,
+          episodes,
+          ready: true,
+          failed: !response.success && episodes.length === 0,
+        }
+      })
+    }).catch(() => {
+      if (cancelled || fetchGeneration.current !== generation) return
+      setEpisodeNav((current) => ({
+        projectId,
+        episodes: current.projectId === projectId ? current.episodes : [],
+        ready: true,
+        failed: current.projectId !== projectId || current.episodes.length === 0,
+      }))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeProjectId, inProjectShell, sidebarSection])
+
+  const visibleEpisodes = useMemo(
+    () => sortEpisodesForNav(episodeNav.projectId === activeProjectId ? episodeNav.episodes : []),
+    [activeProjectId, episodeNav.episodes, episodeNav.projectId]
+  )
+  const episodesReady = episodeNav.ready && episodeNav.projectId === activeProjectId
 
   const navClass = (active: boolean) =>
     `flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 py-2 text-sm leading-5 transition-colors ${
@@ -186,38 +262,103 @@ export default function Sidebar() {
           </div>
         )}
 
-        <nav className="flex-1 space-y-1.5">
+        <nav className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
           {inProjectShell ? (
             <>
-              {projectNav.map((item) => {
-                const isActive =
-                  (item.label === "工作台" && isWorkbenchPath) ||
-                  (item.label === "剧本" && isScriptPath) ||
-                  (item.label === "资产" && isAssetsPath && !isWorkbenchPath && !isScriptPath)
-                return (
-                  <div key={item.label}>
-                    <Link to={item.href} className={navClass(isActive && !isFavoritesPath)}>
-                      <item.icon className="h-[18px] w-[18px]" />
-                      <span>{item.label}</span>
-                    </Link>
-                    {item.label === "资产" && activeProjectId ? (
-                      <Link
-                        to={projectAssetsPath(activeProjectId, "favorites")}
-                        className={`${navClass(isFavoritesPath)} mt-1 pl-11`}
-                      >
-                        <Star className="h-4 w-4" />
-                        <span>我的收藏</span>
-                      </Link>
-                    ) : null}
-                  </div>
-                )
-              })}
+              <Link
+                to={activeProjectId ? projectDashboardPath(activeProjectId) : APP_HOME_PATH}
+                className={navClass(sidebarSection === "workbench")}
+              >
+                <LayoutGrid className="h-[18px] w-[18px]" />
+                <span>工作台</span>
+              </Link>
+              {activeProjectId ? (
+                <Link
+                  to={projectScriptPath(activeProjectId)}
+                  className={navClass(sidebarSection === "script")}
+                >
+                  <ScrollText className="h-[18px] w-[18px]" />
+                  <span>剧本</span>
+                </Link>
+              ) : null}
+              {activeProjectId ? (
+                <div>
+                  <button
+                    type="button"
+                    className={`${navClass(sidebarSection === "episodes")} w-full text-left`}
+                    aria-expanded={episodesExpanded}
+                    aria-controls="sidebar-episode-list"
+                    onClick={() => setEpisodesExpanded((open) => !open)}
+                  >
+                    <Clapperboard className="h-[18px] w-[18px]" />
+                    <span className="flex-1">剧集</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 opacity-70 transition-transform ${episodesExpanded ? "" : "-rotate-90"}`}
+                    />
+                  </button>
+                  {episodesExpanded ? (
+                    <div id="sidebar-episode-list" className="mt-1 space-y-1">
+                      {!episodesReady ? (
+                        <p className="py-1 pl-11 pr-2 text-xs leading-5 text-[hsl(var(--secondary))]">加载中</p>
+                      ) : null}
+                      {episodesReady && episodeNav.failed && visibleEpisodes.length === 0 ? (
+                        <p className="py-1 pl-11 pr-2 text-xs leading-5 text-[hsl(var(--secondary))]">剧集加载失败</p>
+                      ) : null}
+                      {episodesReady && !episodeNav.failed && visibleEpisodes.length === 0 ? (
+                        <div className="py-1 pl-11 pr-2">
+                          <p className="text-xs leading-5 text-[hsl(var(--secondary))]">暂无剧集</p>
+                          <Link
+                            to={projectScriptPath(activeProjectId)}
+                            className="text-xs font-medium leading-5 text-[hsl(var(--primary))]"
+                          >
+                            去剧本创建
+                          </Link>
+                        </div>
+                      ) : null}
+                      {episodesReady && !episodeNav.failed
+                        ? visibleEpisodes.map((episode, index) => {
+                            const { label, fullLabel } = formatEpisodeNavLabel(episode, index + 1)
+                            const active = currentEpisodeId === episode.id
+                            return (
+                              <Link
+                                key={episode.id}
+                                to={projectEpisodePath(activeProjectId, episode.id)}
+                                title={fullLabel}
+                                className={cn(navClass(active), "min-w-0 pl-11")}
+                              >
+                                <span className="truncate">{label}</span>
+                              </Link>
+                            )
+                          })
+                        : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {activeProjectId ? (
+                <div>
+                  <Link
+                    to={projectAssetsPath(activeProjectId)}
+                    className={navClass(sidebarSection === "assets" && !isFavoritesPath)}
+                  >
+                    <Box className="h-[18px] w-[18px]" />
+                    <span>资产</span>
+                  </Link>
+                  <Link
+                    to={projectAssetsPath(activeProjectId, "favorites")}
+                    className={`${navClass(isFavoritesPath)} mt-1 pl-11`}
+                  >
+                    <Star className="h-4 w-4" />
+                    <span>我的收藏</span>
+                  </Link>
+                </div>
+              ) : null}
               {activeProjectId ? (
                 <>
                   <div className="my-2.5 border-t border-[hsl(var(--outline-variant))]/30" />
                   <Link
                     to={projectSettingsPath(activeProjectId)}
-                    className={navClass(isSettingsPath)}
+                    className={navClass(sidebarSection === "settings")}
                   >
                     <Shield className="h-[18px] w-[18px]" />
                     <span>项目设置</span>
