@@ -22,6 +22,8 @@ import {
 } from "lucide-react"
 import { QuerySpinner } from "@/components/feedback/ListQueryState"
 import EpisodeStoryboard from "./EpisodeStoryboard"
+import { EpisodeAssetColumn } from "./EpisodeAssetCard"
+import { episodeAssetStatusLine, splitEpisodePlot, type EpisodeAssetKind } from "./episodeOverview"
 
 export default function EpisodeDetail() {
   const { projectId, episodeId } = useParams()
@@ -147,6 +149,10 @@ export default function EpisodeDetail() {
   }
 
   const progress = episode?.progress ?? 0
+  const assetPrompt = (kind: EpisodeAssetKind, id: number) => {
+    const list = kind === "character" ? catalog.characters : kind === "scene" ? catalog.scenes : catalog.objects
+    return list.find((item) => item.id === id)?.description
+  }
   const relationPreview = useMemo(
     () => ({
       characters: relatedCharacters as EpisodeRelationItem[],
@@ -315,15 +321,26 @@ export default function EpisodeDetail() {
               <span className="text-[13px] font-semibold">本集剧情</span>
             </div>
             {episode.description ? (
-              <div className="mt-4 max-h-[420px] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-[hsl(var(--on-surface))]">
-                <PlotMentionText
-                  text={episode.description}
-                  assets={plotAssets}
-                  onMentionClick={(asset) => {
-                    const tab = asset.category === "character" ? "characters" : asset.category === "scene" ? "scenes" : "objects"
-                    navigate(`/project/${projectId}/assets/${tab}`)
-                  }}
-                />
+              <div className="mt-4 max-h-[420px] overflow-y-auto text-sm text-[hsl(var(--on-surface))]">
+                {splitEpisodePlot(episode.description).map((block, index) => (
+                  <div
+                    key={`${block.kind}-${index}`}
+                    className={
+                      block.kind === "roster"
+                        ? "mt-3 flex flex-col gap-1.5 leading-6"
+                        : "whitespace-pre-wrap leading-7"
+                    }
+                  >
+                    <PlotMentionText
+                      text={block.lines.join("\n")}
+                      assets={plotAssets}
+                      onMentionClick={(asset) => {
+                        const tab = asset.category === "character" ? "characters" : asset.category === "scene" ? "scenes" : "objects"
+                        navigate(`/project/${projectId}/assets/${tab}`)
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="mt-4 text-sm text-[hsl(var(--secondary))]">
@@ -393,132 +410,84 @@ export default function EpisodeDetail() {
             </section>
           ) : null}
 
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr_1fr]">
-            <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
-              <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
-                <Users className="h-4 w-4" />
-                <span className="text-[13px] font-semibold">登场角色</span>
-              </div>
-              <div className="mt-5 space-y-3">
-                {relationPreview.characters.length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--secondary))]">还没有关联角色</p>
-                ) : (
-                  relationPreview.characters.map((char) => (
-                    <button
-                      key={char.id}
-                      onClick={() =>
-                        projectId &&
-                        void launchWorkflow({
-                          projectId,
-                          sourceType: "character",
-                          sourceName: char.name,
-                          sourceAssetId: char.id,
-                          seedImage: char.image,
-                          returnTo: episodeReturnTo,
-                          from: "episode",
-                        })
-                      }
-                      className="flex w-full items-center gap-3 rounded-2xl bg-[hsl(var(--surface-container-high))] p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
-                    >
-                      <img src={char.image} alt={char.name} className="h-12 w-12 rounded-xl object-cover" />
-                      <div>
-                        <div className="text-sm font-bold text-[hsl(var(--on-surface))]">{char.name}</div>
-                        <div className="text-xs text-[hsl(var(--secondary))]">{char.role}</div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
-              <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
-                <ImageIcon className="h-4 w-4" />
-                <span className="text-[13px] font-semibold">场景参考</span>
-              </div>
-              <div className="mt-5 space-y-3">
-                {relationPreview.scenes.length === 0 ? (
-                  <p className="text-sm text-[hsl(var(--secondary))]">还没有关联场景</p>
-                ) : (
-                  relationPreview.scenes.map((scene) => (
-                    <button
-                      key={scene.id}
-                      onClick={() =>
-                        projectId &&
-                        void launchWorkflow({
-                          projectId,
-                          sourceType: "scene",
-                          sourceName: scene.name,
-                          sourceAssetId: scene.id,
-                          seedImage: scene.image,
-                          returnTo: episodeReturnTo,
-                          from: "episode",
-                        })
-                      }
-                      className="block w-full overflow-hidden rounded-2xl bg-[hsl(var(--surface-container-high))] text-left"
-                    >
-                      {scene.image ? (
-                        <img src={scene.image} alt={scene.name} className="aspect-[16/9] w-full object-cover" />
-                      ) : null}
-                      <div className="p-3 text-sm font-semibold text-[hsl(var(--on-surface))]">{scene.name}</div>
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface-container-low))] p-6">
-              <div className="flex items-center gap-2 text-[hsl(var(--secondary))]">
-                <Package className="h-4 w-4" />
-                <span className="text-[13px] font-semibold">道具与操作</span>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                {relationPreview.objects.length === 0 ? (
-                  <p className="col-span-2 text-sm text-[hsl(var(--secondary))]">还没有关联物品</p>
-                ) : (
-                  relationPreview.objects.map((obj) => (
-                    <button
-                      key={obj.id}
-                      onClick={() =>
-                        projectId &&
-                        void launchWorkflow({
-                          projectId,
-                          sourceType: "object",
-                          sourceName: obj.name,
-                          sourceAssetId: obj.id,
-                          seedImage: obj.image,
-                          returnTo: episodeReturnTo,
-                          from: "episode",
-                        })
-                      }
-                      className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-2 text-left transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
-                    >
-                      {obj.image ? (
-                        <img src={obj.image} alt={obj.name} className="aspect-square w-full rounded-xl object-cover" />
-                      ) : null}
-                      <div className="px-1 pb-1 pt-3">
-                        <div className="text-sm font-bold text-[hsl(var(--on-surface))]">{obj.name}</div>
-                        <div className="text-xs text-[hsl(var(--secondary))]">{obj.type}</div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-[hsl(var(--surface-container-high))] p-4">
-                <div className="text-sm font-semibold text-[hsl(var(--on-surface))]">本集创作建议</div>
-                <p className="mt-2 text-sm leading-6 text-[hsl(var(--secondary))]">
-                  先确认本集角色、场景和道具，再进入画布生成，最后把结果保存回素材库。
-                </p>
-                <Button
-                  onClick={() => void openCanvas()}
-                  className="mt-4 h-11 w-full rounded-2xl signature-gradient text-white"
-                >
-                  打开画布继续
-                  <MoveRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          <section className="mt-6 grid items-stretch gap-6 lg:grid-cols-3">
+            {(
+              [
+                {
+                  kind: "character" as const,
+                  title: "登场角色",
+                  empty: "还没有关联角色",
+                  icon: <Users className="h-4 w-4" />,
+                  items: relationPreview.characters,
+                },
+                {
+                  kind: "scene" as const,
+                  title: "场景参考",
+                  empty: "还没有关联场景",
+                  icon: <ImageIcon className="h-4 w-4" />,
+                  items: relationPreview.scenes,
+                },
+                {
+                  kind: "object" as const,
+                  title: "道具与操作",
+                  empty: "还没有关联物品",
+                  icon: <Package className="h-4 w-4" />,
+                  items: relationPreview.objects,
+                },
+              ] satisfies Array<{
+                kind: EpisodeAssetKind
+                title: string
+                empty: string
+                icon: JSX.Element
+                items: EpisodeRelationItem[]
+              }>
+            ).map((column) => (
+              <EpisodeAssetColumn
+                key={column.kind}
+                icon={column.icon}
+                title={column.title}
+                empty={column.empty}
+                items={column.items.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  image: item.image,
+                  kind: column.kind,
+                  statusLine: episodeAssetStatusLine({
+                    shapingStatus: item.shapingStatus,
+                    prompt: assetPrompt(column.kind, item.id),
+                  }),
+                  onClick: () => {
+                    if (!projectId) return
+                    void launchWorkflow({
+                      projectId,
+                      sourceType: column.kind,
+                      sourceName: item.name,
+                      sourceAssetId: item.id,
+                      seedImage: item.image,
+                      returnTo: episodeReturnTo,
+                      from: "episode",
+                    })
+                  },
+                }))}
+                footer={
+                  column.kind === "object" ? (
+                    <div className="rounded-2xl bg-[hsl(var(--surface-container-high))] p-4">
+                      <div className="text-sm font-semibold text-[hsl(var(--on-surface))]">本集创作建议</div>
+                      <p className="mt-2 text-sm leading-6 text-[hsl(var(--secondary))]">
+                        先确认本集角色、场景和道具，再进入画布生成，最后把结果保存回素材库。
+                      </p>
+                      <Button
+                        onClick={() => void openCanvas()}
+                        className="mt-4 h-11 w-full rounded-2xl signature-gradient text-white"
+                      >
+                        打开画布继续
+                        <MoveRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : null
+                }
+              />
+            ))}
           </section>
           </>
           ) : null}
