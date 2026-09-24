@@ -254,6 +254,8 @@ On 物品管理, and the same workspace shell elsewhere, opening a dialog (上�
 
 Keep scroll locking. Outside `@layer`, `html body[data-scroll-locked]` forces `overflow: hidden`, clears the compensation margin/padding, and sets `--removed-body-scroll-bar-size: 0px !important`. The stable scrollbar gutter keeps the viewport width, so the workspace shell and fixed header no longer pick up a second inset.
 
+Case 011 superseded the gutter-only part of this fix. On overlay scrollbars the gutter does not hold after the viewport bar is removed, so clearing the compensation drops the right margin. The current rule still clears the extra margin, and keeps the root scrollbar instead of relying on the gutter.
+
 ### Why this fix fit the project
 
 - Every modal on asset pages goes through the shared Radix dialog primitive, not a page-local overlay.
@@ -266,3 +268,30 @@ Keep scroll locking. Outside `@layer`, `html body[data-scroll-locked]` forces `o
 - `src/components/ui/dialog.tsx`
 - `src/components/layout/ProjectHeader.tsx`
 - `src/pages/project/index.tsx`
+
+## Case 011: Asset detail dialogs drop the right margin when the scrollbar hides
+
+### Symptom
+
+On 场景管理, and the same project shell for 角色管理 / 物品管理, opening an asset detail dialog removed the gap between the top bar (avatar, credits) / the toolbar (批量删除) and the viewport's right edge. The vertical scrollbar visible while the dialog was closed disappeared, and the page flashed wider. Closing the dialog put the margin back.
+
+### Root cause
+
+`scroll-lock jitter` after Case 010. `::-webkit-scrollbar { width: 6px }` forces a classic scrollbar that consumes layout space, including on macOS where scrollbars are otherwise overlays. `html { scrollbar-gutter: stable }` keeps that space when `overflow` becomes `hidden` on classic-scrollbar platforms, but on overlay-scrollbar platforms the gutter does not hold once the viewport bar is removed. Case 010 zeroed react-remove-scroll's `margin-right` and `--removed-body-scroll-bar-size`, so nothing put the 6px back. Restoring that margin unconditionally shifts classic-scrollbar browsers the other way, because their gutter already held.
+
+### Fix
+
+Move the permanent viewport scrollbar to `html { overflow-y: scroll }`. While `body[data-scroll-locked]` is set, pin the body (`position: fixed`, width 100%, library margin cleared) so the document cannot scroll and the root scrollbar never leaves. `html:has(body.workspace-body-lock)` still hides that root bar on shells whose `main` already scrolls. `installScrollLockAnchor` records the scroll offset in `--scroll-lock-top` so a scrolled page does not jump to the top.
+
+### Why this fix fit the project
+
+- Every modal goes through Radix Dialog/Sheet, which sets `data-scroll-locked` on `body`.
+- Asset pages share one workspace shell and fixed header; keeping the root bar stable fixes the header, tabs, and card grid together.
+- Workspace layouts that already locked body scrolling stay single-scrollbar.
+- The dialog tree, copy, and dismissal behavior stay on the shared primitive.
+
+### Implementation reference
+
+- `src/index.css`
+- `src/lib/scrollLockAnchor.ts`
+- `src/main.tsx`
