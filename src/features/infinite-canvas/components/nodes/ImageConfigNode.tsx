@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Download, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import type { CustomNode } from '../../types';
@@ -19,6 +19,7 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction';
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -33,6 +34,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const hasMedia = Boolean(data.url);
+  const lastPreviewClickAt = React.useRef(0);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -120,6 +122,16 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         }
         actions={[
           {
+            key: 'preview',
+            label: '预览',
+            icon: <Eye className="h-4 w-4" />,
+            onClick: (event) => {
+              event.stopPropagation();
+              setShowPreview(true);
+            },
+            hidden: !hasMedia,
+          },
+          {
             key: 'save',
             label: '保存到素材库',
             icon: <FolderPlus className="h-4 w-4" />,
@@ -142,9 +154,19 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             src={mediaUrl(data.url)}
             alt={data.label}
             draggable={false}
-            className="h-full w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+            className="h-full w-full object-cover"
             onDragStart={(event) => event.preventDefault()}
-            onClick={() => setShowPreview(true)}
+            onClick={(event) => {
+              const now = Date.now();
+              if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
+                lastPreviewClickAt.current = now;
+                return;
+              }
+              event.stopPropagation();
+              event.preventDefault();
+              lastPreviewClickAt.current = 0;
+              setShowPreview(true);
+            }}
           />
         ) : (
           <MediaEmptyGlyph kind="image" />

@@ -9,15 +9,23 @@ import { seedNodeId, type PlotAsset } from '@/lib/plotMentions';
 import type { CustomNode } from '../../types';
 import { PlusHandle } from './PlusHandle';
 import { MediaPreviewCard, TEXT_NOTE_WIDTH } from './MediaPreviewCard';
+import { pointerTravelExceeds } from '../../utils/canvasInteraction';
 import { requestTextEditFocus } from '../../utils/textEditFocus';
 
 const DEFAULT_TEXT_LABEL = '文本';
 
 function TextNoteEmptyState({ onWrite }: { onWrite: () => void }) {
+  const pointerOrigin = React.useRef<{ x: number; y: number } | null>(null)
   return (
     <div
       className="flex min-h-[256px] flex-col px-7 pb-8 pt-9"
-      onClick={onWrite}
+      onPointerDown={(event) => {
+        pointerOrigin.current = { x: event.clientX, y: event.clientY }
+      }}
+      onClick={(event) => {
+        if (pointerTravelExceeds(pointerOrigin.current, event)) return
+        onWrite()
+      }}
     >
       <div className="mb-8 flex justify-center" aria-hidden>
         <AlignJustify className="h-7 w-7 text-[hsl(var(--on-surface-variant))]/45" strokeWidth={1.65} />
@@ -116,6 +124,8 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
     }
   }, [nodes, selectNode, setCenter])
 
+  const pointerOrigin = React.useRef<{ x: number; y: number } | null>(null)
+
   const enterWrite = useCallback(() => {
     selectNode(id)
     requestTextEditFocus(id)
@@ -168,9 +178,14 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
         ) : (
           <button
             type="button"
-            className="nodrag nowheel flex min-h-[200px] w-full flex-col px-3.5 py-3 text-left"
-            onClick={enterWrite}
-            onPointerDown={(event) => event.stopPropagation()}
+            className="nowheel flex min-h-[200px] w-full flex-col px-3.5 py-3 text-left"
+            onPointerDown={(event) => {
+              pointerOrigin.current = { x: event.clientX, y: event.clientY }
+            }}
+            onClick={(event) => {
+              if (pointerTravelExceeds(pointerOrigin.current, event)) return
+              enterWrite()
+            }}
             title="在底部编辑旁白或便签"
           >
             <div className="max-h-[240px] overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--on-surface))]">
