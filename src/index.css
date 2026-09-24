@@ -63,13 +63,6 @@
     overflow: hidden;
   }
 
-  body[data-scroll-locked] {
-    margin-right: 0 !important;
-    padding-right: 0 !important;
-    overflow-y: scroll !important;
-    --removed-body-scroll-bar-size: 0px;
-  }
-
   .workspace-shell {
     width: 100%;
     max-width: 100%;
@@ -107,6 +100,22 @@
     background: hsl(var(--outline-variant));
     border-radius: 10px;
   }
+}
+
+/*
+  Radix Dialog/Sheet lock scroll through react-remove-scroll. That library
+  injects an unlayered body[data-scroll-locked] rule (overflow:hidden plus
+  margin-right equal to the scrollbar). html already reserves that width with
+  scrollbar-gutter: stable, so the extra margin shrinks the workspace by one
+  scrollbar. This rule stays outside @layer and uses a stronger selector so it
+  wins over the injected stylesheet. Scroll locking stays; only the extra inset
+  is removed.
+*/
+html body[data-scroll-locked] {
+  overflow: hidden !important;
+  margin-right: 0px !important;
+  padding-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
 }
 
 /* Signature gradient */

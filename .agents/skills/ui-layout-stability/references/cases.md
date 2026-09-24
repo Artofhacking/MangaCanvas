@@ -239,3 +239,30 @@ Lock the generate dock to a reserved width (`BAR_WIDTH`) and give each trigger a
 
 - `src/features/infinite-canvas/components/NodeGenerateBar.tsx`
 - `src/features/infinite-canvas/components/NodeDockOverlay.tsx`
+
+## Case 010: Asset dialogs shift the workspace when scroll lock starts
+
+### Symptom
+
+On 物品管理, and the same workspace shell elsewhere, opening a dialog (上传物品, asset detail, or any other Radix dialog) nudged the tabs, asset grid, and top-right profile slightly sideways. Closing the dialog moved them back.
+
+### Root cause
+
+`scroll-lock jitter` plus `shell compensation mismatch`. Shared `Dialog` / `Sheet` mount Radix `RemoveScroll` (`react-remove-scroll-bar`), which injects an unlayered `body[data-scroll-locked]` rule: `overflow: hidden` and `margin-right` equal to the scrollbar width (6px with the custom scrollbar), and sets `--removed-body-scroll-bar-size`. `html` already uses `scrollbar-gutter: stable`, so that margin is a second reservation. The older `@layer base` override could not beat the injected `!important` margin, and the shell/header also consumed the scrollbar variable. Opening a dialog therefore narrowed the asset grid against the fixed header.
+
+### Fix
+
+Keep scroll locking. Outside `@layer`, `html body[data-scroll-locked]` forces `overflow: hidden`, clears the compensation margin/padding, and sets `--removed-body-scroll-bar-size: 0px !important`. The stable scrollbar gutter keeps the viewport width, so the workspace shell and fixed header no longer pick up a second inset.
+
+### Why this fix fit the project
+
+- Every modal on asset pages goes through the shared Radix dialog primitive, not a page-local overlay.
+- The workspace shell and fixed header already share one compensation variable, so correcting that variable fixes 物品管理 and the other workspace pages together.
+- Body scroll lock stays in place; only the extra horizontal inset is removed.
+
+### Implementation reference
+
+- `src/index.css`
+- `src/components/ui/dialog.tsx`
+- `src/components/layout/ProjectHeader.tsx`
+- `src/pages/project/index.tsx`
