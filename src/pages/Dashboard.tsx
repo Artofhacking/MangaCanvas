@@ -211,7 +211,7 @@ export default function Dashboard() {
         header={
           <WorkspaceHeader
             title={hasProjects || projectId ? '工作台' : '欢迎'}
-            subtitle={hasProjects || projectId ? "无限画布创作中心" : "开始你的创作之旅"}
+            subtitle={hasProjects || projectId ? undefined : "开始你的创作之旅"}
             searchPlaceholder="搜索..."
             actions={
               hasProjects || projectId ? (
