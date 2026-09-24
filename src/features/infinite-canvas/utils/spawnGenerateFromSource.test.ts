@@ -3,10 +3,11 @@ import { useCanvasStore } from '../stores/canvasStore'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from './generateSlots'
 import { resolveMentionsForSend } from './promptMentions'
 import { spawnGenerateFromSource, spawnTextNoteFromSource } from './spawnGenerateFromSource'
-import { consumePendingTextEditFocus } from './textEditFocus'
+import { clearTextEditFocus, consumePendingTextEditFocus, getTextEditNodeId } from './textEditFocus'
 
 describe('spawnGenerateFromSource', () => {
   beforeEach(() => {
+    clearTextEditFocus()
     useCanvasStore.getState().clearCanvas()
   })
 
@@ -84,6 +85,7 @@ describe('spawnGenerateFromSource', () => {
         targetHandle: 'left',
       }),
     ])
+    expect(getTextEditNodeId()).toBe(id)
     expect(consumePendingTextEditFocus(id!)).toBe(true)
   })
 

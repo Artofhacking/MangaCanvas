@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Download, FolderPlus, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
+import { Copy, Download, Eye, FolderPlus, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { remapVideoModel } from '../../config/models';
@@ -20,6 +20,7 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction';
 
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -40,6 +41,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [muted, setMuted] = useState(true);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const hasMedia = Boolean(data.url);
+  const lastPreviewClickAt = useRef(0);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -153,6 +155,17 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         }
         actions={[
           {
+            key: 'preview',
+            label: '预览',
+            icon: <Eye className="h-4 w-4" />,
+            onClick: (event) => {
+              event.stopPropagation();
+              if (videoRef.current) videoRef.current.pause();
+              setShowPreview(true);
+            },
+            hidden: !hasMedia,
+          },
+          {
             key: 'mute',
             label: muted ? '打开声音' : '静音',
             icon: muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />,
@@ -195,18 +208,18 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               }}
             />
             <div
-              className="absolute inset-0 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                if (videoRef.current) {
-                  videoRef.current.pause();
+              className="absolute inset-0"
+              onClick={(event) => {
+                const now = Date.now();
+                if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
+                  lastPreviewClickAt.current = now;
+                  return;
                 }
+                event.stopPropagation();
+                event.preventDefault();
+                lastPreviewClickAt.current = 0;
+                if (videoRef.current) videoRef.current.pause();
                 setShowPreview(true);
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
               }}
             />
             <button

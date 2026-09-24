@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Position, NodeProps, useReactFlow } from 'reactflow';
 import { message } from 'antd';
-import { AlignJustify, Copy, FileText, Trash2 } from 'lucide-react';
+import { AlignJustify, Copy, FileText, Pencil, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PlotMentionText from '@/components/PlotMentionText';
@@ -9,15 +9,43 @@ import { seedNodeId, type PlotAsset } from '@/lib/plotMentions';
 import type { CustomNode } from '../../types';
 import { PlusHandle } from './PlusHandle';
 import { MediaPreviewCard, TEXT_NOTE_WIDTH } from './MediaPreviewCard';
+import { isMediaPreviewDoubleClick, pointerTravelExceeds } from '../../utils/canvasInteraction';
 import { requestTextEditFocus } from '../../utils/textEditFocus';
 
 const DEFAULT_TEXT_LABEL = '文本';
 
+function useOpenOnSecondClick(onOpen: () => void) {
+  const pointerOrigin = React.useRef<{ x: number; y: number } | null>(null)
+  const lastClickAt = React.useRef(0)
+
+  const onPointerDown = (event: React.PointerEvent) => {
+    pointerOrigin.current = { x: event.clientX, y: event.clientY }
+  }
+
+  const onClick = (event: React.MouseEvent) => {
+    if (pointerTravelExceeds(pointerOrigin.current, event)) return
+    const now = Date.now()
+    if (!isMediaPreviewDoubleClick(now, lastClickAt.current)) {
+      lastClickAt.current = now
+      return
+    }
+    lastClickAt.current = 0
+    event.stopPropagation()
+    event.preventDefault()
+    onOpen()
+  }
+
+  return { onPointerDown, onClick }
+}
+
 function TextNoteEmptyState({ onWrite }: { onWrite: () => void }) {
+  const openOnSecondClick = useOpenOnSecondClick(onWrite)
   return (
     <div
       className="flex min-h-[256px] flex-col px-7 pb-8 pt-9"
-      onClick={onWrite}
+      title="双击编辑"
+      onPointerDown={openOnSecondClick.onPointerDown}
+      onClick={openOnSecondClick.onClick}
     >
       <div className="mb-8 flex justify-center" aria-hidden>
         <AlignJustify className="h-7 w-7 text-[hsl(var(--on-surface-variant))]/45" strokeWidth={1.65} />
@@ -121,6 +149,8 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
     requestTextEditFocus(id)
   }, [id, selectNode])
 
+  const openOnSecondClick = useOpenOnSecondClick(enterWrite)
+
   const handleDuplicate = (e: React.MouseEvent) => {
     e.stopPropagation();
     duplicateNode(id);
@@ -140,7 +170,12 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
         label={displayLabel}
         labelContent={
           isActNode ? (
-            <PlotMentionText text={displayLabel} assets={plotAssets} onMentionClick={focusAsset} />
+            <PlotMentionText
+              text={displayLabel}
+              assets={plotAssets}
+              onMentionClick={focusAsset}
+              allowNodeDrag
+            />
           ) : undefined
         }
         icon={<FileText />}
@@ -159,6 +194,15 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
           </>
         }
         actions={[
+          {
+            key: 'edit',
+            label: '编辑',
+            icon: <Pencil className="h-4 w-4" />,
+            onClick: (event) => {
+              event.stopPropagation()
+              enterWrite()
+            },
+          },
           { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
           { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
         ]}
@@ -166,21 +210,25 @@ const TextNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected 
         {isEmpty ? (
           <TextNoteEmptyState onWrite={enterWrite} />
         ) : (
-          <button
-            type="button"
-            className="nodrag nowheel flex min-h-[200px] w-full flex-col px-3.5 py-3 text-left"
-            onClick={enterWrite}
-            onPointerDown={(event) => event.stopPropagation()}
-            title="在底部编辑旁白或便签"
+          <div
+            className="nowheel flex min-h-[200px] w-full flex-col px-3.5 py-3 text-left"
+            title="双击编辑"
+            onPointerDown={openOnSecondClick.onPointerDown}
+            onClick={openOnSecondClick.onClick}
           >
             <div className="max-h-[240px] overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-[hsl(var(--on-surface))]">
               {isActNode ? (
-                <PlotMentionText text={content} assets={plotAssets} onMentionClick={focusAsset} />
+                <PlotMentionText
+                  text={content}
+                  assets={plotAssets}
+                  onMentionClick={focusAsset}
+                  allowNodeDrag
+                />
               ) : (
                 content
               )}
             </div>
-          </button>
+          </div>
         )}
       </MediaPreviewCard>
     </div>

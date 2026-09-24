@@ -8,7 +8,10 @@ import {
 } from '../utils/mentionPromptLayout'
 import { isTextNoteType } from '../utils/nodeDock'
 import {
+  clearTextEditFocus,
   consumePendingTextEditFocus,
+  getTextEditNodeId,
+  resolveTextEditTarget,
   subscribeTextEditFocus,
 } from '../utils/textEditFocus'
 import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
@@ -21,9 +24,11 @@ const PLACEHOLDER = '输入旁白、对白或便签…'
 
 const TextEditBar: React.FC = () => {
   const selectedId = useExactlySelectedNodeId(isTextNoteType)
+  const [editingId, setEditingId] = useState<string | null>(getTextEditNodeId)
+  const activeId = resolveTextEditTarget(selectedId, editingId)
   const { node, nodes, updateNode } = useCanvasStore(
     useShallow((state) => ({
-      node: state.nodes.find((item) => item.id === selectedId) ?? null,
+      node: state.nodes.find((item) => item.id === activeId) ?? null,
       nodes: state.nodes,
       updateNode: state.updateNode,
     }))
@@ -49,39 +54,42 @@ const TextEditBar: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    setEditingId(getTextEditNodeId())
+    return subscribeTextEditFocus(setEditingId)
+  }, [])
+
+  useEffect(() => {
+    if (editingId && editingId !== selectedId) clearTextEditFocus(editingId)
+  }, [editingId, selectedId])
+
+  useEffect(() => {
     setDraft(typeof node?.data.content === 'string' ? node.data.content : '')
-  }, [node?.data.content, selectedId])
+  }, [node?.data.content, activeId])
 
   useEffect(() => {
-    if (!selectedId) return
-    consumePendingTextEditFocus(selectedId)
+    if (!activeId) return
+    consumePendingTextEditFocus(activeId)
     focusInput()
-  }, [focusInput, selectedId])
-
-  useEffect(() => {
-    return subscribeTextEditFocus((nodeId) => {
-      if (nodeId === selectedId) focusInput()
-    })
-  }, [focusInput, selectedId])
+  }, [activeId, focusInput])
 
   const handleChange = (value: string) => {
-    if (!selectedId) return
+    if (!activeId) return
     setDraft(value)
-    updateNode(selectedId, { content: value })
+    updateNode(activeId, { content: value })
   }
 
   const handleBlur = () => {
-    if (!selectedId || !selectedId.startsWith('act_')) return
+    if (!activeId || !activeId.startsWith('act_')) return
     const next = mentionizePlot(draft, plotAssets)
     if (next !== draft) {
       setDraft(next)
-      updateNode(selectedId, { content: next })
+      updateNode(activeId, { content: next })
     }
   }
 
   return (
     <NodeDockOverlay
-      nodeId={selectedId && node ? selectedId : null}
+      nodeId={activeId && node ? activeId : null}
       barWidth={BAR_WIDTH}
       estimatedHeight={BAR_ESTIMATED_HEIGHT}
       dockKey="text-edit"

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Position, NodeProps } from 'reactflow';
 import { Upload, Spin, message } from 'antd';
 import { DeleteOutlined, DownloadOutlined, CopyOutlined, PictureOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined } from '@ant-design/icons';
-import { Copy, Download, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
@@ -22,6 +22,7 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction';
 
 const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, removeNode, duplicateNode } = useCanvasStore();
@@ -34,6 +35,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const [saveCategory, setSaveCategory] = useState<string | undefined>(undefined);
   const contextMenuRef = React.useRef<HTMLDivElement | null>(null);
+  const lastPreviewClickAt = React.useRef(0);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -394,6 +396,16 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         }
         actions={[
           {
+            key: 'preview',
+            label: '预览',
+            icon: <Eye className="h-4 w-4" />,
+            onClick: (event) => {
+              event.stopPropagation();
+              setShowPreview(true);
+            },
+            hidden: !data?.url,
+          },
+          {
             key: 'save',
             label: '保存到素材库',
             icon: <FolderPlus className="h-4 w-4" />,
@@ -416,9 +428,19 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             src={mediaUrl(data.url)}
             alt={data.label}
             draggable={false}
-            className="h-full w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+            className="h-full w-full object-cover"
             onDragStart={(event) => event.preventDefault()}
-            onClick={() => setShowPreview(true)}
+            onClick={(event) => {
+              const now = Date.now();
+              if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
+                lastPreviewClickAt.current = now;
+                return;
+              }
+              event.stopPropagation();
+              event.preventDefault();
+              lastPreviewClickAt.current = 0;
+              setShowPreview(true);
+            }}
           />
         ) : (
           <Upload
