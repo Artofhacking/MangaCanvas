@@ -2,18 +2,21 @@ import { describe, expect, it } from "vitest"
 import {
   episodeIdFromPath,
   formatEpisodeNavLabel,
+  isSidebarSectionRowActive,
+  PROJECT_ASSET_NAV_ITEMS,
   resolveProjectSidebarSection,
+  resolveSidebarSelection,
   sortEpisodesForNav,
 } from "./sidebarNav"
 
 describe("resolveProjectSidebarSection", () => {
-  it("highlights 剧集 for episode overview and canvas, not 资产 or 工作台", () => {
+  it("classifies an open episode as 剧集, separate from 资产 and 工作台", () => {
     expect(resolveProjectSidebarSection("/project/9/episode/3")).toBe("episodes")
     expect(resolveProjectSidebarSection("/project/9/episode/3/canvas")).toBe("episodes")
     expect(resolveProjectSidebarSection("/project/9/episode/3?view=storyboard")).toBe("episodes")
   })
 
-  it("keeps the assets episodes tab on 资产", () => {
+  it("keeps asset tabs, including 剧集管理 and 我的收藏, on 项目资产", () => {
     expect(resolveProjectSidebarSection("/project/9/assets")).toBe("assets")
     expect(resolveProjectSidebarSection("/project/9/assets/episodes")).toBe("assets")
     expect(resolveProjectSidebarSection("/project/9/assets/favorites")).toBe("assets")
@@ -25,6 +28,70 @@ describe("resolveProjectSidebarSection", () => {
     expect(resolveProjectSidebarSection("/project/9/script")).toBe("script")
     expect(resolveProjectSidebarSection("/project/9/settings")).toBe("settings")
     expect(resolveProjectSidebarSection("/projects")).toBeNull()
+  })
+})
+
+describe("resolveSidebarSelection", () => {
+  it("highlights only the open episode, not the 剧集 parent", () => {
+    expect(resolveSidebarSelection("/project/9/episode/3")).toEqual({
+      section: "episodes",
+      parentActive: false,
+      episodeId: 3,
+    })
+    expect(resolveSidebarSelection("/project/9/episode/3/canvas")).toEqual({
+      section: "episodes",
+      parentActive: false,
+      episodeId: 3,
+    })
+    expect(resolveSidebarSelection("/project/9/episode/3?view=storyboard")).toEqual({
+      section: "episodes",
+      parentActive: false,
+      episodeId: 3,
+    })
+    expect(isSidebarSectionRowActive(resolveSidebarSelection("/project/9/episode/3"), "episodes")).toBe(false)
+  })
+
+  it("lists the same 项目资产 entries as the asset header and highlights only the matching child", () => {
+    expect(PROJECT_ASSET_NAV_ITEMS.map((item) => item.label)).toEqual([
+      "剧集管理",
+      "角色管理",
+      "场景管理",
+      "物品管理",
+      "工作流",
+      "我的收藏",
+    ])
+
+    for (const item of PROJECT_ASSET_NAV_ITEMS) {
+      const selection = resolveSidebarSelection(`/project/9/assets/${item.id}`)
+      expect(selection).toEqual({
+        section: "assets",
+        parentActive: false,
+        assetId: item.id,
+      })
+      expect(isSidebarSectionRowActive(selection, "assets")).toBe(false)
+    }
+
+    expect(resolveSidebarSelection("/project/9/assets")).toEqual({
+      section: "assets",
+      parentActive: false,
+      assetId: null,
+    })
+    expect(resolveSidebarSelection("/project/9/assets/unknown")).toEqual({
+      section: "assets",
+      parentActive: false,
+      assetId: null,
+    })
+  })
+
+  it("does not highlight an asset child from the workflow canvas", () => {
+    expect(resolveSidebarSelection("/project/9/workflows/12")).toEqual({
+      section: "workbench",
+      parentActive: true,
+    })
+    expect(isSidebarSectionRowActive(resolveSidebarSelection("/project/9/dashboard"), "workbench")).toBe(true)
+    expect(isSidebarSectionRowActive(resolveSidebarSelection("/project/9/script"), "script")).toBe(true)
+    expect(isSidebarSectionRowActive(resolveSidebarSelection("/project/9/settings"), "settings")).toBe(true)
+    expect(resolveSidebarSelection("/projects")).toBeNull()
   })
 })
 

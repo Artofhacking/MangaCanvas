@@ -1,5 +1,21 @@
 export type ProjectSidebarSection = "workbench" | "script" | "episodes" | "assets" | "settings"
 
+export const PROJECT_ASSET_NAV_ITEMS = [
+  { id: "episodes", label: "剧集管理" },
+  { id: "characters", label: "角色管理" },
+  { id: "scenes", label: "场景管理" },
+  { id: "objects", label: "物品管理" },
+  { id: "workflows", label: "工作流" },
+  { id: "favorites", label: "我的收藏" },
+] as const
+
+export type ProjectAssetNavId = (typeof PROJECT_ASSET_NAV_ITEMS)[number]["id"]
+
+export type SidebarSelection =
+  | { section: "workbench" | "script" | "settings"; parentActive: true }
+  | { section: "episodes"; parentActive: false; episodeId: number | null }
+  | { section: "assets"; parentActive: false; assetId: ProjectAssetNavId | null }
+
 const PROJECT_EPISODE_PATH = /\/project\/\d+\/episode\/(\d+)(?:\/|$|\?|#)/
 
 const EPISODE_NAME_PATTERN =
@@ -43,8 +59,31 @@ export function resolveProjectSidebarSection(pathname: string): ProjectSidebarSe
   return null
 }
 
-export function isProjectFavoritesPath(pathname: string): boolean {
-  return /\/project\/\d+\/assets\/favorites(?:\/|$)/.test(pathname)
+const PROJECT_ASSET_NAV_ID_SET = new Set<string>(PROJECT_ASSET_NAV_ITEMS.map((item) => item.id))
+
+export function resolveActiveAssetNavId(pathname: string): ProjectAssetNavId | null {
+  const matched = pathname.match(/\/project\/\d+\/assets\/([^/?#]+)/)
+  if (!matched || !PROJECT_ASSET_NAV_ID_SET.has(matched[1])) return null
+  return matched[1] as ProjectAssetNavId
+}
+
+export function resolveSidebarSelection(pathname: string): SidebarSelection | null {
+  const section = resolveProjectSidebarSection(pathname)
+  if (!section) return null
+  if (section === "episodes") {
+    return { section, parentActive: false, episodeId: episodeIdFromPath(pathname) }
+  }
+  if (section === "assets") {
+    return { section, parentActive: false, assetId: resolveActiveAssetNavId(pathname) }
+  }
+  return { section, parentActive: true }
+}
+
+export function isSidebarSectionRowActive(
+  selection: SidebarSelection | null,
+  section: ProjectSidebarSection
+): boolean {
+  return Boolean(selection && selection.section === section && selection.parentActive)
 }
 
 export function episodeIdFromPath(pathname: string): number | null {
