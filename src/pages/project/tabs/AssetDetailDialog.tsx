@@ -5,13 +5,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 import { RectangleHorizontal } from "lucide-react"
-import type { ReactNode } from "react"
-
-export function formatAssetAspectRatio(ratio?: string | null) {
-  const value = ratio?.trim()
-  return value ? value : "—"
-}
+import { useState, type ReactNode, type SyntheticEvent } from "react"
+import {
+  aspectRatioFromNaturalSize,
+  assetDetailPreviewMediaClass,
+  resolveDisplayedAspectRatio,
+} from "./assetDetailPreview"
 
 export interface AssetDetailMeta {
   icon: ReactNode
@@ -48,25 +49,50 @@ export default function AssetDetailDialog({
   onOpenCanvas,
   extra,
 }: AssetDetailDialogProps) {
+  const [measured, setMeasured] = useState<{ src: string; ratio: string | null } | null>(null)
+  const naturalRatio = image && measured?.src === image ? measured.ratio : null
+
+  const rememberNaturalSize = (width: number, height: number) => {
+    if (!image) return
+    setMeasured({ src: image, ratio: aspectRatioFromNaturalSize(width, height) })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden">
-        <div className="flex flex-col md:flex-row">
-          <div className="w-full md:w-1/2 aspect-square md:aspect-auto md:min-h-[360px] bg-[hsl(var(--surface-container-low))]">
+        <div className="flex flex-col md:flex-row md:items-stretch">
+          <div
+            className={cn(
+              "relative w-full overflow-hidden md:w-1/2 md:min-h-[360px] md:self-stretch",
+              image
+                ? "aspect-square bg-black md:aspect-auto"
+                : "min-h-[240px] bg-[hsl(var(--surface-container-low))]"
+            )}
+          >
             {image ? (
               mediaType === "video" ? (
                 <video
                   src={image}
-                  className="h-full w-full bg-black object-contain"
+                  className={assetDetailPreviewMediaClass}
                   controls
                   playsInline
                   preload="metadata"
+                  onLoadedMetadata={(event: SyntheticEvent<HTMLVideoElement>) => {
+                    rememberNaturalSize(event.currentTarget.videoWidth, event.currentTarget.videoHeight)
+                  }}
                 />
               ) : (
-                <img src={image} alt={name} className="w-full h-full object-cover" />
+                <img
+                  src={image}
+                  alt={name}
+                  className={assetDetailPreviewMediaClass}
+                  onLoad={(event: SyntheticEvent<HTMLImageElement>) => {
+                    rememberNaturalSize(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)
+                  }}
+                />
               )
             ) : (
-              <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-[hsl(var(--secondary))]">
+              <div className="absolute inset-0 flex items-center justify-center text-sm text-[hsl(var(--secondary))]">
                 暂无预览
               </div>
             )}
@@ -86,7 +112,7 @@ export default function AssetDetailDialog({
                 {
                   icon: <RectangleHorizontal className="w-4 h-4" />,
                   label: "比例",
-                  value: formatAssetAspectRatio(aspectRatio),
+                  value: resolveDisplayedAspectRatio(aspectRatio, naturalRatio),
                 },
               ].map((meta) => (
                 <div key={meta.label} className="flex items-start gap-3">
