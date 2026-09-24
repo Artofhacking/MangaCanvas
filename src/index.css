@@ -50,12 +50,17 @@
   }
   html {
     scrollbar-gutter: stable;
+    /* The viewport scrollbar lives on the root. Dialog lock must not be the
+       thing that creates or removes it — see the unlayered rule below. */
+    overflow-y: scroll;
+  }
+  html:has(body.workspace-body-lock) {
+    overflow-y: hidden;
   }
   body {
     @apply bg-[hsl(var(--surface))] text-[hsl(var(--on-surface))];
     font-family: 'Inter', system-ui, sans-serif;
     min-height: 100vh;
-    overflow-y: scroll;
     overflow-x: hidden;
   }
 
@@ -104,14 +109,26 @@
 
 /*
   Radix Dialog/Sheet lock scroll through react-remove-scroll. That library
-  injects an unlayered body[data-scroll-locked] rule (overflow:hidden plus
-  margin-right equal to the scrollbar). html already reserves that width with
-  scrollbar-gutter: stable, so the extra margin shrinks the workspace by one
-  scrollbar. This rule stays outside @layer and uses a stronger selector so it
-  wins over the injected stylesheet. Scroll locking stays; only the extra inset
-  is removed.
+  injects an unlayered body[data-scroll-locked] rule: overflow:hidden plus
+  margin-right equal to the scrollbar, and sets --removed-body-scroll-bar-size.
+
+  scrollbar-gutter: stable does not keep that width on browsers that use
+  overlay scrollbars (macOS) once ::-webkit-scrollbar has turned the scrollbar
+  into a classic 6px bar. Zeroing the library margin then lets the page grow
+  into the gap that just disappeared. Keeping a second margin on top of a
+  gutter that DOES hold (Windows/Linux) shifts the page the other way.
+
+  The root element owns a permanent overflow-y: scroll bar, and this rule
+  pins the body so the document cannot scroll while the bar stays put.
+  Workspace shells opt out via html:has(body.workspace-body-lock), because
+  those pages already scroll inside main and must not show a second bar.
+  --scroll-lock-top is set by src/lib/scrollLockAnchor.ts.
 */
 html body[data-scroll-locked] {
+  position: fixed !important;
+  top: var(--scroll-lock-top, 0px) !important;
+  left: 0 !important;
+  width: 100% !important;
   overflow: hidden !important;
   margin-right: 0px !important;
   padding-right: 0px !important;
