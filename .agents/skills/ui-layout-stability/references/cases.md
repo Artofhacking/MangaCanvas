@@ -248,11 +248,11 @@ On 物品管理, and the same workspace shell elsewhere, opening a dialog (上�
 
 ### Root cause
 
-`scroll-lock jitter` plus `shell compensation mismatch`. Shared `Dialog` / `Sheet` mount Radix `RemoveScroll` (`react-remove-scroll-bar`), which sets `body[data-scroll-locked]` and an unlayered `--removed-body-scroll-bar-size` equal to the scrollbar width (6px with the custom scrollbar). The `@layer base` override already kept `overflow-y: scroll` and cleared body margin, so the scrollbar never left and the viewport width did not change. That variable zero was not `!important`, so the injected value won. `.workspace-shell` then added `padding-right` and `.workspace-fixed-header` inset `right` by the same amount, shifting the grid and header together.
+`scroll-lock jitter` plus `shell compensation mismatch`. Shared `Dialog` / `Sheet` mount Radix `RemoveScroll` (`react-remove-scroll-bar`), which injects an unlayered `body[data-scroll-locked]` rule: `overflow: hidden` and `margin-right` equal to the scrollbar width (6px with the custom scrollbar), and sets `--removed-body-scroll-bar-size`. `html` already uses `scrollbar-gutter: stable`, so that margin is a second reservation. The older `@layer base` override could not beat the injected `!important` margin, and the shell/header also consumed the scrollbar variable. Opening a dialog therefore narrowed the asset grid against the fixed header.
 
 ### Fix
 
-Keep scroll locking and the reserved scrollbar. Mark `--removed-body-scroll-bar-size: 0px !important` on `body[data-scroll-locked]` in `src/index.css`, so workspace shells and fixed headers do not add a second inset while the scrollbar is still present.
+Keep scroll locking. Outside `@layer`, `html body[data-scroll-locked]` forces `overflow: hidden`, clears the compensation margin/padding, and sets `--removed-body-scroll-bar-size: 0px !important`. The stable scrollbar gutter keeps the viewport width, so the workspace shell and fixed header no longer pick up a second inset.
 
 ### Why this fix fit the project
 
