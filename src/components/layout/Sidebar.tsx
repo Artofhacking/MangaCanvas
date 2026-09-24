@@ -15,7 +15,6 @@ import {
   Box,
   ScrollText,
   Shield,
-  Star,
   Clapperboard,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
@@ -39,10 +38,10 @@ import {
   switchProjectPath,
 } from "@/lib/workspaceRoutes"
 import {
-  episodeIdFromPath,
   formatEpisodeNavLabel,
-  isProjectFavoritesPath,
-  resolveProjectSidebarSection,
+  isSidebarSectionRowActive,
+  PROJECT_ASSET_NAV_ITEMS,
+  resolveSidebarSelection,
   sortEpisodesForNav,
 } from "@/lib/sidebarNav"
 import { useProjectStore } from "@/store/projectStore"
@@ -103,12 +102,16 @@ export default function Sidebar() {
     }, 300)
   }
 
-  const sidebarSection = resolveProjectSidebarSection(location.pathname)
-  const isFavoritesPath = isProjectFavoritesPath(location.pathname)
-  const currentEpisodeId = episodeIdFromPath(location.pathname)
+  const selection = resolveSidebarSelection(location.pathname)
+  const sidebarSection = selection?.section ?? null
+  const currentEpisodeId = selection?.section === "episodes" ? selection.episodeId : null
+  const activeAssetNavId = selection?.section === "assets" ? selection.assetId : null
   const onEpisodeRoute = currentEpisodeId != null
+  const inAssetsSection = sidebarSection === "assets"
   const [episodesExpanded, setEpisodesExpanded] = useState(true)
+  const [assetsExpanded, setAssetsExpanded] = useState(true)
   const previousOnEpisodeRoute = useRef(false)
+  const previousInAssets = useRef(false)
   const fetchGeneration = useRef(0)
   const storeEpisodes = useProjectStore((state) => state.assets.episodes)
   const initializedProjectId = useProjectStore((state) => state.initializedProjectId)
@@ -128,7 +131,15 @@ export default function Sidebar() {
   }, [onEpisodeRoute])
 
   useEffect(() => {
+    if (inAssetsSection && !previousInAssets.current) {
+      setAssetsExpanded(true)
+    }
+    previousInAssets.current = inAssetsSection
+  }, [inAssetsSection])
+
+  useEffect(() => {
     setEpisodesExpanded(true)
+    setAssetsExpanded(true)
   }, [activeProjectId])
 
   useEffect(() => {
@@ -267,7 +278,7 @@ export default function Sidebar() {
             <>
               <Link
                 to={activeProjectId ? projectDashboardPath(activeProjectId) : APP_HOME_PATH}
-                className={navClass(sidebarSection === "workbench")}
+                className={navClass(isSidebarSectionRowActive(selection, "workbench"))}
               >
                 <LayoutGrid className="h-[18px] w-[18px]" />
                 <span>工作台</span>
@@ -275,7 +286,7 @@ export default function Sidebar() {
               {activeProjectId ? (
                 <Link
                   to={projectScriptPath(activeProjectId)}
-                  className={navClass(sidebarSection === "script")}
+                  className={navClass(isSidebarSectionRowActive(selection, "script"))}
                 >
                   <ScrollText className="h-[18px] w-[18px]" />
                   <span>剧本</span>
@@ -285,7 +296,7 @@ export default function Sidebar() {
                 <div>
                   <button
                     type="button"
-                    className={`${navClass(sidebarSection === "episodes")} w-full text-left`}
+                    className={`${navClass(isSidebarSectionRowActive(selection, "episodes"))} w-full text-left`}
                     aria-expanded={episodesExpanded}
                     aria-controls="sidebar-episode-list"
                     onClick={() => setEpisodesExpanded((open) => !open)}
@@ -337,20 +348,39 @@ export default function Sidebar() {
               ) : null}
               {activeProjectId ? (
                 <div>
-                  <Link
-                    to={projectAssetsPath(activeProjectId)}
-                    className={navClass(sidebarSection === "assets" && !isFavoritesPath)}
+                  <button
+                    type="button"
+                    className={`${navClass(isSidebarSectionRowActive(selection, "assets"))} w-full text-left`}
+                    aria-expanded={assetsExpanded}
+                    aria-controls="sidebar-asset-list"
+                    onClick={() => {
+                      if (sidebarSection !== "assets") {
+                        setAssetsExpanded(true)
+                        navigate(projectAssetsPath(activeProjectId))
+                        return
+                      }
+                      setAssetsExpanded((open) => !open)
+                    }}
                   >
                     <Box className="h-[18px] w-[18px]" />
-                    <span>资产</span>
-                  </Link>
-                  <Link
-                    to={projectAssetsPath(activeProjectId, "favorites")}
-                    className={`${navClass(isFavoritesPath)} mt-1 pl-11`}
-                  >
-                    <Star className="h-4 w-4" />
-                    <span>我的收藏</span>
-                  </Link>
+                    <span className="flex-1">项目资产</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 opacity-70 transition-transform ${assetsExpanded ? "" : "-rotate-90"}`}
+                    />
+                  </button>
+                  {assetsExpanded ? (
+                    <div id="sidebar-asset-list" className="mt-1 space-y-1">
+                      {PROJECT_ASSET_NAV_ITEMS.map((item) => (
+                        <Link
+                          key={item.id}
+                          to={projectAssetsPath(activeProjectId, item.id)}
+                          className={cn(navClass(activeAssetNavId === item.id), "min-w-0 pl-11")}
+                        >
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {activeProjectId ? (
@@ -358,7 +388,7 @@ export default function Sidebar() {
                   <div className="my-2.5 border-t border-[hsl(var(--outline-variant))]/30" />
                   <Link
                     to={projectSettingsPath(activeProjectId)}
-                    className={navClass(sidebarSection === "settings")}
+                    className={navClass(isSidebarSectionRowActive(selection, "settings"))}
                   >
                     <Shield className="h-[18px] w-[18px]" />
                     <span>项目设置</span>
