@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   evaluateStoryboardGate,
+  foreignShotSceneNames,
   generationCover,
   lockedPromptLine,
   storyboardDependencyAssets,
@@ -44,6 +45,31 @@ describe('storyboardDependencyAssets', () => {
         objects,
       })
     ).toEqual([])
+  })
+
+  it('keeps another episode scene out of the lock list and names it separately', () => {
+    const cafe = { id: 34, name: '街角咖啡馆', description: '玻璃窗', shapingStatus: 'unset' as const }
+    const assets = storyboardDependencyAssets({
+      episodeCharacterIds: [1],
+      episodeSceneIds: [8],
+      episodeObjectIds: [4],
+      shots: [{ characterIds: [1], sceneId: 34, prompt: '' }],
+      characters,
+      scenes: [...scenes, cafe],
+      objects,
+    })
+    expect(assets.map((item) => item.name)).not.toContain('街角咖啡馆')
+    expect(assets.map((item) => item.name).sort()).toEqual(['夜诊所', '林深', '铁钥匙'].sort())
+    expect(
+      foreignShotSceneNames({
+        episodeSceneIds: [8],
+        shots: [{ sceneId: 34 }],
+        scenes: [...scenes, cafe],
+      })
+    ).toEqual(['街角咖啡馆'])
+    const gate = evaluateStoryboardGate(assets)
+    expect(gate.blockedMessage).toContain('林深')
+    expect(gate.blockedMessage).not.toContain('街角咖啡馆')
   })
 })
 

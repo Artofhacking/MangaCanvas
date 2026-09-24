@@ -3,11 +3,14 @@ import {
   buildShotPrompt,
   collectShotReferenceImages,
   createStoryboardShot,
+  matchAssetIds,
   normalizeStoryboard,
   persistableStoryboard,
   pickStoryboardModel,
+  resolveShotSceneId,
   shotsFromEpisodeScript,
   splitEpisodeScript,
+  storyboardSceneChoices,
   storyboardUsesReferenceImages,
 } from './storyboard'
 
@@ -44,6 +47,19 @@ describe('splitEpisodeScript', () => {
   })
 })
 
+const projectScenes = [
+  { id: 34, name: '街角咖啡馆' },
+  { id: 33, name: '出租屋客厅' },
+]
+
+const episodeOneScript = [
+  '林夏推开老旧木门，狭小的出租屋只有一盏台灯亮着。窗缝里灌进冷风，桌面上摊着未写完的分镜稿。她把湿透的外套挂好，对镜子里的自己说：「明天还得交一版。」',
+  '',
+  '出场：林夏（女，二十多岁，黑发及肩，穿深蓝卫衣）',
+  '场景：出租屋客厅（夜晚，台灯暖光，窗缝透风）',
+  '物品：台灯、分镜稿',
+].join('\n')
+
 describe('shotsFromEpisodeScript', () => {
   it('links character and scene names found in the beat', () => {
     const shots = shotsFromEpisodeScript('青羽走进雾隐后山。', {
@@ -53,6 +69,58 @@ describe('shotsFromEpisodeScript', () => {
     expect(shots).toHaveLength(1)
     expect(shots[0].characterIds).toEqual([7])
     expect(shots[0].sceneId).toBe(3)
+  })
+
+  it('binds every beat to the only scene of this episode', () => {
+    const shots = shotsFromEpisodeScript(episodeOneScript, {
+      characters: [
+        { id: 34, name: '林夏' },
+        { id: 35, name: '周衡' },
+      ],
+      scenes: projectScenes,
+      episodeSceneIds: [33],
+    })
+    expect(shots.length).toBeGreaterThan(1)
+    expect(shots.every((shot) => shot.sceneId === 33)).toBe(true)
+    expect(shots.every((shot) => shot.prompt.trim().length > 0)).toBe(true)
+    expect(shots[0].characterIds).toEqual([34])
+    expect(shots.some((shot) => shot.prompt === '' && shot.sceneId === 34)).toBe(false)
+  })
+
+  it('does not bind another episode when its name is the only scene mentioned', () => {
+    const shots = shotsFromEpisodeScript('林夏路过街角咖啡馆。', {
+      characters: [{ id: 34, name: '林夏' }],
+      scenes: projectScenes,
+      episodeSceneIds: [33],
+    })
+    expect(shots).toHaveLength(1)
+    expect(shots[0].sceneId).toBe(33)
+  })
+})
+
+describe('resolveShotSceneId', () => {
+  it('defaults a blank shot to the only episode scene, not the newest project scene', () => {
+    expect(resolveShotSceneId('', projectScenes, [33])).toBe(33)
+    expect(createStoryboardShot(1).sceneId).toBeNull()
+    expect(matchAssetIds('', projectScenes)).toEqual([])
+  })
+
+  it('keeps a project-wide name list from choosing the first hit', () => {
+    expect(
+      matchAssetIds('街角咖啡馆的窗边，也能看见出租屋客厅的灯', projectScenes)
+    ).toEqual([34, 33])
+    expect(
+      resolveShotSceneId('街角咖啡馆的窗边，也能看见出租屋客厅的灯', projectScenes, [33, 34])
+    ).toBeNull()
+    expect(resolveShotSceneId('她回到出租屋客厅。', projectScenes, [33, 34])).toBe(33)
+  })
+
+  it('limits the scene menu to this episode, in episode order', () => {
+    expect(storyboardSceneChoices(projectScenes, [33]).map((scene) => scene.id)).toEqual([33])
+    expect(storyboardSceneChoices(projectScenes, [33, 34]).map((scene) => scene.name)).toEqual([
+      '出租屋客厅',
+      '街角咖啡馆',
+    ])
   })
 })
 

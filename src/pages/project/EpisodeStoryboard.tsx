@@ -19,11 +19,13 @@ import {
   createStoryboardShot,
   persistableStoryboard,
   pickStoryboardModel,
+  resolveShotSceneId,
   shotsFromEpisodeScript,
+  storyboardSceneChoices,
   STORYBOARD_STATUS_LABEL,
   storyboardUsesReferenceImages,
 } from "@/features/project/storyboard"
-import { evaluateStoryboardGate, storyboardDependencyAssets } from "@/features/project/shaping"
+import { evaluateStoryboardGate, foreignShotSceneNames, storyboardDependencyAssets } from "@/features/project/shaping"
 import { useProjectStore } from "@/store/projectStore"
 import type { Character, Episode, ObjectItem, Scene, StoryboardShot } from "@/types"
 import { ChevronDown, ChevronUp, Clapperboard, Plus, RefreshCw, Sparkles, Trash2 } from "lucide-react"
@@ -69,12 +71,26 @@ export default function EpisodeStoryboard({
   }, [episode.id])
 
   const catalog = useMemo(() => ({ characters, scenes, objects }), [characters, objects, scenes])
+  const episodeSceneIds = useMemo(() => episode.sceneIds || [], [episode.sceneIds])
+  const sceneChoices = useMemo(
+    () => storyboardSceneChoices(scenes, episodeSceneIds),
+    [episodeSceneIds, scenes]
+  )
+  const foreignScenes = useMemo(
+    () =>
+      foreignShotSceneNames({
+        episodeSceneIds,
+        shots,
+        scenes,
+      }),
+    [episodeSceneIds, scenes, shots]
+  )
   const gate = useMemo(
     () =>
       evaluateStoryboardGate(
         storyboardDependencyAssets({
           episodeCharacterIds: episode.characterIds,
-          episodeSceneIds: episode.sceneIds,
+          episodeSceneIds,
           episodeObjectIds: episode.objectIds,
           shots,
           characters,
@@ -82,7 +98,7 @@ export default function EpisodeStoryboard({
           objects,
         })
       ),
-    [characters, episode.characterIds, episode.objectIds, episode.sceneIds, objects, scenes, shots]
+    [characters, episode.characterIds, episode.objectIds, episodeSceneIds, objects, scenes, shots]
   )
   const modelIds = imageModels.map((model) => model.id)
   const busy = shots.some((shot) => shot.status === "generating")
@@ -124,11 +140,15 @@ export default function EpisodeStoryboard({
   }
 
   const addShot = (prompt = "") => {
-    commit((current) => [...current, createStoryboardShot(current.length + 1, prompt)])
+    const sceneId = resolveShotSceneId(prompt, scenes, episodeSceneIds)
+    commit((current) => [...current, { ...createStoryboardShot(current.length + 1, prompt), sceneId }])
   }
 
   const splitFromScript = () => {
-    const next = shotsFromEpisodeScript(episode.description || "", catalog)
+    const next = shotsFromEpisodeScript(episode.description || "", {
+      ...catalog,
+      episodeSceneIds,
+    })
     if (!next.length) {
       notify.warning("本集还没有可拆的剧情")
       return
@@ -218,6 +238,11 @@ export default function EpisodeStoryboard({
           {gate.blockedMessage}
         </div>
       ) : null}
+      {foreignScenes.length ? (
+        <div className="mb-4 rounded-xl bg-[hsl(var(--primary))]/10 px-4 py-3 text-sm text-[hsl(var(--primary))]">
+          引用了其他集的场景：{foreignScenes.join("、")}
+        </div>
+      ) : null}
       {gate.semiHint ? (
         <div className="mb-4 rounded-xl bg-[hsl(var(--primary))]/10 px-4 py-3 text-sm text-[hsl(var(--primary))]">
           {gate.semiHint}
@@ -251,6 +276,7 @@ export default function EpisodeStoryboard({
               {shots.map((shot, index) => {
                 const characterNames = characters.filter((item) => shot.characterIds.includes(item.id))
                 const scene = scenes.find((item) => item.id === shot.sceneId)
+                const sceneFromOtherEpisode = Boolean(scene && !episodeSceneIds.includes(scene.id))
                 return (
                   <tr key={shot.id} className="align-top">
                     <td className="px-2 py-2">
@@ -360,7 +386,7 @@ export default function EpisodeStoryboard({
                             className="h-11 w-full justify-between rounded-xl bg-[hsl(var(--surface-container-low))] px-3 text-left text-sm font-normal hover:bg-[hsl(var(--surface-container-high))]"
                           >
                             <span className={scene ? "text-[hsl(var(--on-surface))]" : "text-[hsl(var(--secondary))]"}>
-                              {scene?.name || "选择场景"}
+                              {scene ? (sceneFromOtherEpisode ? `${scene.name} · 其他集` : scene.name) : "选择场景"}
                             </span>
                             <ChevronDown className="h-4 w-4 shrink-0 text-[hsl(var(--secondary))]" />
                           </Button>
@@ -377,10 +403,10 @@ export default function EpisodeStoryboard({
                           >
                             不关联
                           </DropdownMenuItem>
-                          {scenes.length === 0 ? (
-                            <DropdownMenuItem disabled>项目里还没有场景</DropdownMenuItem>
+                          {sceneChoices.length === 0 ? (
+                            <DropdownMenuItem disabled>本集还没有关联场景</DropdownMenuItem>
                           ) : (
-                            scenes.map((item) => (
+                            sceneChoices.map((item) => (
                               <DropdownMenuItem
                                 key={item.id}
                                 onClick={() =>
