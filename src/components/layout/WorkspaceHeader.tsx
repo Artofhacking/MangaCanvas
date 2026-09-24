@@ -35,9 +35,11 @@ export default function WorkspaceHeader({
     <>
       <header className="workspace-fixed-header fixed top-0 z-40 h-14 border-b border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-lowest))]/85 px-6 backdrop-blur-md">
         <div className="flex h-full items-center justify-between gap-6">
-          <div className="min-w-0">
-            <h1 className="cn-nowrap text-base font-bold text-[hsl(var(--on-surface))]">{title}</h1>
-            {subtitle ? <p className="text-[13px] text-[hsl(var(--secondary))]">{subtitle}</p> : null}
+          <div className="flex h-full min-w-0 items-center">
+            <div className="min-w-0">
+              <h1 className="cn-nowrap text-base font-bold text-[hsl(var(--on-surface))]">{title}</h1>
+              {subtitle ? <p className="text-[13px] text-[hsl(var(--secondary))]">{subtitle}</p> : null}
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
