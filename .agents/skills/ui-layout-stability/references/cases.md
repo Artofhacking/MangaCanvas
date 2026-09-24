@@ -239,3 +239,30 @@ Lock the generate dock to a reserved width (`BAR_WIDTH`) and give each trigger a
 
 - `src/features/infinite-canvas/components/NodeGenerateBar.tsx`
 - `src/features/infinite-canvas/components/NodeDockOverlay.tsx`
+
+## Case 010: Asset dialogs shift the workspace when scroll lock starts
+
+### Symptom
+
+On 物品管理, and the same workspace shell elsewhere, opening a dialog (上传物品, asset detail, or any other Radix dialog) nudged the tabs, asset grid, and top-right profile slightly sideways. Closing the dialog moved them back.
+
+### Root cause
+
+`scroll-lock jitter` plus `shell compensation mismatch`. Shared `Dialog` / `Sheet` mount Radix `RemoveScroll` (`react-remove-scroll-bar`), which sets `body[data-scroll-locked]` and an unlayered `--removed-body-scroll-bar-size` equal to the scrollbar width (6px with the custom scrollbar). The `@layer base` override already kept `overflow-y: scroll` and cleared body margin, so the scrollbar never left and the viewport width did not change. That variable zero was not `!important`, so the injected value won. `.workspace-shell` then added `padding-right` and `.workspace-fixed-header` inset `right` by the same amount, shifting the grid and header together.
+
+### Fix
+
+Keep scroll locking and the reserved scrollbar. Mark `--removed-body-scroll-bar-size: 0px !important` on `body[data-scroll-locked]` in `src/index.css`, so workspace shells and fixed headers do not add a second inset while the scrollbar is still present.
+
+### Why this fix fit the project
+
+- Every modal on asset pages goes through the shared Radix dialog primitive, not a page-local overlay.
+- The workspace shell and fixed header already share one compensation variable, so correcting that variable fixes 物品管理 and the other workspace pages together.
+- Body scroll lock stays in place; only the extra horizontal inset is removed.
+
+### Implementation reference
+
+- `src/index.css`
+- `src/components/ui/dialog.tsx`
+- `src/components/layout/ProjectHeader.tsx`
+- `src/pages/project/index.tsx`

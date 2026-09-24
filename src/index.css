@@ -67,7 +67,14 @@
     margin-right: 0 !important;
     padding-right: 0 !important;
     overflow-y: scroll !important;
-    --removed-body-scroll-bar-size: 0px;
+    /*
+      react-remove-scroll injects an unlayered rule that sets this variable
+      to the scrollbar width. Unlayered normal declarations beat @layer base,
+      so the zero below must be !important. Otherwise .workspace-shell and
+      .workspace-fixed-header inset by that width while the scrollbar stays,
+      and the page shifts when any Dialog/Sheet opens.
+    */
+    --removed-body-scroll-bar-size: 0px !important;
   }
 
   .workspace-shell {
