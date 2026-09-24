@@ -97,17 +97,51 @@ export function matchAssetIds(prompt: string, items: { id: number; name: string 
     .map((item) => item.id)
 }
 
+export function storyboardSceneChoices<T extends { id: number }>(
+  scenes: T[],
+  episodeSceneIds?: number[] | null
+): T[] {
+  if (!episodeSceneIds?.length) return []
+  const byId = new Map(scenes.map((scene) => [scene.id, scene]))
+  const choices: T[] = []
+  for (const id of episodeSceneIds) {
+    const scene = byId.get(id)
+    if (scene) choices.push(scene)
+  }
+  return choices
+}
+
+/**
+ * Scene linked on a new or split shot.
+ * Only episode.sceneIds are eligible. One scene defaults to that scene.
+ * Several scenes use a unique name hit in the beat; zero or several hits stay empty.
+ */
+export function resolveShotSceneId(
+  prompt: string,
+  scenes: { id: number; name: string }[],
+  episodeSceneIds?: number[] | null
+): number | null {
+  const allowed =
+    episodeSceneIds == null ? scenes : storyboardSceneChoices(scenes, episodeSceneIds)
+  if (allowed.length === 1) return allowed[0].id
+  const matched = matchAssetIds(prompt, allowed)
+  return matched.length === 1 ? matched[0] : null
+}
+
 export function shotsFromEpisodeScript(
   text: string,
-  catalog: { characters: { id: number; name: string }[]; scenes: { id: number; name: string }[] }
+  catalog: {
+    characters: { id: number; name: string }[]
+    scenes: { id: number; name: string }[]
+    episodeSceneIds?: number[] | null
+  }
 ): StoryboardShot[] {
   return splitEpisodeScript(text).map((prompt, index) => {
     const characterIds = matchAssetIds(prompt, catalog.characters)
-    const sceneIds = matchAssetIds(prompt, catalog.scenes)
     return {
       ...createStoryboardShot(index + 1, prompt),
       characterIds,
-      sceneId: sceneIds[0] ?? null,
+      sceneId: resolveShotSceneId(prompt, catalog.scenes, catalog.episodeSceneIds),
     }
   })
 }

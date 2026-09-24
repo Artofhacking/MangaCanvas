@@ -40,9 +40,10 @@ function named(names: string[], copy: string) {
 /**
  * Assets that gate storyboard generation.
  *
- * Prefer this episode's cast (character / scene / prop links). Also include
- * characters and scenes pinned on the current shot rows, plus props whose
- * names appear in a shot prompt. Props have no shot-level id field yet.
+ * The list is this episode's cast. Shot rows can add characters and props
+ * named in the beat. A scene pinned on a row counts only when it already
+ * belongs to the episode; another episode's scene is reported separately
+ * and is not mixed into the lock list.
  * An empty set means this episode does not depend on any asset, so generation stays available.
  */
 export function storyboardDependencyAssets(input: {
@@ -61,6 +62,8 @@ export function storyboardDependencyAssets(input: {
     if (!asset) return
     picked.set(`${kind}:${asset.id}`, asset)
   }
+  const episodeScenes = new Set(input.episodeSceneIds || [])
+  const restrictScenes = Array.isArray(input.episodeSceneIds)
 
   for (const id of input.episodeCharacterIds || []) add('character', id, input.characters)
   for (const id of input.episodeSceneIds || []) add('scene', id, input.scenes)
@@ -68,7 +71,9 @@ export function storyboardDependencyAssets(input: {
 
   for (const shot of input.shots) {
     for (const id of shot.characterIds || []) add('character', id, input.characters)
-    add('scene', shot.sceneId, input.scenes)
+    if (shot.sceneId && (!restrictScenes || episodeScenes.has(shot.sceneId))) {
+      add('scene', shot.sceneId, input.scenes)
+    }
     const prompt = shot.prompt || ''
     for (const object of input.objects) {
       if (object.name && prompt.includes(object.name)) picked.set(`object:${object.id}`, object)
@@ -76,6 +81,21 @@ export function storyboardDependencyAssets(input: {
   }
 
   return [...picked.values()]
+}
+
+export function foreignShotSceneNames(input: {
+  episodeSceneIds?: number[] | null
+  shots: Array<{ sceneId?: number | null }>
+  scenes: Array<{ id: number; name: string }>
+}): string[] {
+  const allowed = new Set(input.episodeSceneIds || [])
+  const names: string[] = []
+  for (const shot of input.shots) {
+    if (!shot.sceneId || allowed.has(shot.sceneId)) continue
+    const name = input.scenes.find((scene) => scene.id === shot.sceneId)?.name?.trim()
+    if (name && !names.includes(name)) names.push(name)
+  }
+  return names
 }
 
 export function evaluateStoryboardGate(assets: Array<Pick<ShapingAsset, 'name' | 'shapingStatus'>>): StoryboardGate {
