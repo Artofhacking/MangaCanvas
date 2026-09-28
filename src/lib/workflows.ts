@@ -244,7 +244,19 @@ export const openOrCreateWorkflow = async (
           Number(workflow.sourceAssetId) === Number(options.sourceAssetId)
       )
       if (hit) {
-        const current = normalizeCanvasData(hit.canvasData)
+        const detail = await workflowsApi.getById(numericProjectId, hit.id)
+        const loaded = detail.success ? detail.data : null
+        // List rows no longer include canvasData. Rebuilding from that absence
+        // would treat a real episode canvas as empty and overwrite it.
+        if (!loaded?.canvasData) {
+          return {
+            id: hit.id,
+            name: loaded?.name || hit.name,
+            created: false,
+            canvasData: hit.canvasData ? normalizeCanvasData(hit.canvasData) : emptyCanvasData(),
+          }
+        }
+        const current = normalizeCanvasData(loaded.canvasData)
         const rebuild =
           (options.sourceType === 'episode' && shouldRebuildEpisodeCanvas(current)) ||
           shouldRepairAssetSeedCanvas(current, options)
@@ -253,14 +265,14 @@ export const openOrCreateWorkflow = async (
           const updated = await workflowsApi.update(numericProjectId, hit.id, { canvasData })
           return {
             id: hit.id,
-            name: hit.name,
+            name: loaded.name || hit.name,
             created: false,
             canvasData: normalizeCanvasData(updated.data?.canvasData || canvasData),
           }
         }
         return {
           id: hit.id,
-          name: hit.name,
+          name: loaded.name || hit.name,
           created: false,
           canvasData: current,
         }

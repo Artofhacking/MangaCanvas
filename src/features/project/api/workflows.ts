@@ -25,7 +25,9 @@ const mapWorkflow = (dto: WorkflowDTO): Workflow => ({
   status: (dto.status as Workflow['status']) || 'draft',
   modified: dto.updatedAt || dto.createdAt || new Date().toISOString(),
   thumbnail: dto.thumbnail ?? undefined,
-  canvasData: normalizeCanvasData(dto.canvasData),
+  // List responses omit canvasData. Do not invent an empty graph here, or
+  // callers cannot tell "not loaded" from "this canvas really has no nodes".
+  ...(dto.canvasData ? { canvasData: normalizeCanvasData(dto.canvasData) } : {}),
 })
 
 export const workflowsApi = {

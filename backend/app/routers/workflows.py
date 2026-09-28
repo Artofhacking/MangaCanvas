@@ -2,14 +2,15 @@ import secrets
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, defer
 
 from .. import models, serialize
 from ..serialize import normalize_canvas
 from ..db import get_db
 from ..deps import current_user, require_project_access
 from ..errors import fail, ok
-from ..util import iso, now, paginate
+from ..util import iso, now
 
 router = APIRouter(prefix="/projects/{project_id}/canvas-workflows")
 
@@ -46,15 +47,26 @@ def list_workflows(
     db: Session = Depends(get_db),
 ):
     require_project_access(db, user, project_id)
+    page = max(page or 1, 1)
+    size = min(max(size or 20, 1), 100)
+    # MySQL filesort copies selected columns into the sort buffer. Including
+    # the JSON canvas_data column raises 1038 once a workflow payload is large.
+    total = (
+        db.query(func.count(models.CanvasWorkflow.id))
+        .filter(models.CanvasWorkflow.project_id == project_id)
+        .scalar()
+    )
     rows = (
         db.query(models.CanvasWorkflow)
-        .filter_by(project_id=project_id)
-        .order_by(models.CanvasWorkflow.updated_at.desc())
+        .options(defer(models.CanvasWorkflow.canvas_data))
+        .filter(models.CanvasWorkflow.project_id == project_id)
+        .order_by(models.CanvasWorkflow.updated_at.desc(), models.CanvasWorkflow.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
         .all()
     )
-    items = [serialize.workflow(r, include_canvas=True) for r in rows]
-    sliced, pagination = paginate(items, page, size)
-    return ok({"list": sliced, "pagination": pagination})
+    items = [serialize.workflow(r, include_canvas=False) for r in rows]
+    return ok({"list": items, "pagination": {"page": page, "size": size, "total": int(total or 0)}})
 
 
 @router.post("")
