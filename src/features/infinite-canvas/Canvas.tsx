@@ -92,6 +92,7 @@ import {
   CANVAS_PAN_ACTIVATION_KEY,
   getCanvasPanOnDrag,
 } from './utils/canvasInteraction';
+import { CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS } from './utils/canvasMediaBudget';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -1234,6 +1235,7 @@ const CanvasInner: React.FC = () => {
           minZoom={0.1}
           maxZoom={2}
           className={isDark ? 'dark' : ''}
+          onlyRenderVisibleElements={CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS}
           nodesDraggable={!isLocked}
           nodesConnectable={!isLocked}
           elementsSelectable={!isLocked}

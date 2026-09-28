@@ -17,7 +17,7 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
-import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction';
+import { CanvasVideoPreview } from './CanvasVideoPreview';
 
 const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { nodes, edges, updateNode, duplicateNode, removeNode, addNode, addEdgeManually } = useCanvasStore();
@@ -28,7 +28,6 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [extracting, setExtracting] = useState(false);
   const [muted, setMuted] = useState(true);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
-  const lastPreviewClickAt = useRef(0);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -240,33 +239,16 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
           />
         ) : data.url ? (
           <div className="relative h-full w-full">
-            <video
-              ref={videoRef}
-              src={mediaUrl(data.url)}
-              autoPlay
-              loop
+            <CanvasVideoPreview
+              nodeId={id}
+              url={data.url}
+              thumbnail={data.thumbnail}
+              selected={selected}
               muted={muted}
-              playsInline
-              draggable={false}
-              className="h-full w-full bg-black object-cover"
-              poster={mediaUrl(data.thumbnail)}
-              onDragStart={(event) => event.preventDefault()}
-              onCanPlay={() => {
-                videoRef.current?.play().catch(() => {});
-              }}
-            />
-            <div
-              className="absolute inset-0"
-              onClick={(event) => {
-                const now = Date.now();
-                if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
-                  lastPreviewClickAt.current = now;
-                  return;
-                }
-                event.stopPropagation();
-                event.preventDefault();
-                lastPreviewClickAt.current = 0;
-                if (videoRef.current) videoRef.current.pause();
+              suspended={showPreview}
+              videoRef={videoRef}
+              onOpenPreview={() => {
+                videoRef.current?.pause();
                 setShowPreview(true);
               }}
             />
