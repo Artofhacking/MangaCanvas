@@ -142,17 +142,27 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
       return;
     }
 
-    const remoteDocuments: Project[] = response.data.list.map((workflow) => ({
-      id: workflow.id,
-      name: workflow.name,
-      thumbnail: workflow.thumbnail || '',
-      createdAt: new Date(workflow.modified),
-      updatedAt: new Date(workflow.modified),
-      projectId: String(workflow.projectId),
-      sourceType: workflow.sourceType,
-      sourceAssetId: workflow.sourceAssetId,
-      canvasData: toCanvasData(workflow.canvasData),
-    }));
+    const previousById = new Map(
+      get()
+        .projects.filter((item) => String(item.projectId) === String(projectId))
+        .map((item) => [item.id, item]),
+    );
+    const remoteDocuments: Project[] = response.data.list.map((workflow) => {
+      const previous = previousById.get(workflow.id);
+      return {
+        id: workflow.id,
+        name: workflow.name,
+        thumbnail: workflow.thumbnail || '',
+        createdAt: new Date(workflow.modified),
+        updatedAt: new Date(workflow.modified),
+        projectId: String(workflow.projectId),
+        sourceType: workflow.sourceType,
+        sourceAssetId: workflow.sourceAssetId,
+        canvasData: workflow.canvasData
+          ? toCanvasData(workflow.canvasData)
+          : previous?.canvasData ?? emptyCanvasData(),
+      };
+    });
 
     const others = get().projects.filter((item) => String(item.projectId) !== String(projectId));
     set({ projects: [...remoteDocuments, ...others] });
