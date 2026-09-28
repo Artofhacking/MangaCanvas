@@ -19,7 +19,7 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
-import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction';
+import { CanvasImagePreview } from './CanvasImagePreview';
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -34,7 +34,6 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const hasMedia = Boolean(data.url);
-  const lastPreviewClickAt = React.useRef(0);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -150,23 +149,12 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             onCancel={bindNodeGenerationCancel(id, updateNode)}
           />
         ) : data.url ? (
-          <img
-            src={mediaUrl(data.url)}
-            alt={data.label}
-            draggable={false}
-            className="h-full w-full object-cover"
-            onDragStart={(event) => event.preventDefault()}
-            onClick={(event) => {
-              const now = Date.now();
-              if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
-                lastPreviewClickAt.current = now;
-                return;
-              }
-              event.stopPropagation();
-              event.preventDefault();
-              lastPreviewClickAt.current = 0;
-              setShowPreview(true);
-            }}
+          <CanvasImagePreview
+            nodeId={id}
+            url={data.url}
+            thumbnail={data.thumbnail}
+            alt={data.label || '图片'}
+            onOpenPreview={() => setShowPreview(true)}
           />
         ) : (
           <MediaEmptyGlyph kind="image" />
