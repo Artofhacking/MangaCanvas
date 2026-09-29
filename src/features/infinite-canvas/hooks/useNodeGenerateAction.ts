@@ -155,8 +155,19 @@ export function useNodeGenerateAction(nodeId: string | null) {
         updateNode(nodeId, { loading: false, error: toErrorMessage(err, '生成失败'), progress: undefined })
       }
     } finally {
-      finishGenerationJob(nodeId, signal)
+      const ownsJob = finishGenerationJob(nodeId, signal)
       setSending(false)
+      if (ownsJob) {
+        const current = useCanvasStore.getState().nodes.find((item) => item.id === nodeId)
+        if (current?.data.loading) {
+          const existing = typeof current.data.error === 'string' ? current.data.error : ''
+          updateNode(nodeId, {
+            loading: false,
+            progress: undefined,
+            error: existing || '生成失败',
+          })
+        }
+      }
     }
   }, [generateImage, generateVideo, nodeId])
 

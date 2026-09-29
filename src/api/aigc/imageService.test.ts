@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { HttpError } from '@/api/core/error'
 import {
+  IMAGE_GENERATION_TIMEOUT_MESSAGE,
+  imageGenerationErrorMessage,
   isI2IModel,
   resolveImageReferences,
   UNSUPPORTED_REFERENCE_IMAGE_MESSAGE,
@@ -25,6 +28,25 @@ describe('isI2IModel', () => {
     expect(isI2IModel('wan2.6-t2i')).toBe(false)
     expect(isI2IModel('qwen-image-2.0')).toBe(false)
     expect(isI2IModel('qwen-image-2.0-pro')).toBe(false)
+  })
+})
+
+describe('imageGenerationErrorMessage', () => {
+  it('turns transport and gateway timeouts into a clear retry hint', () => {
+    expect(imageGenerationErrorMessage(new HttpError('timeout of 600000ms exceeded', { code: 'ECONNABORTED' }))).toBe(
+      IMAGE_GENERATION_TIMEOUT_MESSAGE
+    )
+    expect(imageGenerationErrorMessage(new HttpError('Request failed with status code 504', { status: 504 }))).toBe(
+      IMAGE_GENERATION_TIMEOUT_MESSAGE
+    )
+    expect(imageGenerationErrorMessage(new Error('The read operation timed out'))).toBe(IMAGE_GENERATION_TIMEOUT_MESSAGE)
+  })
+
+  it('leaves model rejection and cancel messages alone', () => {
+    expect(imageGenerationErrorMessage(new Error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE))).toBe(
+      UNSUPPORTED_REFERENCE_IMAGE_MESSAGE
+    )
+    expect(imageGenerationErrorMessage(new Error('已取消'))).toBe('已取消')
   })
 })
 

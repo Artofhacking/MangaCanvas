@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { PLACEHOLDER_COVER_URL } from './assetSeed'
 import { shouldRebuildEpisodeCanvas } from './plotActs'
-import { buildSeedCanvas, shouldRepairAssetSeedCanvas, type OpenWorkflowOptions } from './workflows'
+import {
+  INTERRUPTED_GENERATION_ERROR,
+  buildSeedCanvas,
+  normalizeCanvasData,
+  shouldRepairAssetSeedCanvas,
+  type OpenWorkflowOptions,
+} from './workflows'
 
 const base = (overrides: Partial<OpenWorkflowOptions>): OpenWorkflowOptions => ({
   projectId: '1',
@@ -9,6 +15,41 @@ const base = (overrides: Partial<OpenWorkflowOptions>): OpenWorkflowOptions => (
   sourceName: '青羽',
   sourceAssetId: 7,
   ...overrides,
+})
+
+describe('normalizeCanvasData stale generation', () => {
+  it('clears a persisted loading flag so a reload is not stuck on 生成中', () => {
+    const canvas = normalizeCanvasData({
+      nodes: [
+        {
+          id: 'gen',
+          type: 'imageConfig',
+          position: { x: 0, y: 0 },
+          data: { label: '画面节点', loading: true, progress: 40, prompt: '@2 穿上 @1' },
+        },
+        {
+          id: 'again',
+          type: 'imageConfig',
+          position: { x: 1, y: 1 },
+          data: { label: '画面节点', loading: true, url: 'https://cdn.example/prev.png', error: '' },
+        },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    })
+
+    expect(canvas.nodes[0].data).toMatchObject({
+      loading: false,
+      error: INTERRUPTED_GENERATION_ERROR,
+      prompt: '@2 穿上 @1',
+    })
+    expect(canvas.nodes[0].data.progress).toBeUndefined()
+    expect(canvas.nodes[1].data).toMatchObject({
+      loading: false,
+      url: 'https://cdn.example/prev.png',
+      error: '',
+    })
+  })
 })
 
 describe('buildSeedCanvas asset media', () => {

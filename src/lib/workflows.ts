@@ -134,6 +134,19 @@ export const emptyCanvasData = (): CanvasGraph => ({
   viewport: { x: 100, y: 50, zoom: 0.8 },
 })
 
+export const INTERRUPTED_GENERATION_ERROR = '生成中断，请重新生成'
+
+/** Drop in-flight generation flags. Jobs live in memory, so a reloaded graph cannot still be running. */
+export function clearStaleGenerationLoading<T extends { data?: Record<string, unknown> }>(node: T): T {
+  const data = node.data
+  if (!data?.loading) return node
+  const next: Record<string, unknown> = { ...data, loading: false }
+  delete next.progress
+  const url = typeof next.url === 'string' ? next.url.trim() : ''
+  if (!url && !next.error) next.error = INTERRUPTED_GENERATION_ERROR
+  return { ...node, data: next }
+}
+
 export const normalizeCanvasData = (canvasData?: {
   nodes?: unknown[]
   edges?: unknown[]
@@ -144,11 +157,7 @@ export const normalizeCanvasData = (canvasData?: {
     if (node.type === 'text' && !data.content) {
       data.content = data.value || ''
     }
-    if (data.loading && !data.url) {
-      data.loading = false
-      if (!data.error) data.error = '生成中断，请重新生成'
-    }
-    return { ...node, data }
+    return clearStaleGenerationLoading({ ...node, data })
   })
   return {
     nodes,

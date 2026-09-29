@@ -1,10 +1,20 @@
 import asyncio
+import base64
 import inspect
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import httpx
+import pytest
 
 from app.ai_media import (
+    IMAGE_GENERATION_TIMEOUT_MESSAGE,
+    OPENAI_IMAGE_DEADLINE_SECONDS,
     build_happyhorse_video_body,
     build_nexcor_seedance_video_body,
     mention_image_roles,
+    openai_image_generate,
+    openai_image_http_timeout,
     openai_video_generate,
     resolve_vidu_r2v_model,
     resolve_video_model,
@@ -12,6 +22,7 @@ from app.ai_media import (
     vidu_video_generate,
     video_image_data_uri,
 )
+from app.errors import ApiError
 from app.routers import ai as ai_router
 
 
@@ -104,3 +115,143 @@ def test_multi_ref_no_longer_hijacks_disabled_vidu():
 def test_video_image_data_uri_passthrough():
     uri = "data:image/png;base64,abcd"
     assert asyncio.run(video_image_data_uri(uri)) == uri
+
+
+def test_openai_image_deadline_stays_under_gateway():
+    assert OPENAI_IMAGE_DEADLINE_SECONDS == 540
+    assert OPENAI_IMAGE_DEADLINE_SECONDS < 600
+    timeout = openai_image_http_timeout()
+    assert timeout.read == OPENAI_IMAGE_DEADLINE_SECONDS
+    assert timeout.connect <= 30
+    assert timeout.write <= 90
+
+
+class _ImageClient:
+    posts: list[tuple[str, dict]] = []
+
+    def __init__(self, *_args, **_kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return False
+
+    async def post(self, url, **kwargs):
+        type(self).posts.append((url, kwargs))
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"data": [{"b64_json": "aaa"}]}
+        return response
+
+
+def _data_url(payload: bytes) -> str:
+    return "data:image/png;base64," + base64.b64encode(payload).decode()
+
+
+def test_openai_image_without_refs_stays_text_to_image(monkeypatch):
+    monkeypatch.setattr("app.ai_media.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.ai_media.settings.openai_base_url", "https://example.test/v1")
+    _ImageClient.posts = []
+    monkeypatch.setattr("app.ai_media.httpx.AsyncClient", _ImageClient)
+
+    payload = asyncio.run(
+        openai_image_generate(prompt="lineart", model="gpt-image-2", size="1024x1024", n=1, quality="low")
+    )
+
+    assert payload["data"][0]["b64_json"] == "aaa"
+    url, kwargs = _ImageClient.posts[0]
+    assert url == "https://example.test/v1/images/generations"
+    assert "files" not in kwargs
+    assert kwargs["json"]["model"] == "gpt-image-2"
+
+
+def test_openai_image_edits_uploads_every_reference(monkeypatch):
+    monkeypatch.setattr("app.ai_media.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.ai_media.settings.openai_base_url", "https://example.test/v1")
+    _ImageClient.posts = []
+    monkeypatch.setattr("app.ai_media.httpx.AsyncClient", _ImageClient)
+
+    asyncio.run(
+        openai_image_generate(
+            prompt="@2 穿上 @1",
+            model="gpt-image-2",
+            size="1536x1024",
+            n=1,
+            quality="low",
+            images=[_data_url(b"dress"), _data_url(b"sheet")],
+        )
+    )
+
+    url, kwargs = _ImageClient.posts[0]
+    assert url == "https://example.test/v1/images/edits"
+    names = [item[1][0] for item in kwargs["files"]]
+    bodies = [item[1][1] for item in kwargs["files"]]
+    assert names == ["reference_0.png", "reference_1.png"]
+    assert bodies == [b"dress", b"sheet"]
+    assert kwargs["data"]["quality"] == "low"
+    assert kwargs["data"]["size"] == "1536x1024"
+
+
+def test_openai_image_read_timeout_is_a_clear_error(monkeypatch):
+    monkeypatch.setattr("app.ai_media.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.ai_media.settings.openai_base_url", "https://example.test/v1")
+
+    class TimeoutClient(_ImageClient):
+        async def post(self, url, **kwargs):
+            raise httpx.ReadTimeout("The read operation timed out")
+
+    monkeypatch.setattr("app.ai_media.httpx.AsyncClient", TimeoutClient)
+    with pytest.raises(ApiError) as exc:
+        asyncio.run(
+            openai_image_generate(
+                prompt="dress",
+                model="gpt-image-2",
+                size="1536x1024",
+                n=1,
+                quality="low",
+                images=[_data_url(b"dress")],
+            )
+        )
+    assert exc.value.code == 3001
+    assert exc.value.http_status == 504
+    assert exc.value.message == IMAGE_GENERATION_TIMEOUT_MESSAGE
+
+
+def test_openai_image_deadline_cancels_a_slow_upstream(monkeypatch):
+    monkeypatch.setattr("app.ai_media.settings.openai_api_key", "sk-test")
+    monkeypatch.setattr("app.ai_media.settings.openai_base_url", "https://example.test/v1")
+    monkeypatch.setattr("app.ai_media.OPENAI_IMAGE_DEADLINE_SECONDS", 0.05)
+
+    class SlowClient(_ImageClient):
+        async def post(self, url, **kwargs):
+            await asyncio.sleep(2)
+            raise AssertionError("slow upstream should have been cancelled")
+
+    monkeypatch.setattr("app.ai_media.httpx.AsyncClient", SlowClient)
+    with pytest.raises(ApiError) as exc:
+        asyncio.run(
+            openai_image_generate(prompt="dress", model="gpt-image-2", size="1024x1024", n=1, quality="low")
+        )
+    assert exc.value.message == IMAGE_GENERATION_TIMEOUT_MESSAGE
+    assert exc.value.http_status == 504
+
+
+def test_images_route_reports_upstream_timeout(monkeypatch):
+    monkeypatch.setattr(ai_router.settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr(ai_router.settings, "dashscope_api_key", "")
+    monkeypatch.setattr(ai_router.settings, "billing_enabled", False)
+
+    async def boom(**_kwargs):
+        raise httpx.ReadTimeout("")
+
+    monkeypatch.setattr(ai_router, "openai_image_generate", boom)
+    request = MagicMock()
+    request.json = AsyncMock(return_value={"model": "gpt-image-2", "prompt": "dress", "images": ["a", "b"]})
+    request.headers = {}
+    with pytest.raises(ApiError) as exc:
+        asyncio.run(ai_router.images(request, SimpleNamespace(id=1)))
+    assert exc.value.code == 3001
+    assert exc.value.http_status == 504
+    assert exc.value.message == IMAGE_GENERATION_TIMEOUT_MESSAGE

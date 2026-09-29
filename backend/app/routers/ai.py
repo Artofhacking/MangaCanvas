@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+import httpx
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ from ..ai_media import (
     is_seedance_model,
     is_vidu_model,
     minimax_video_generate,
+    IMAGE_GENERATION_TIMEOUT_MESSAGE,
     openai_image_generate,
     openai_quality,
     openai_size,
@@ -197,6 +199,9 @@ async def images(request: Request, user: models.User = Depends(current_user_deta
         return ok(media)
     except ApiError:
         raise
+    except (httpx.TimeoutException, TimeoutError):
+        note_upstream_result(str(model), 0, "timeout")
+        fail(3001, IMAGE_GENERATION_TIMEOUT_MESSAGE, 504)
     except Exception as exc:
         note_upstream_result(str(model), 0, str(exc))
         fail(3001, f"生成任务失败: {exc}", 502)
