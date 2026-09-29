@@ -208,6 +208,17 @@ def persist_openai_images(payload: dict) -> list[str]:
     return urls
 
 
+# Must finish before nginx proxy_read_timeout and the frontend appClient (both 600s).
+# wait_for is a wall-clock cap: httpx's read timeout resets whenever bytes arrive,
+# so a slow GPT Image edit can otherwise run until the gateway cuts the client.
+OPENAI_IMAGE_DEADLINE_SECONDS = 540
+IMAGE_GENERATION_TIMEOUT_MESSAGE = "图片生成超时，请稍后重试或减小参考图"
+
+
+def openai_image_http_timeout() -> httpx.Timeout:
+    return httpx.Timeout(OPENAI_IMAGE_DEADLINE_SECONDS, connect=10.0, write=60.0, pool=5.0)
+
+
 async def openai_image_generate(
     *,
     prompt: str,
@@ -219,12 +230,43 @@ async def openai_image_generate(
 ) -> dict:
     if not settings.openai_api_key:
         fail(3001, "未配置图片模型 API Key", 503)
+    try:
+        return await asyncio.wait_for(
+            _openai_image_request(
+                prompt=prompt,
+                model=model,
+                size=size,
+                n=n,
+                quality=quality,
+                images=images,
+            ),
+            timeout=OPENAI_IMAGE_DEADLINE_SECONDS,
+        )
+    except ApiError:
+        raise
+    except (httpx.TimeoutException, TimeoutError):
+        fail(3001, IMAGE_GENERATION_TIMEOUT_MESSAGE, 504)
+    raise RuntimeError("unreachable")
+
+
+async def _openai_image_request(
+    *,
+    prompt: str,
+    model: str,
+    size: str,
+    n: int,
+    quality: str,
+    images: list[str] | None,
+) -> dict:
     base = settings.openai_base_url.rstrip("/")
     headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
-    async with httpx.AsyncClient(timeout=180) as client:
-        if images:
-            image_bytes = await load_image_bytes(images[0])
-            files = {"image": ("reference.png", image_bytes, "image/png")}
+    refs = [url for url in (images or []) if url]
+    async with httpx.AsyncClient(timeout=openai_image_http_timeout()) as client:
+        if refs:
+            files = []
+            for index, url in enumerate(refs):
+                image_bytes = await load_image_bytes(url)
+                files.append(("image", (f"reference_{index}.png", image_bytes, "image/png")))
             data = {
                 "model": model,
                 "prompt": prompt or "edit this image",

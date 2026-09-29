@@ -69,6 +69,54 @@ describe('syncProjectWorkflows', () => {
     expect(saved.canvasData.edges).toHaveLength(1)
   })
 
+  it('clears a stale loading flag kept from a previous canvas', async () => {
+    useCanvasDocumentsStore.setState({
+      projects: [
+        {
+          id: 'workflow_a',
+          name: '旧名',
+          thumbnail: '',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+          projectId: '4',
+          sourceType: 'blank',
+          canvasData: {
+            nodes: [{
+              id: 'gen',
+              type: 'imageConfig',
+              position: { x: 0, y: 0 },
+              data: { label: '画面节点', loading: true },
+            }],
+            edges: [],
+            viewport: { x: 0, y: 0, zoom: 1 },
+          },
+        },
+      ],
+    })
+    vi.mocked(workflowsApi.getAll).mockResolvedValue({
+      success: true,
+      data: {
+        list: [
+          {
+            id: 'workflow_a',
+            projectId: '4',
+            name: '新名',
+            sourceType: 'blank',
+            status: 'draft',
+            modified: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        pagination: { page: 1, size: 100, total: 1 },
+      },
+    })
+
+    await useCanvasDocumentsStore.getState().syncProjectWorkflows('4')
+
+    const node = useCanvasDocumentsStore.getState().projects[0].canvasData.nodes[0]
+    expect(node.data.loading).toBe(false)
+    expect(node.data.error).toBe('生成中断，请重新生成')
+  })
+
   it('uses an empty canvas for a workflow the client has never loaded', async () => {
     vi.mocked(workflowsApi.getAll).mockResolvedValue({
       success: true,

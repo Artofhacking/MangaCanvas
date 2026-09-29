@@ -1,4 +1,5 @@
 import { appClient } from '@/api/clients/appClient'
+import { HttpError, isCanceledError } from '@/api/core/error'
 import { requestData } from '@/api/core/response'
 import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
 import { resolveProjectId } from '@/lib/session'
@@ -20,6 +21,40 @@ export const isI2IModel = (model: string) =>
 
 export const UNSUPPORTED_REFERENCE_IMAGE_MESSAGE =
   '当前模型不支持参考图，请改用 GPT Image、万相 2.7 或万相 2.6 图生图'
+
+export const IMAGE_GENERATION_TIMEOUT_MESSAGE = '图片生成超时，请稍后重试或减小参考图'
+
+export function imageGenerationErrorMessage(error: unknown, fallback = '生成失败'): string {
+  if (isCanceledError(error)) {
+    return error instanceof Error && error.message ? error.message : '已取消'
+  }
+  const message = error instanceof Error ? error.message : ''
+  const status = axiosStatus(error)
+  const code = axiosCode(error)
+  if (
+    code === 'ECONNABORTED' ||
+    code === 'ETIMEDOUT' ||
+    status === 504 ||
+    /timeout of \d+ms exceeded|timed out|readtimeout|图片生成超时/i.test(message)
+  ) {
+    return IMAGE_GENERATION_TIMEOUT_MESSAGE
+  }
+  return message || fallback
+}
+
+function axiosStatus(error: unknown): number | undefined {
+  if (error instanceof HttpError) return error.status
+  if (error && typeof error === 'object' && 'response' in error) {
+    const status = (error as { response?: { status?: number } }).response?.status
+    if (typeof status === 'number') return status
+  }
+  return undefined
+}
+
+function axiosCode(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('code' in error)) return ''
+  return String((error as { code?: unknown }).code || '')
+}
 
 /** Attach refs for i2i-capable models; never silently drop them. */
 export function resolveImageReferences(
@@ -85,9 +120,12 @@ export const imageService = {
       useGenerationHistoryStore.getState().succeed(historyId, urls[0])
       return urls
     } catch (error) {
-      const message = error instanceof Error ? error.message : '生成失败'
+      const message = imageGenerationErrorMessage(error)
       useGenerationHistoryStore.getState().fail(historyId, message)
-      throw error
+      if (isCanceledError(error) || (error instanceof Error && error.message === message)) {
+        throw error
+      }
+      throw new Error(message)
     }
   },
 }

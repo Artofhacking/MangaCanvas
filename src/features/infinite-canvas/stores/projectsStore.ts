@@ -102,7 +102,7 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
                 projectId,
                 sourceType,
                 sourceAssetId,
-                canvasData: canvasData ? toCanvasData(canvasData) : project.canvasData,
+                canvasData: toCanvasData(canvasData || project.canvasData),
                 updatedAt: new Date(),
               }
             : project
@@ -158,9 +158,7 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
         projectId: String(workflow.projectId),
         sourceType: workflow.sourceType,
         sourceAssetId: workflow.sourceAssetId,
-        canvasData: workflow.canvasData
-          ? toCanvasData(workflow.canvasData)
-          : previous?.canvasData ?? emptyCanvasData(),
+        canvasData: toCanvasData(workflow.canvasData || previous?.canvasData),
       };
     });
 

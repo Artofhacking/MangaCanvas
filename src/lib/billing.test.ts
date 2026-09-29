@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { HttpError } from '@/api/core/error'
 import { withIdempotentGenerate } from './billing'
 
 const UUID_V4 =
@@ -24,5 +25,36 @@ describe('withIdempotentGenerate', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+
+  it('does not keep the canvas waiting by retrying a client timeout', async () => {
+    let calls = 0
+    await expect(
+      withIdempotentGenerate(async () => {
+        calls += 1
+        throw new HttpError('timeout of 600000ms exceeded', {
+          code: 'ECONNABORTED',
+          url: '/ai/images/generations',
+        })
+      })
+    ).rejects.toThrow(/timeout of 600000ms exceeded/)
+    expect(calls).toBe(1)
+  })
+
+  it('stops after one anonymous gateway timeout instead of retrying forever', async () => {
+    vi.useFakeTimers()
+    let calls = 0
+    const pending = withIdempotentGenerate(async () => {
+      calls += 1
+      throw new HttpError('Request failed with status code 504', {
+        status: 504,
+        url: '/ai/images/generations',
+      })
+    })
+    const assertion = expect(pending).rejects.toThrow(/504/)
+    await vi.runAllTimersAsync()
+    await assertion
+    expect(calls).toBe(2)
+    vi.useRealTimers()
   })
 })
