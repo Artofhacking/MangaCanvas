@@ -211,7 +211,7 @@ export default function EpisodeStoryboard({
         <div>
           <h3 className="text-lg font-bold text-[hsl(var(--on-surface))]">分镜表</h3>
           <p className="mt-1 text-sm text-[hsl(var(--secondary))]">
-            一行一镜。已定妆的角色、场景和道具会带定妆图；半定型只写入锁定的提示词。参考图仅在图生图模型（wan2.6-image）生效。
+            一行一镜。已定妆的角色、场景和道具会带定妆图；半定型只写入锁定的提示词。参考图会交给支持它的模型（GPT Image、万相 2.7 / Pro、万相 2.6 图生图）。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

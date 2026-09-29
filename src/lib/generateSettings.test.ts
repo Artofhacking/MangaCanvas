@@ -215,14 +215,53 @@ describe('buildImageGenerateOptions', () => {
     })
   })
 
-  it('errors instead of silently dropping refs on text-only models', () => {
+  it('attaches optional reference images for 万相 2.7 and Pro', () => {
+    const settings = { aspectRatio: '1:1' as const, quality: 'standard' as const, clarity: '1k' as const, quantity: 1 }
     expect(
       buildImageGenerateOptions({
         model: 'wan2.7-image',
         prompt: 'lineart',
+        settings,
+        referenceImages: ['https://example.com/city.png'],
+      })
+    ).toMatchObject({
+      model: 'wan2.7-image',
+      images: ['https://example.com/city.png'],
+    })
+    expect(
+      buildImageGenerateOptions({
+        model: 'wan2.7-image-pro',
+        prompt: 'lineart',
+        settings,
+        referenceImages: ['https://example.com/city.png'],
+      })
+    ).toMatchObject({
+      model: 'wan2.7-image-pro',
+      images: ['https://example.com/city.png'],
+    })
+  })
+
+  it('keeps 万相 2.7 text-to-image when no reference images are connected', () => {
+    expect(
+      buildImageGenerateOptions({
+        model: 'wan2.7-image-pro',
+        prompt: 'a lantern',
+        settings: { aspectRatio: '1:1', quality: 'standard', clarity: '1k', quantity: 1 },
+      })
+    ).toMatchObject({
+      model: 'wan2.7-image-pro',
+      images: undefined,
+    })
+  })
+
+  it('errors instead of silently dropping refs on text-only models', () => {
+    expect(
+      buildImageGenerateOptions({
+        model: 'qwen-image-2.0',
+        prompt: 'lineart',
         settings: { aspectRatio: '1:1', quality: 'standard', clarity: '1k', quantity: 1 },
         referenceImages: ['https://example.com/city.png'],
       })
-    ).toEqual({ error: '当前模型不支持参考图，请改用万相 2.6 图生图' })
+    ).toEqual({ error: '当前模型不支持参考图，请改用 GPT Image、万相 2.7 或万相 2.6 图生图' })
   })
 })
