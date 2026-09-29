@@ -5,6 +5,8 @@ import { DeleteOutlined, CopyOutlined, PlayCircleOutlined } from '@ant-design/ic
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useVideoGeneration } from '../../hooks';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { isInlineCanvasMedia } from '@/lib/canvasPayload';
+import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia';
 import { isCanceledError } from '@/api/core';
 import { finishGenerationJob, startGenerationJob } from '../../utils/generationJobs';
 import { creditsApi } from '@/api/creditsApi';
@@ -213,7 +215,10 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       }
 
       if (videoUrl) {
-        updateNode(videoNodeId, { url: videoUrl, loading: false, progress: undefined, updatedAt: Date.now() });
+        const storedVideoUrl = isInlineCanvasMedia(videoUrl)
+          ? await uploadCanvasMediaUrl(videoUrl)
+          : videoUrl
+        updateNode(videoNodeId, { url: storedVideoUrl, loading: false, progress: undefined, updatedAt: Date.now() });
       } else {
         updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined });
       }

@@ -56,6 +56,7 @@ import { dominantAssetNode } from '@/lib/assetSeed';
 import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
 import {
   persistWorkflowCanvasNavState,
   projectAssetsPath,
@@ -314,8 +315,12 @@ const CanvasInner: React.FC = () => {
     backTarget.action();
   }, [backTarget, cleanupCanvasTransientUi]);
 
-  const persistCurrentCanvas = useCallback(() => {
-    persistOpenCanvas({ projectId, workflowId: canvasDocumentId || workflowId });
+  const persistCurrentCanvas = useCallback((immediate = false) => {
+    persistOpenCanvas({
+      projectId,
+      workflowId: canvasDocumentId || workflowId,
+      immediate,
+    });
   }, [canvasDocumentId, projectId, workflowId]);
 
   const handleSwitchWorkflow = useCallback(
@@ -324,7 +329,7 @@ const CanvasInner: React.FC = () => {
         setShowProjectMenu(false);
         return;
       }
-      persistCurrentCanvas();
+      persistCurrentCanvas(true);
       cleanupCanvasTransientUi();
       navigate(`/project/${projectId}/workflows/${nextWorkflowId}`, {
         state: location.state,
@@ -336,7 +341,7 @@ const CanvasInner: React.FC = () => {
   const handleSwitchEpisode = useCallback(
     async (nextEpisodeId: number) => {
       if (!projectId) return;
-      persistCurrentCanvas();
+      persistCurrentCanvas(true);
       cleanupCanvasTransientUi();
       const episodeResponse = await projectApi.episodes.getById(Number(projectId), nextEpisodeId);
       const result = await openOrCreateWorkflow({
@@ -608,19 +613,19 @@ const CanvasInner: React.FC = () => {
           const file = item.getAsFile();
           if (!file) continue;
 
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const base64 = event.target?.result as string;
-            const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
-            const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
-            
-            addNode('image', 
-              { x: viewportCenterX - 140, y: viewportCenterY - 100 }, 
-              { url: base64, base64, label: '粘贴图片', loading: false }
-            );
-            message.success('图片已粘贴');
-          };
-          reader.readAsDataURL(file);
+          const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
+          const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
+          void uploadCanvasBlob(file)
+            .then((url) => {
+              addNode('image',
+                { x: viewportCenterX - 140, y: viewportCenterY - 100 },
+                { url, label: '粘贴图片', loading: false }
+              );
+              message.success('图片已粘贴');
+            })
+            .catch(() => {
+              message.error('图片粘贴失败');
+            });
           return;
         }
       }
@@ -790,14 +795,14 @@ const CanvasInner: React.FC = () => {
   useEffect(() => {
     if (!canvasDocumentId || !projectId) return;
     if (hydratedWorkflowId !== canvasDocumentId) return;
-    persistCurrentCanvas();
+    persistCurrentCanvas(true);
     const timer = setInterval(() => persistCurrentCanvas(), 2500);
     return () => clearInterval(timer);
   }, [canvasDocumentId, hydratedWorkflowId, persistCurrentCanvas, projectId]);
 
   useEffect(() => {
     if (!canvasDocumentId || hydratedWorkflowId !== canvasDocumentId) return;
-    const onHide = () => persistCurrentCanvas();
+    const onHide = () => persistCurrentCanvas(true);
     window.addEventListener('pagehide', onHide);
     window.addEventListener('beforeunload', onHide);
     return () => {

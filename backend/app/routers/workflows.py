@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, defer
 
 from .. import models, serialize
+from ..canvas_media import persist_inline_canvas_logged
 from ..serialize import normalize_canvas
 from ..db import get_db
 from ..deps import current_user, require_project_access
@@ -82,7 +83,7 @@ def create_workflow(
         thumbnail=body.thumbnail,
         source_type=body.sourceType or "blank",
         source_asset_id=body.sourceAssetId,
-        canvas_data=normalize_canvas(body.canvasData or _default_canvas()),
+        canvas_data=normalize_canvas(persist_inline_canvas_logged(body.canvasData) or _default_canvas()),
         created_by=user.id,
     )
     db.add(row)
@@ -124,7 +125,7 @@ def update_workflow(
     if body.status is not None:
         row.status = body.status
     if body.canvasData is not None:
-        row.canvas_data = normalize_canvas(body.canvasData)
+        row.canvas_data = normalize_canvas(persist_inline_canvas_logged(body.canvasData))
     row.updated_at = now()
     return ok(serialize.workflow(row))
 

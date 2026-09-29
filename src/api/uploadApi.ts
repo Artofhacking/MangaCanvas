@@ -10,7 +10,7 @@ import type { ListData } from './types'
 // ==================== 类型定义 ====================
 
 /** 文件目录类型 */
-export type UploadDirectory = 'characters' | 'scenes' | 'objects' | 'episodes' | 'assets' | 'avatars'
+export type UploadDirectory = 'characters' | 'scenes' | 'objects' | 'episodes' | 'assets' | 'avatars' | 'generated'
 
 /** 预签名请求参数 */
 export interface PresignedUrlRequest {

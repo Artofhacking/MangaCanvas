@@ -158,7 +158,7 @@ echo "==> install Python deps"
 cd "$APP_ROOT"
 .venv/bin/pip install -r requirements.txt -q
 
-echo "==> apply nginx SPA config"
+echo "==> apply nginx SPA config (client_max_body_size 128m + JSON 413 on the existing conf)"
 if [[ ! -f "$NGINX_CONF" ]]; then
   if [[ -n "$NGINX_TEMPLATE" && -f "$NGINX_TEMPLATE" ]]; then
     sudo cp "$NGINX_TEMPLATE" "$NGINX_CONF"

@@ -7,6 +7,7 @@ import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
+import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
 import { PlusHandle } from './PlusHandle';
 import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
 import {
@@ -116,8 +117,13 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       if (!ctx) throw new Error('Canvas 初始化失败');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 转换为 base64
-      const base64 = canvas.toDataURL('image/png');
+      const frame = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((value) => {
+          if (value) resolve(value);
+          else reject(new Error('截帧失败'));
+        }, 'image/png');
+      });
+      const frameUrl = await uploadCanvasBlob(frame);
 
       // 获取当前节点位置
       const currentNode = nodes.find((n) => n.id === id);
@@ -127,14 +133,13 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       const outgoing = edges.filter((e) => e.source === id);
       const xOffset = outgoing.length * 320;
 
-      // 创建图片节点
+      // 创建图片节点。只写入文件地址，避免把整帧 base64 放进画布 JSON。
       const imageNodeId = addNode(
         'image',
         { x: currentNode.position.x + 400 + xOffset, y: currentNode.position.y },
-        { 
-          label: '尾帧截图', 
-          base64,
-          url: base64,
+        {
+          label: '尾帧截图',
+          url: frameUrl,
         }
       );
 

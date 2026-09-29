@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime, timezone
 
 import pytest
@@ -193,3 +194,139 @@ def test_detail_create_and_update_still_return_canvas(client, project_id):
     assert updated["name"] == "已改"
     assert updated["canvasData"]["nodes"][0]["id"] == "edited"
     assert updated["canvasData"]["edges"] == []
+
+
+def test_invalid_json_is_a_non_empty_json_400(client, project_id):
+    """App validation never answers with an empty body. Access-log `400 0` is not this handler."""
+    response = client.put(
+        f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old",
+        content=b"{",
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 400
+    assert len(response.content) > 0
+    body = response.json()
+    assert body["code"] == 1001
+    assert body["message"]
+    assert "参数错误" in body["message"]
+
+
+def test_put_externalizes_duplicate_data_urls(client, project_id, tmp_path, monkeypatch):
+    upload_dir = tmp_path / "uploads"
+    monkeypatch.setattr("app.config.settings.upload_dir", upload_dir)
+    payload = base64.b64encode(b"same-bitmap").decode()
+    data_url = f"data:image/png;base64,{payload}"
+    updated = _data(
+        client.put(
+            f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old",
+            json={
+                "canvasData": {
+                    "nodes": [
+                        {"id": "a", "type": "image", "data": {"url": data_url, "base64": data_url, "label": "贴图"}},
+                        {"id": "b", "type": "image", "data": {"url": data_url}},
+                    ],
+                    "edges": [],
+                    "viewport": {"x": 0, "y": 0, "zoom": 1},
+                }
+            },
+        )
+    )
+    urls = [node["data"]["url"] for node in updated["canvasData"]["nodes"]]
+    assert urls[0] == urls[1]
+    assert urls[0].startswith("/static/uploads/")
+    assert "base64" not in updated["canvasData"]["nodes"][0]["data"]
+    assert "data:image" not in response_text(updated)
+    stored = list(upload_dir.rglob("*"))
+    files = [path for path in stored if path.is_file()]
+    assert len(files) == 1
+    assert files[0].read_bytes() == b"same-bitmap"
+
+
+def test_put_live_canvas_shape_externalizes_data_urls_in_url(client, project_id, tmp_path, monkeypatch):
+    """Live workflow_cb2ae3386ac7: 3 nodes, 0 edges, two data URLs in data.url, one static path."""
+    import json
+
+    upload_dir = tmp_path / "uploads"
+    monkeypatch.setattr("app.config.settings.upload_dir", upload_dir)
+    wide = base64.b64encode(b"wide-png" * 400).decode()
+    narrow = base64.b64encode(b"narrow-png" * 120).decode()
+    static = "/static/uploads/generated/already.png"
+    body = {
+        "canvasData": {
+            "nodes": [
+                {"id": "a", "type": "image", "data": {"url": f"data:image/png;base64,{wide}"}},
+                {"id": "b", "type": "image", "data": {"url": f"data:image/png;base64,{narrow}"}},
+                {"id": "c", "type": "image", "data": {"url": static}},
+            ],
+            "edges": [],
+            "viewport": {"x": 0, "y": 0, "zoom": 1},
+        }
+    }
+    request_text = json.dumps(body)
+    updated = _data(
+        client.put(
+            f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old",
+            json=body,
+        )
+    )
+    response_body = response_text(updated)
+    urls = [node["data"]["url"] for node in updated["canvasData"]["nodes"]]
+    assert urls[0].startswith("/static/uploads/")
+    assert urls[1].startswith("/static/uploads/")
+    assert urls[0] != urls[1]
+    assert urls[2] == static
+    assert updated["canvasData"]["edges"] == []
+    assert "data:image" not in response_body
+    assert "base64" not in updated["canvasData"]["nodes"][0]["data"]
+    assert len(response_body) < len(request_text) / 2
+    files = [path for path in upload_dir.rglob("*") if path.is_file()]
+    assert len(files) == 2
+    detail = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old"))
+    assert "data:image" not in response_text(detail)
+    assert [node["data"]["url"] for node in detail["canvasData"]["nodes"]] == urls
+
+
+def test_put_rejects_oversized_inline_image_with_json(client, project_id, tmp_path, monkeypatch):
+    upload_dir = tmp_path / "uploads"
+    monkeypatch.setattr("app.config.settings.upload_dir", upload_dir)
+    monkeypatch.setattr("app.canvas_media.MAX_INLINE_MEDIA_BYTES", 4)
+    data_url = "data:image/png;base64," + base64.b64encode(b"0123456789abcdef").decode()
+    response = client.put(
+        f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old",
+        json={
+            "canvasData": {
+                "nodes": [{"id": "huge", "type": "image", "data": {"url": data_url, "base64": data_url}}],
+                "edges": [],
+                "viewport": {"x": 0, "y": 0, "zoom": 1},
+            }
+        },
+    )
+    assert response.status_code == 413
+    assert len(response.content) > 0
+    body = response.json()
+    assert body["code"] == 1001
+    assert "过大" in body["message"]
+    assert list(upload_dir.rglob("*")) == []
+    detail = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old"))
+    assert detail["canvasData"]["nodes"][0]["id"] == "n-heavy"
+
+
+def test_get_does_not_externalize_stored_data_urls(client, db, project_id, tmp_path, monkeypatch):
+    upload_dir = tmp_path / "uploads"
+    monkeypatch.setattr("app.config.settings.upload_dir", upload_dir)
+    row = db.query(models.CanvasWorkflow).filter_by(id="workflow_old").one()
+    row.canvas_data = {
+        "nodes": [{"id": "kept", "type": "image", "data": {"url": "data:image/png;base64,AAAA"}}],
+        "edges": [],
+        "viewport": {"x": 0, "y": 0, "zoom": 1},
+    }
+    db.commit()
+    detail = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old"))
+    assert detail["canvasData"]["nodes"][0]["data"]["url"].startswith("data:image/png;base64,")
+    assert list(upload_dir.rglob("*")) == []
+
+
+def response_text(payload) -> str:
+    import json
+
+    return json.dumps(payload, ensure_ascii=False)
