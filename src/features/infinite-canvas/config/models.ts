@@ -185,6 +185,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
     durs: [
       { label: '5秒', key: 5 },
       { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
     ],
     defaultParams: {
       size: '1280*720',
@@ -203,6 +204,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
     durs: [
       { label: '5秒', key: 5 },
       { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
     ],
     defaultParams: {
       resolution: '720P',
@@ -221,6 +223,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
     durs: [
       { label: '5秒', key: 5 },
       { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
     ],
     defaultParams: {
       resolution: '720P',
