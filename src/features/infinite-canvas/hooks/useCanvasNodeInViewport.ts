@@ -3,8 +3,9 @@ import { flowNodeIntersectsViewport } from '../utils/canvasMediaBudget'
 
 /**
  * True when the measured node overlaps the pane.
- * Unmeasured nodes return true so the first paint is not stuck blank; media
- * decode is still capped separately.
+ * Unmeasured nodes return false. React Flow mounts those nodes on the opening
+ * frame (`onlyRenderVisibleElements` treats missing dimensions as visible),
+ * and treating them as in-view decoded every image before fitView.
  */
 export function useCanvasNodeInViewport(nodeId: string, minVisibleRatio: number): boolean {
   return useStore((state) => {
@@ -12,9 +13,9 @@ export function useCanvasNodeInViewport(nodeId: string, minVisibleRatio: number)
     const width = node?.width
     const height = node?.height
     if (typeof width !== 'number' || typeof height !== 'number' || width <= 0 || height <= 0) {
-      return true
+      return false
     }
-    if (state.width <= 0 || state.height <= 0) return true
+    if (state.width <= 0 || state.height <= 0) return false
     const [translateX, translateY, zoom] = state.transform
     return flowNodeIntersectsViewport({
       nodeX: node?.positionAbsolute?.x ?? node?.position.x ?? 0,

@@ -4,9 +4,12 @@ import ReactFlow, {
   Background,
   MiniMap,
   useReactFlow,
+  useStore,
+  useStoreApi,
   ReactFlowProvider,
   SelectionMode,
   Node as RFNode,
+  Edge,
   Connection,
   OnConnectStart,
 } from 'reactflow';
@@ -92,7 +95,7 @@ import {
   CANVAS_PAN_ACTIVATION_KEY,
   getCanvasPanOnDrag,
 } from './utils/canvasInteraction';
-import { CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS } from './utils/canvasMediaBudget';
+import { CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS, captureCanvasOverviewZoom, deferCanvasFitView } from './utils/canvasMediaBudget';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -111,6 +114,10 @@ const edgeTypes = {
   imageRole: ImageRoleEdge,
 };
 
+const HIDDEN_FLOW_NODES: RFNode[] = []
+const HIDDEN_FLOW_EDGES: Edge[] = []
+const CANVAS_FIT_VIEW_OPTIONS = { padding: 0.1, duration: 0 }
+
 const CanvasInner: React.FC = () => {
   const { projectId, workflowId, episodeId } = useParams<{
     projectId: string;
@@ -120,6 +127,7 @@ const CanvasInner: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { screenToFlowPosition } = useReactFlow();
+  const reactFlowStore = useStoreApi();
   const canvasPaneRef = useRef<HTMLDivElement>(null);
   useTwoFingerPan(canvasPaneRef);
   const canvasDocumentId = workflowId;
@@ -157,6 +165,23 @@ const CanvasInner: React.FC = () => {
     syncProjectWorkflows,
   } = useCanvasDocumentsStore();
   const [hydratedWorkflowId, setHydratedWorkflowId] = useState<string | null>(null);
+  const canvasReady = Boolean(canvasDocumentId) && hydratedWorkflowId === canvasDocumentId;
+  const flowNodes = canvasReady ? nodes : HIDDEN_FLOW_NODES;
+  const flowEdges = canvasReady ? edges : HIDDEN_FLOW_EDGES;
+  const fitViewSettled = useStore((state) => (state as { fitViewOnInitDone?: boolean }).fitViewOnInitDone === true);
+  useEffect(() => {
+    if (!fitViewSettled) return;
+    let innerFrame = 0;
+    const outerFrame = window.requestAnimationFrame(() => {
+      innerFrame = window.requestAnimationFrame(() => {
+        captureCanvasOverviewZoom(reactFlowStore.getState().transform[2]);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outerFrame);
+      window.cancelAnimationFrame(innerFrame);
+    };
+  }, [fitViewSettled, reactFlowStore]);
   const { isDark } = useThemeStore();
 
   const [showApiSettings, setShowApiSettings] = useState(false);
@@ -675,6 +700,7 @@ const CanvasInner: React.FC = () => {
 
     let cancelled = false;
     setHydratedWorkflowId(null);
+    deferCanvasFitView(reactFlowStore);
 
     const hydrate = async () => {
       const numericProjectId = Number(projectId);
@@ -744,7 +770,9 @@ const CanvasInner: React.FC = () => {
       setHydratedWorkflowId(canvasDocumentId);
     };
 
-    void hydrate();
+    void hydrate().catch(() => {
+      if (!cancelled) setHydratedWorkflowId(canvasDocumentId);
+    });
     return () => {
       cancelled = true;
     };
@@ -755,6 +783,7 @@ const CanvasInner: React.FC = () => {
     getProjectCanvas,
     loadProject,
     projectId,
+    reactFlowStore,
     workflowId,
   ]);
 
@@ -1215,8 +1244,8 @@ const CanvasInner: React.FC = () => {
           </div>
         )}
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={flowNodes}
+          edges={flowEdges}
           onNodesChange={isLocked ? undefined : onNodesChange}
           onEdgesChange={isLocked ? undefined : onEdgesChange}
           onConnect={isLocked ? undefined : handleConnect}
@@ -1230,6 +1259,7 @@ const CanvasInner: React.FC = () => {
           onMoveEnd={(_, newViewport) => updateViewport(newViewport)}
           onPaneClick={handlePaneClick}
           fitView
+          fitViewOptions={CANVAS_FIT_VIEW_OPTIONS}
           snapToGrid
           snapGrid={[20, 20]}
           minZoom={0.1}
@@ -1263,7 +1293,7 @@ const CanvasInner: React.FC = () => {
           />
         ) : null}
 
-        {nodes.length === 0 && (
+        {canvasReady && nodes.length === 0 && (
           <div className="pointer-events-none absolute inset-0 z-[15] flex items-center justify-center p-6">
             <div className="pointer-events-auto w-[min(420px,calc(100%-2rem))] rounded-[28px] border border-[hsl(var(--outline-variant))]/40 bg-[hsl(var(--surface-container-lowest))]/95 p-6 text-center shadow-[0_18px_50px_rgba(42,28,24,0.12)] backdrop-blur-md">
               <p className="text-lg font-bold text-[hsl(var(--on-surface))]">从画面节点或素材库开始</p>

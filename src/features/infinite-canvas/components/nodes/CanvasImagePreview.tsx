@@ -1,15 +1,8 @@
 import { useRef } from 'react'
-import { useStore } from 'reactflow'
 import { Image as ImageIcon } from 'lucide-react'
 import { mediaUrl } from '@/lib/mediaUrl'
 import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction'
-import { useCanvasFullResSlot } from '../../hooks/useCanvasFullResSlot'
-import { useCanvasNodeInViewport } from '../../hooks/useCanvasNodeInViewport'
-import {
-  CANVAS_FULL_RES_MIN_ZOOM,
-  CANVAS_IMAGE_MIN_VISIBLE_RATIO,
-  resolveCanvasImageDisplaySrc,
-} from '../../utils/canvasMediaBudget'
+import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
 
 interface CanvasImagePreviewProps {
   nodeId: string
@@ -26,21 +19,9 @@ export function CanvasImagePreview({
   alt,
   onOpenPreview,
 }: CanvasImagePreviewProps) {
-  const allowFullResolution = useStore((state) => state.transform[2] >= CANVAS_FULL_RES_MIN_ZOOM)
-  const inViewport = useCanvasNodeInViewport(nodeId, CANVAS_IMAGE_MIN_VISIBLE_RATIO)
-  const full = (url || '').trim()
-  const thumb = (thumbnail || '').trim()
-  const wantsFullResolution = Boolean(full) && inViewport && allowFullResolution && !(thumb && thumb !== full)
-  const fullResGranted = useCanvasFullResSlot(nodeId, wantsFullResolution)
   const lastPreviewClickAt = useRef(0)
-
-  const displaySrc = resolveCanvasImageDisplaySrc({
-    url,
-    thumbnail,
-    inViewport,
-    allowFullResolution,
-    fullResGranted,
-  })
+  // Card chrome only. Preview modal, download, and save-to-library keep `url`.
+  const displaySrc = useCanvasMediaDisplaySrc({ nodeId, url, thumbnail })
 
   return (
     <div className="relative h-full w-full">
@@ -51,6 +32,7 @@ export function CanvasImagePreview({
           draggable={false}
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
           className="h-full w-full object-cover"
           onDragStart={(event) => event.preventDefault()}
         />
