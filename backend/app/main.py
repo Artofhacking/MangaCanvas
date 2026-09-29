@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
 from . import billing_service
+from .body_limit import RequestSizeLimitMiddleware
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .errors import ApiError, api_error_handler, unhandled_exception_handler, validation_error_handler
@@ -82,6 +83,8 @@ app = FastAPI(title="MangaCanvas API", version="2.0", redirect_slashes=False, li
 app.add_exception_handler(ApiError, api_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
+# Registered before CORS so CORS stays outermost and still decorates the 413.
+app.add_middleware(RequestSizeLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

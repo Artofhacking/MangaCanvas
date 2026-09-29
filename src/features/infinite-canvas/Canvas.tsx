@@ -314,8 +314,12 @@ const CanvasInner: React.FC = () => {
     backTarget.action();
   }, [backTarget, cleanupCanvasTransientUi]);
 
-  const persistCurrentCanvas = useCallback(() => {
-    persistOpenCanvas({ projectId, workflowId: canvasDocumentId || workflowId });
+  const persistCurrentCanvas = useCallback((immediate = false) => {
+    persistOpenCanvas({
+      projectId,
+      workflowId: canvasDocumentId || workflowId,
+      immediate,
+    });
   }, [canvasDocumentId, projectId, workflowId]);
 
   const handleSwitchWorkflow = useCallback(
@@ -324,7 +328,7 @@ const CanvasInner: React.FC = () => {
         setShowProjectMenu(false);
         return;
       }
-      persistCurrentCanvas();
+      persistCurrentCanvas(true);
       cleanupCanvasTransientUi();
       navigate(`/project/${projectId}/workflows/${nextWorkflowId}`, {
         state: location.state,
@@ -336,7 +340,7 @@ const CanvasInner: React.FC = () => {
   const handleSwitchEpisode = useCallback(
     async (nextEpisodeId: number) => {
       if (!projectId) return;
-      persistCurrentCanvas();
+      persistCurrentCanvas(true);
       cleanupCanvasTransientUi();
       const episodeResponse = await projectApi.episodes.getById(Number(projectId), nextEpisodeId);
       const result = await openOrCreateWorkflow({
@@ -790,14 +794,14 @@ const CanvasInner: React.FC = () => {
   useEffect(() => {
     if (!canvasDocumentId || !projectId) return;
     if (hydratedWorkflowId !== canvasDocumentId) return;
-    persistCurrentCanvas();
+    persistCurrentCanvas(true);
     const timer = setInterval(() => persistCurrentCanvas(), 2500);
     return () => clearInterval(timer);
   }, [canvasDocumentId, hydratedWorkflowId, persistCurrentCanvas, projectId]);
 
   useEffect(() => {
     if (!canvasDocumentId || hydratedWorkflowId !== canvasDocumentId) return;
-    const onHide = () => persistCurrentCanvas();
+    const onHide = () => persistCurrentCanvas(true);
     window.addEventListener('pagehide', onHide);
     window.addEventListener('beforeunload', onHide);
     return () => {
