@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/features/infinite-canvas/utils/indexedDB', () => ({
   migrateFromLocalStorage: vi.fn(),
@@ -14,11 +14,7 @@ vi.mock('@/features/project/api/workflows', () => ({
   },
 }))
 
-vi.mock('@/api/aigc/imageService', () => ({
-  persistMedia: vi.fn(),
-}))
-
-import { persistMedia } from '@/api/aigc/imageService'
+import { uploadApi } from '@/api/uploadApi'
 import { workflowsApi } from '@/features/project/api/workflows'
 import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
 import {
@@ -40,6 +36,10 @@ function textNode(content: string) {
 }
 
 describe('persistOpenCanvas', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   beforeEach(() => {
     resetCanvasAutosaveForTests()
     useCanvasStore.setState({
@@ -52,8 +52,7 @@ describe('persistOpenCanvas', () => {
     })
     vi.mocked(workflowsApi.update).mockReset()
     vi.mocked(workflowsApi.update).mockResolvedValue({ success: true, data: {} as never })
-    vi.mocked(persistMedia).mockReset()
-    vi.mocked(persistMedia).mockResolvedValue(STORED)
+    vi.spyOn(uploadApi, 'uploadSingleFile').mockResolvedValue(STORED)
   })
 
   it('stores pasted bitmaps as file URLs and does not PUT the data URL', async () => {
@@ -70,8 +69,10 @@ describe('persistOpenCanvas', () => {
 
     await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
 
-    expect(persistMedia).toHaveBeenCalledTimes(1)
-    expect(persistMedia).toHaveBeenCalledWith(PNG)
+    expect(uploadApi.uploadSingleFile).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(uploadApi.uploadSingleFile).mock.calls[0][1]).toBe('generated')
+    const uploaded = vi.mocked(uploadApi.uploadSingleFile).mock.calls[0][0]
+    expect(new TextDecoder().decode(await uploaded.arrayBuffer())).not.toContain('data:image')
     const payload = vi.mocked(workflowsApi.update).mock.calls[0][2]
     expect(JSON.stringify(payload)).not.toContain('data:image')
     expect(payload?.canvasData?.nodes?.[0]).toMatchObject({
