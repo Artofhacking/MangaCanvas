@@ -10,6 +10,8 @@ import SaveToMaterialsModal from '../SaveToMaterialsModal';
 import type { CanvasMaterialItem, CustomNode } from '../../types';
 import { MATERIAL_DRAG_MIME } from '../MaterialPanel';
 import { mediaUrl } from '@/lib/mediaUrl';
+import { isInlineCanvasMedia } from '@/lib/canvasPayload';
+import { uploadCanvasBlob, uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia';
 import { resolveAssetMedia } from '@/lib/assetSeed';
 import { PlusHandle } from './PlusHandle';
 import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
@@ -104,24 +106,20 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const handleUpload = useCallback(
     (file: File) => {
       setUploading(true);
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        updateNode(id, {
-          url: base64,
-          base64: base64,
-          loading: false,
-          label: '上传图片',
-        });
-        setUploading(false);
-        message.success('图片上传成功');
-      };
-      reader.onerror = () => {
-        setUploading(false);
-        message.error('图片上传失败');
-      };
-      reader.readAsDataURL(file);
+      void uploadCanvasBlob(file)
+        .then((url) => {
+          updateNode(id, {
+            url,
+            base64: undefined,
+            loading: false,
+            label: '上传图片',
+          });
+          message.success('图片上传成功');
+        })
+        .catch(() => {
+          message.error('图片上传失败');
+        })
+        .finally(() => setUploading(false));
 
       return false;
     },
@@ -166,10 +164,14 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     message.success(`已使用素材“${item.title}”`);
   }, [id, updateNode]);
 
-  const applyImageToNode = useCallback((payload: { url: string; base64?: string; label?: string }) => {
+  const applyImageToNode = useCallback(async (payload: { url: string; base64?: string; label?: string }) => {
+    const inline = isInlineCanvasMedia(payload.url)
+      ? payload.url
+      : (isInlineCanvasMedia(payload.base64) ? payload.base64 : '')
+    const url = inline ? await uploadCanvasMediaUrl(inline) : payload.url
     updateNode(id, {
-      url: payload.url,
-      base64: payload.base64,
+      url,
+      base64: undefined,
       label: payload.label || data.label || '图片节点',
       loading: false,
       updatedAt: Date.now(),
@@ -276,16 +278,9 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         if (!imageType) continue;
 
         const blob = await item.getType(imageType);
-        const reader = new FileReader();
-        reader.onload = (loadEvent) => {
-          const base64 = loadEvent.target?.result as string;
-          applyImageToNode({ url: base64, base64, label: '粘贴图片' });
-          message.success('已替换为剪贴板图片');
-        };
-        reader.onerror = () => {
-          message.error('图片读取失败');
-        };
-        reader.readAsDataURL(blob);
+        const url = await uploadCanvasBlob(blob);
+        await applyImageToNode({ url, label: '粘贴图片' });
+        message.success('已替换为剪贴板图片');
         return;
       }
 

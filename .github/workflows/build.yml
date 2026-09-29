@@ -22,7 +22,7 @@ jobs:
       - run: npm ci
         env:
           HUSKY: "0"
-      - run: npx vitest run src/lib/canvasPayload.test.ts src/lib/persistCanvas.test.ts
+      - run: npx vitest run src/lib/canvasPayload.test.ts src/lib/persistCanvas.test.ts src/lib/uploadCanvasMedia.test.ts
       - run: npx tsc --noEmit
       - run: npm run build
         env:

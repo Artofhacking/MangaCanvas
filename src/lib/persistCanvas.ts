@@ -1,5 +1,5 @@
-import { persistMedia } from '@/api/aigc/imageService'
 import { HttpError } from '@/api/core/error'
+import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia'
 import { workflowsApi } from '@/features/project/api/workflows'
 import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
 import { useCanvasDocumentsStore } from '@/features/infinite-canvas/stores/projectsStore'
@@ -40,26 +40,6 @@ export function resetCanvasAutosaveForTests() {
   blockedKey = ''
   debounceResolvers.splice(0).forEach((resolve) => resolve())
   waiters.splice(0).forEach((resolve) => resolve())
-}
-
-async function uploadInline(value: string): Promise<string> {
-  let source = value
-  if (value.startsWith('blob:')) {
-    const response = await fetch(value)
-    if (!response.ok) throw new Error('读取本地图片失败')
-    source = await readBlobAsDataUrl(await response.blob())
-  }
-  if (!source.startsWith('data:')) return source
-  return persistMedia(source)
-}
-
-function readBlobAsDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('读取本地图片失败'))
-    reader.readAsDataURL(blob)
-  })
 }
 
 function isTooLargeMessage(message: string): boolean {
@@ -105,7 +85,7 @@ async function saveOnce(): Promise<void> {
     guard += 1
     let replacements: Map<string, string>
     try {
-      replacements = await collectInlineReplacements(graph, uploadInline)
+      replacements = await collectInlineReplacements(graph, uploadCanvasMediaUrl)
     } catch (error) {
       if (isTooLarge(error)) blockedKey = autosaveKey(workflowId, graph)
       return

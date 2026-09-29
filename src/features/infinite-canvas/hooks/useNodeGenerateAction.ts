@@ -10,6 +10,8 @@ import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } 
 import { resolveMentionsForSend } from '../utils/promptMentions'
 import { useImageGeneration } from './useImageGeneration'
 import { useVideoGeneration } from './useVideoGeneration'
+import { isInlineCanvasMedia } from '@/lib/canvasPayload'
+import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia'
 
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_VIDEO_MODEL = 'happyhorse-1.1-t2v'
@@ -99,8 +101,12 @@ export function useNodeGenerateAction(nodeId: string | null) {
         if (signal.aborted || !finishGenerationJob(nodeId, signal)) return
 
         if (result && result.length > 0) {
+          const generatedUrl = isInlineCanvasMedia(result[0])
+            ? await uploadCanvasMediaUrl(result[0])
+            : result[0]
           updateNode(nodeId, {
-            url: result[0],
+            url: generatedUrl,
+            base64: undefined,
             loading: false,
             error: '',
             progress: undefined,
@@ -130,8 +136,11 @@ export function useNodeGenerateAction(nodeId: string | null) {
       if (signal.aborted || !finishGenerationJob(nodeId, signal)) return
 
       if (videoUrl) {
+        const storedVideoUrl = isInlineCanvasMedia(videoUrl)
+          ? await uploadCanvasMediaUrl(videoUrl)
+          : videoUrl
         updateNode(nodeId, {
-          url: videoUrl,
+          url: storedVideoUrl,
           loading: false,
           error: '',
           progress: undefined,

@@ -56,6 +56,7 @@ import { dominantAssetNode } from '@/lib/assetSeed';
 import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
 import {
   persistWorkflowCanvasNavState,
   projectAssetsPath,
@@ -612,19 +613,19 @@ const CanvasInner: React.FC = () => {
           const file = item.getAsFile();
           if (!file) continue;
 
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const base64 = event.target?.result as string;
-            const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
-            const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
-            
-            addNode('image', 
-              { x: viewportCenterX - 140, y: viewportCenterY - 100 }, 
-              { url: base64, base64, label: '粘贴图片', loading: false }
-            );
-            message.success('图片已粘贴');
-          };
-          reader.readAsDataURL(file);
+          const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
+          const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
+          void uploadCanvasBlob(file)
+            .then((url) => {
+              addNode('image',
+                { x: viewportCenterX - 140, y: viewportCenterY - 100 },
+                { url, label: '粘贴图片', loading: false }
+              );
+              message.success('图片已粘贴');
+            })
+            .catch(() => {
+              message.error('图片粘贴失败');
+            });
           return;
         }
       }
