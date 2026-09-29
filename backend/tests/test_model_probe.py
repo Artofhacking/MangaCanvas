@@ -46,6 +46,13 @@ def test_video_catalog_declares_duration_and_resolution():
             assert defaults["size"] in params["sizes"]
 
 
+def test_happyhorse_video_durations_include_15_seconds():
+    for model_id in ("happyhorse-1.1-t2v", "happyhorse-1.1-i2v", "happyhorse-1.1-r2v"):
+        item = next(row for row in VIDEO_CATALOG if row["id"] == model_id)
+        assert item["parameters"]["durations"] == [5, 10, 15]
+        assert item["defaultParams"]["duration"] == 5
+
+
 def test_catalog_ids_are_the_shared_id_space():
     ids = [item["id"] for item in [*IMAGE_CATALOG, *VIDEO_CATALOG, *TEXT_CATALOG]]
     assert len(ids) == len(set(ids))

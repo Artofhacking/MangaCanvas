@@ -106,9 +106,32 @@ describe('capability lookup by id', () => {
     expect(wan.defaultParams?.size).toBe('1280*1280')
     expect(wan.getSizesByQuality?.('standard').map((item) => item.key)).toContain('1696*960')
 
-    const horse = resolveVideoCapabilities('happyhorse-1.1-t2v')
-    expect(horse.durs?.map((item) => item.key)).toEqual([5, 10])
-    expect(horse.defaultParams?.size).toBe('1280*720')
+    for (const id of ['happyhorse-1.1-t2v', 'happyhorse-1.1-i2v', 'happyhorse-1.1-r2v'] as const) {
+      const horse = resolveVideoCapabilities(id)
+      expect(horse.durs).toEqual([
+        { label: '5秒', key: 5 },
+        { label: '10秒', key: 10 },
+        { label: '15秒', key: 15 },
+      ])
+    }
+    expect(resolveVideoCapabilities('happyhorse-1.1-t2v').defaultParams?.size).toBe('1280*720')
+  })
+
+  it('maps HappyHorse live durations so the generate bar can show 15秒', () => {
+    const fromApi = capabilitiesFromApi(
+      live('happyhorse-1.1-i2v', 'HappyHorse 图生视频', 'video', {
+        parameters: {
+          resolutions: ['720P', '1080P'],
+          durations: [5, 10, 15],
+        },
+        defaultParams: { resolution: '720P', duration: 5 },
+      })
+    )
+    expect(fromApi.durs).toEqual([
+      { label: '5秒', key: 5 },
+      { label: '10秒', key: 10 },
+      { label: '15秒', key: 15 },
+    ])
   })
 
   it('prefers structured parameters from the live API row', () => {

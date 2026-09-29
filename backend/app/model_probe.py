@@ -155,7 +155,7 @@ VIDEO_CATALOG = [
         **_video_caps(
             sizes=WIDESCREEN_VIDEO_SIZES,
             resolutions=["720P", "1080P"],
-            durations=[5, 10],
+            durations=[5, 10, 15],
             default_size="1280*720",
             default_resolution="720P",
             supports_aspect=True,
@@ -166,14 +166,14 @@ VIDEO_CATALOG = [
         "name": "HappyHorse 图生视频",
         "owned_by": "nexcor",
         "modality": "video",
-        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10], default_resolution="720P"),
+        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10, 15], default_resolution="720P"),
     },
     {
         "id": "happyhorse-1.1-r2v",
         "name": "HappyHorse 参考图生视频",
         "owned_by": "nexcor",
         "modality": "video",
-        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10], default_resolution="720P"),
+        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10, 15], default_resolution="720P"),
     },
     {
         "id": "doubao-seedance-2-0-260128",
