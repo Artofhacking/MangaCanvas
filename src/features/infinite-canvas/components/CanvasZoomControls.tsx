@@ -4,6 +4,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { useReactFlow, useStore } from 'reactflow';
+import { armCanvasOverviewCapture, captureCanvasOverviewZoom } from '../utils/canvasMediaBudget';
 
 export function formatCanvasZoomPercent(zoom: number): string {
   return `${Math.round(zoom * 100)}%`;
@@ -27,13 +28,17 @@ export function CanvasZoomPercent() {
 }
 
 export function CanvasZoomControls() {
-  const { zoomIn, zoomOut, fitView } = useReactFlow();
+  const { zoomIn, zoomOut, fitView, getZoom } = useReactFlow();
 
   return (
     <>
       <button
         type="button"
-        onClick={() => fitView({ padding: 0.2 })}
+        onClick={() => {
+          armCanvasOverviewCapture();
+          fitView({ padding: 0.2, duration: 0 });
+          captureCanvasOverviewZoom(getZoom());
+        }}
         className="rounded-xl p-2.5 text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] transition-colors"
         title="适应视图"
       >

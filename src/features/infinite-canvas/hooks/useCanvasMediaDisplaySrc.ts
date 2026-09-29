@@ -1,10 +1,13 @@
+import { useSyncExternalStore } from 'react'
 import { useStore } from 'reactflow'
 import { mediaUrl } from '@/lib/mediaUrl'
 import {
-  CANVAS_FULL_RES_MIN_ZOOM,
   CANVAS_IMAGE_MIN_VISIBLE_RATIO,
+  allowsCanvasFullResolution,
   canDownscaleCanvasImageUrl,
+  getCanvasOverviewZoom,
   resolveCanvasImageDisplay,
+  subscribeCanvasOverviewZoom,
 } from '../utils/canvasMediaBudget'
 import { useCanvasDisplayObjectUrl } from './useCanvasDisplayObjectUrl'
 import { useCanvasDisplaySlot, useCanvasFullResSlot, useCanvasPreviewSlot } from './useCanvasFullResSlot'
@@ -22,6 +25,8 @@ export function useCanvasMediaDisplaySrc(input: {
 }): string {
   const viewportSettled = useCanvasViewportSettled()
   const zoom = useStore((state) => state.transform[2])
+  const overviewZoom = useSyncExternalStore(subscribeCanvasOverviewZoom, getCanvasOverviewZoom, () => null)
+  const allowFullResolution = allowsCanvasFullResolution(zoom, overviewZoom)
   const measured = useStore((state) => {
     const node = state.nodeInternals.get(input.nodeId)
     const width = node?.width
@@ -33,7 +38,7 @@ export function useCanvasMediaDisplaySrc(input: {
   const thumb = mediaUrl((input.thumbnail || '').trim())
   const distinctThumb = Boolean(thumb && thumb !== full)
   const eligible = viewportSettled && measured && inViewport
-  const wantsFull = eligible && !distinctThumb && Boolean(full) && zoom >= CANVAS_FULL_RES_MIN_ZOOM
+  const wantsFull = eligible && !distinctThumb && Boolean(full) && allowFullResolution
   const fullResGranted = useCanvasFullResSlot(`${input.nodeId}:full`, wantsFull)
   const wantsDisplay = eligible && !distinctThumb && !(wantsFull && fullResGranted) && canDownscaleCanvasImageUrl(full)
   const displayGranted = useCanvasDisplaySlot(`${input.nodeId}:display`, wantsDisplay)

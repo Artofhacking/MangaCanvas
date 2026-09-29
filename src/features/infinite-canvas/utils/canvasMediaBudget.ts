@@ -9,8 +9,13 @@
  * Generated image nodes usually have no thumbnail, or the same URL as the full
  * asset. Putting that URL on an `<img>` decodes the intrinsic bitmap (often
  * 2K). Doing that for every card on open kills the Chromium renderer
- * (Aw Snap / error code 5). Full-resolution bytes stay on the lightbox,
- * download, and save-to-library paths.
+ * (Aw Snap / error code 5).
+ *
+ * LibLib-style LOD: the opening fitView only shows a distinct thumbnail, a
+ * downscaled display bitmap, or a placeholder. The original asset is mounted
+ * after the user zooms into a region, and only on the card. Lightbox,
+ * download, and save-to-library keep the original URL. A real server-side
+ * thumbnail (separate small object) is not generated here.
  *
  * That is separate from the MySQL sort-memory error on the workflow list.
  */
@@ -19,11 +24,17 @@
 export const CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS = true
 
 /**
- * A 448px card is still only a few hundred pixels on screen at this zoom.
- * Overview / fit-all stays below it, so opening a multi-image workflow does
- * not decode original bitmaps. Zooming in crosses the threshold.
+ * Cards only earn an original bitmap once they are large on screen.
+ * The opening fitView is never enough by itself: a fitted zoom of 1 still
+ * stays on the thumbnail or a placeholder until the user zooms further in.
  */
 export const CANVAS_FULL_RES_MIN_ZOOM = 0.85
+
+/**
+ * Ignore float noise from fitView. Full-res starts only after zoom moves
+ * past the captured overview by at least this much (LibLib-style LOD).
+ */
+export const CANVAS_LOD_ZOOM_EPSILON = 0.05
 
 /**
  * Concurrent original-asset bitmaps. A zoomed-in screen of ~448px cards is
@@ -173,9 +184,57 @@ export function isCanvasFitViewSettled(state: { fitViewOnInitDone?: boolean } | 
   return state?.fitViewOnInitDone === true
 }
 
+/**
+ * Full-resolution cards are a zoom-in LOD, not the opening fit.
+ * `overviewZoom` is the zoom captured when fitView settled. Until the user
+ * zooms past that baseline, missing thumbnails stay placeholders (or a
+ * downscaled display bitmap) and never become `<img src=original>`.
+ */
+export function allowsCanvasFullResolution(zoom: number, overviewZoom: number | null): boolean {
+  if (overviewZoom == null || !(overviewZoom > 0) || !(zoom > 0)) return false
+  return zoom >= CANVAS_FULL_RES_MIN_ZOOM && zoom > overviewZoom + CANVAS_LOD_ZOOM_EPSILON
+}
+
+let canvasOverviewZoom: number | null = null
+let canvasOverviewCaptured = false
+const canvasOverviewListeners = new Set<() => void>()
+
+function emitCanvasOverviewZoom() {
+  canvasOverviewListeners.forEach((listener) => listener())
+}
+
+export function getCanvasOverviewZoom(): number | null {
+  return canvasOverviewZoom
+}
+
+export function subscribeCanvasOverviewZoom(listener: () => void) {
+  canvasOverviewListeners.add(listener)
+  return () => {
+    canvasOverviewListeners.delete(listener)
+  }
+}
+
+/** Forget the baseline so the next sample becomes the overview (open, or the fit button). */
+export function armCanvasOverviewCapture() {
+  if (!canvasOverviewCaptured && canvasOverviewZoom == null) return
+  canvasOverviewCaptured = false
+  canvasOverviewZoom = null
+  emitCanvasOverviewZoom()
+}
+
+/** Record the fitView zoom once. Later zoom-in is what unlocks full-res LOD. */
+export function captureCanvasOverviewZoom(zoom: number) {
+  if (canvasOverviewCaptured) return
+  if (!(zoom > 0)) return
+  canvasOverviewZoom = zoom
+  canvasOverviewCaptured = true
+  emitCanvasOverviewZoom()
+}
+
 /** Call when a workflow starts loading so the next measured graph fitViews before images decode. */
 export function deferCanvasFitView(store: { setState: (partial: { fitViewOnInitDone: boolean }) => void }) {
   store.setState({ fitViewOnInitDone: false })
+  armCanvasOverviewCapture()
 }
 
 export interface VideoPlaybackIntent {
@@ -356,4 +415,7 @@ export function resetCanvasMediaBudgetForTests() {
   fullResPool.clear()
   previewPool.clear()
   displayPool.clear()
+  canvasOverviewZoom = null
+  canvasOverviewCaptured = false
+  canvasOverviewListeners.clear()
 }

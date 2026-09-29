@@ -10,8 +10,12 @@ import {
   claimCanvasDisplayBitmap,
   claimCanvasFullResImage,
   claimCanvasPreviewImage,
+  allowsCanvasFullResolution,
+  armCanvasOverviewCapture,
+  captureCanvasOverviewZoom,
   deferCanvasFitView,
   flowNodeIntersectsViewport,
+  getCanvasOverviewZoom,
   flowNodeVisibleRatio,
   getActiveCanvasVideoId,
   isCanvasFitViewSettled,
@@ -92,6 +96,14 @@ describe('resolveCanvasImageDisplay', () => {
     })).toEqual({ mode: 'empty', src: '', downscaleUrl: '' })
   })
 
+  it('keeps a distinct thumbnail after LOD would allow the original', () => {
+    expect(resolveCanvasImageDisplay({
+      ...settled,
+      url: 'https://cdn.example/full.png',
+      thumbnail: 'https://cdn.example/thumb.jpg',
+    })).toMatchObject({ mode: 'preview', src: 'https://cdn.example/thumb.jpg' })
+  })
+
   it('uses the original url once zoom and a decode slot allow it', () => {
     expect(resolveCanvasImageDisplay({
       ...settled,
@@ -160,6 +172,33 @@ describe('resolveCanvasImageDisplay', () => {
 })
 
 describe('first-open image budget', () => {
+  it('does not decode originals on the opening fitView, only after zooming into a region', () => {
+    expect(allowsCanvasFullResolution(1.2, null)).toBe(false)
+    expect(allowsCanvasFullResolution(1.2, 1.2)).toBe(false)
+    expect(allowsCanvasFullResolution(0.5, 0.2)).toBe(false)
+    expect(allowsCanvasFullResolution(1, 0.4)).toBe(true)
+
+    expect(getCanvasOverviewZoom()).toBeNull()
+    captureCanvasOverviewZoom(1.1)
+    expect(allowsCanvasFullResolution(1.1, getCanvasOverviewZoom())).toBe(false)
+    expect(allowsCanvasFullResolution(1.2, getCanvasOverviewZoom())).toBe(true)
+    captureCanvasOverviewZoom(0.2)
+    expect(getCanvasOverviewZoom()).toBe(1.1)
+
+    armCanvasOverviewCapture()
+    expect(getCanvasOverviewZoom()).toBeNull()
+    const state = { fitViewOnInitDone: true }
+    deferCanvasFitView({
+      setState: (partial) => {
+        state.fitViewOnInitDone = partial.fitViewOnInitDone
+      },
+    })
+    expect(state.fitViewOnInitDone).toBe(false)
+    captureCanvasOverviewZoom(0.35)
+    expect(allowsCanvasFullResolution(0.5, getCanvasOverviewZoom())).toBe(false)
+    expect(allowsCanvasFullResolution(0.95, getCanvasOverviewZoom())).toBe(true)
+  })
+
   it('keeps overview zoom and the full-resolution cap below the previous limits', () => {
     expect(CANVAS_FULL_RES_MIN_ZOOM).toBe(0.85)
     expect(CANVAS_MAX_FULL_RES_IMAGES).toBe(4)

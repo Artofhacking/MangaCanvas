@@ -4,6 +4,7 @@ import ReactFlow, {
   Background,
   MiniMap,
   useReactFlow,
+  useStore,
   useStoreApi,
   ReactFlowProvider,
   SelectionMode,
@@ -94,7 +95,7 @@ import {
   CANVAS_PAN_ACTIVATION_KEY,
   getCanvasPanOnDrag,
 } from './utils/canvasInteraction';
-import { CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS, deferCanvasFitView } from './utils/canvasMediaBudget';
+import { CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS, captureCanvasOverviewZoom, deferCanvasFitView } from './utils/canvasMediaBudget';
 import type { CanvasMaterialItem } from './types';
 
 const nodeTypes = {
@@ -167,6 +168,20 @@ const CanvasInner: React.FC = () => {
   const canvasReady = Boolean(canvasDocumentId) && hydratedWorkflowId === canvasDocumentId;
   const flowNodes = canvasReady ? nodes : HIDDEN_FLOW_NODES;
   const flowEdges = canvasReady ? edges : HIDDEN_FLOW_EDGES;
+  const fitViewSettled = useStore((state) => (state as { fitViewOnInitDone?: boolean }).fitViewOnInitDone === true);
+  useEffect(() => {
+    if (!fitViewSettled) return;
+    let innerFrame = 0;
+    const outerFrame = window.requestAnimationFrame(() => {
+      innerFrame = window.requestAnimationFrame(() => {
+        captureCanvasOverviewZoom(reactFlowStore.getState().transform[2]);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outerFrame);
+      window.cancelAnimationFrame(innerFrame);
+    };
+  }, [fitViewSettled, reactFlowStore]);
   const { isDark } = useThemeStore();
 
   const [showApiSettings, setShowApiSettings] = useState(false);
