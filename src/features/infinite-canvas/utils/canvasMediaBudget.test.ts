@@ -1,17 +1,29 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  CANVAS_FULL_RES_MIN_ZOOM,
+  CANVAS_MAX_DISPLAY_BITMAPS,
   CANVAS_MAX_FULL_RES_IMAGES,
+  CANVAS_MAX_PREVIEW_IMAGES,
   CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS,
   activeCanvasVideoProps,
+  canDownscaleCanvasImageUrl,
+  claimCanvasDisplayBitmap,
   claimCanvasFullResImage,
+  claimCanvasPreviewImage,
+  deferCanvasFitView,
   flowNodeIntersectsViewport,
   flowNodeVisibleRatio,
   getActiveCanvasVideoId,
+  isCanvasFitViewSettled,
+  releaseCanvasDisplayBitmap,
   releaseCanvasFullResImage,
+  releaseCanvasPreviewImage,
   resetCanvasMediaBudgetForTests,
   resolveActiveVideoId,
+  resolveCanvasImageDisplay,
   resolveCanvasImageDisplaySrc,
   setCanvasVideoIntent,
+  type CanvasImageSourceInput,
   type VideoPlaybackIntent,
 } from './canvasMediaBudget'
 
@@ -30,52 +42,167 @@ function video(partial: Partial<VideoPlaybackIntent> & Pick<VideoPlaybackIntent,
   }
 }
 
-describe('resolveCanvasImageDisplaySrc', () => {
-  const base = {
+describe('resolveCanvasImageDisplay', () => {
+  const settled: CanvasImageSourceInput = {
     inViewport: true,
+    measured: true,
+    viewportSettled: true,
     allowFullResolution: true,
     fullResGranted: true,
+    previewGranted: true,
+    displayGranted: true,
   }
 
   it('prefers a distinct thumbnail and does not need a full-resolution slot', () => {
-    expect(resolveCanvasImageDisplaySrc({
-      ...base,
+    expect(resolveCanvasImageDisplay({
+      ...settled,
       url: 'https://cdn.example/full.png',
       thumbnail: 'https://cdn.example/thumb.jpg',
       allowFullResolution: false,
       fullResGranted: false,
-    })).toBe('https://cdn.example/thumb.jpg')
+      displayGranted: false,
+    })).toEqual({
+      mode: 'preview',
+      src: 'https://cdn.example/thumb.jpg',
+      downscaleUrl: '',
+    })
   })
 
-  it('keeps the full asset off the card while zoomed out or over the decode cap', () => {
-    expect(resolveCanvasImageDisplaySrc({
-      ...base,
+  it('keeps a remote original off the card while zoomed out or over the decode cap', () => {
+    expect(resolveCanvasImageDisplay({
+      ...settled,
       url: 'https://cdn.example/full.png',
       thumbnail: 'https://cdn.example/full.png',
       allowFullResolution: false,
-    })).toBe('')
-    expect(resolveCanvasImageDisplaySrc({
-      ...base,
+    })).toEqual({ mode: 'empty', src: '', downscaleUrl: '' })
+    expect(resolveCanvasImageDisplay({
+      ...settled,
       url: 'https://cdn.example/full.png',
+      thumbnail: '',
       fullResGranted: false,
-    })).toBe('')
+    })).toEqual({ mode: 'empty', src: '', downscaleUrl: '' })
   })
 
   it('does not decode an image that is outside the pane', () => {
-    expect(resolveCanvasImageDisplaySrc({
-      ...base,
+    expect(resolveCanvasImageDisplay({
+      ...settled,
       url: 'https://cdn.example/full.png',
       thumbnail: 'https://cdn.example/thumb.jpg',
       inViewport: false,
-    })).toBe('')
+    })).toEqual({ mode: 'empty', src: '', downscaleUrl: '' })
   })
 
-  it('uses the full url once zoom and a decode slot allow it', () => {
+  it('uses the original url once zoom and a decode slot allow it', () => {
+    expect(resolveCanvasImageDisplay({
+      ...settled,
+      url: 'https://cdn.example/full.png',
+      thumbnail: '',
+    })).toEqual({
+      mode: 'full',
+      src: 'https://cdn.example/full.png',
+      downscaleUrl: '',
+    })
     expect(resolveCanvasImageDisplaySrc({
-      ...base,
+      ...settled,
       url: 'https://cdn.example/full.png',
       thumbnail: '',
     })).toBe('https://cdn.example/full.png')
+  })
+
+  it('does not decode on the pre-fit frame even when zoom would allow full resolution', () => {
+    const plans = Array.from({ length: 40 }, (_, index) => resolveCanvasImageDisplay({
+      ...settled,
+      measured: index % 2 === 0,
+      viewportSettled: false,
+      url: `https://cdn.example/full-${index}.png`,
+      thumbnail: index % 3 === 0 ? `https://cdn.example/full-${index}.png` : '',
+    }))
+    expect(plans.every((plan) => plan.mode === 'empty' && plan.src === '' && plan.downscaleUrl === '')).toBe(true)
+  })
+
+  it('does not treat an unmeasured node as ready to decode', () => {
+    expect(resolveCanvasImageDisplay({
+      ...settled,
+      measured: false,
+      url: '/static/full.png',
+      thumbnail: 'https://cdn.example/thumb.jpg',
+    })).toEqual({ mode: 'empty', src: '', downscaleUrl: '' })
+  })
+
+  it('downscales a same-origin asset whose thumbnail is missing or identical', () => {
+    expect(resolveCanvasImageDisplay({
+      ...settled,
+      allowFullResolution: false,
+      fullResGranted: false,
+      url: '/static/generated/full.png',
+      thumbnail: '/static/generated/full.png',
+    })).toEqual({
+      mode: 'downscale',
+      src: '',
+      downscaleUrl: '/static/generated/full.png',
+    })
+    expect(resolveCanvasImageDisplaySrc({
+      ...settled,
+      allowFullResolution: false,
+      url: '/static/generated/full.png',
+      thumbnail: '',
+    })).toBe('')
+  })
+
+  it('holds a distinct thumbnail when the preview cap is full', () => {
+    expect(resolveCanvasImageDisplay({
+      ...settled,
+      url: 'https://cdn.example/full.png',
+      thumbnail: 'https://cdn.example/thumb.jpg',
+      previewGranted: false,
+    })).toEqual({ mode: 'empty', src: '', downscaleUrl: '' })
+  })
+})
+
+describe('first-open image budget', () => {
+  it('keeps overview zoom and the full-resolution cap below the previous limits', () => {
+    expect(CANVAS_FULL_RES_MIN_ZOOM).toBe(0.85)
+    expect(CANVAS_MAX_FULL_RES_IMAGES).toBe(4)
+    expect(CANVAS_MAX_PREVIEW_IMAGES).toBe(8)
+    expect(CANVAS_MAX_DISPLAY_BITMAPS).toBe(12)
+  })
+
+  it('downscales local and data urls, not remote originals', () => {
+    expect(canDownscaleCanvasImageUrl('/static/a.png')).toBe(true)
+    expect(canDownscaleCanvasImageUrl('/api/media/a.png')).toBe(true)
+    expect(canDownscaleCanvasImageUrl('https://files.example/static/a.png?x=1')).toBe(true)
+    expect(canDownscaleCanvasImageUrl('data:image/png;base64,aaaa')).toBe(true)
+    expect(canDownscaleCanvasImageUrl('blob:http://local/1')).toBe(true)
+    expect(canDownscaleCanvasImageUrl('https://cdn.example/full.png')).toBe(false)
+    expect(canDownscaleCanvasImageUrl('')).toBe(false)
+  })
+
+  it('keeps every remote card on a placeholder when the fitted zoom is an overview', () => {
+    const plans = Array.from({ length: 40 }, (_, index) => resolveCanvasImageDisplay({
+      inViewport: true,
+      measured: true,
+      viewportSettled: true,
+      allowFullResolution: false,
+      fullResGranted: index < CANVAS_MAX_FULL_RES_IMAGES,
+      previewGranted: true,
+      displayGranted: true,
+      url: `https://cdn.example/shot-${index}.png`,
+      thumbnail: index % 2 === 0 ? `https://cdn.example/shot-${index}.png` : '',
+    }))
+    expect(plans.every((plan) => plan.mode === 'empty' && plan.src === '')).toBe(true)
+  })
+
+  it('waits for fitView before card images mount', () => {
+    expect(isCanvasFitViewSettled(undefined)).toBe(false)
+    expect(isCanvasFitViewSettled({ fitViewOnInitDone: false })).toBe(false)
+    expect(isCanvasFitViewSettled({ fitViewOnInitDone: true })).toBe(true)
+    const state = { fitViewOnInitDone: true }
+    deferCanvasFitView({
+      setState: (partial) => {
+        state.fitViewOnInitDone = partial.fitViewOnInitDone
+      },
+    })
+    expect(isCanvasFitViewSettled(state)).toBe(false)
   })
 })
 
@@ -232,6 +359,23 @@ describe('canvas full-resolution budget', () => {
     releaseCanvasFullResImage('img-0')
     expect(claimCanvasFullResImage('overflow')).toBe(true)
     expect(claimCanvasFullResImage('overflow')).toBe(true)
+  })
+
+  it('caps thumbnail imgs and downscaled previews separately', () => {
+    for (let index = 0; index < CANVAS_MAX_PREVIEW_IMAGES; index += 1) {
+      expect(claimCanvasPreviewImage(`thumb-${index}`)).toBe(true)
+    }
+    expect(claimCanvasPreviewImage('thumb-overflow')).toBe(false)
+    releaseCanvasPreviewImage('thumb-0')
+    expect(claimCanvasPreviewImage('thumb-overflow')).toBe(true)
+
+    for (let index = 0; index < CANVAS_MAX_DISPLAY_BITMAPS; index += 1) {
+      expect(claimCanvasDisplayBitmap(`display-${index}`)).toBe(true)
+    }
+    expect(claimCanvasDisplayBitmap('display-overflow')).toBe(false)
+    releaseCanvasDisplayBitmap('display-0')
+    expect(claimCanvasDisplayBitmap('display-overflow')).toBe(true)
+    expect(claimCanvasFullResImage('still-open')).toBe(true)
   })
 })
 

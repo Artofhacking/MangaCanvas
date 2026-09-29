@@ -1,0 +1,56 @@
+import { useStore } from 'reactflow'
+import { mediaUrl } from '@/lib/mediaUrl'
+import {
+  CANVAS_FULL_RES_MIN_ZOOM,
+  CANVAS_IMAGE_MIN_VISIBLE_RATIO,
+  canDownscaleCanvasImageUrl,
+  resolveCanvasImageDisplay,
+} from '../utils/canvasMediaBudget'
+import { useCanvasDisplayObjectUrl } from './useCanvasDisplayObjectUrl'
+import { useCanvasDisplaySlot, useCanvasFullResSlot, useCanvasPreviewSlot } from './useCanvasFullResSlot'
+import { useCanvasNodeInViewport } from './useCanvasNodeInViewport'
+import { useCanvasViewportSettled } from './useCanvasViewportSettled'
+
+/**
+ * `<img src>` for a canvas card.
+ * The original asset URL stays on lightbox, download, and save-to-library.
+ */
+export function useCanvasMediaDisplaySrc(input: {
+  nodeId: string
+  url?: string | null
+  thumbnail?: string | null
+}): string {
+  const viewportSettled = useCanvasViewportSettled()
+  const zoom = useStore((state) => state.transform[2])
+  const measured = useStore((state) => {
+    const node = state.nodeInternals.get(input.nodeId)
+    const width = node?.width
+    const height = node?.height
+    return typeof width === 'number' && width > 0 && typeof height === 'number' && height > 0
+  })
+  const inViewport = useCanvasNodeInViewport(input.nodeId, CANVAS_IMAGE_MIN_VISIBLE_RATIO)
+  const full = mediaUrl((input.url || '').trim())
+  const thumb = mediaUrl((input.thumbnail || '').trim())
+  const distinctThumb = Boolean(thumb && thumb !== full)
+  const eligible = viewportSettled && measured && inViewport
+  const wantsFull = eligible && !distinctThumb && Boolean(full) && zoom >= CANVAS_FULL_RES_MIN_ZOOM
+  const fullResGranted = useCanvasFullResSlot(`${input.nodeId}:full`, wantsFull)
+  const wantsDisplay = eligible && !distinctThumb && !(wantsFull && fullResGranted) && canDownscaleCanvasImageUrl(full)
+  const displayGranted = useCanvasDisplaySlot(`${input.nodeId}:display`, wantsDisplay)
+  const wantsPreview = eligible && distinctThumb
+  const previewGranted = useCanvasPreviewSlot(`${input.nodeId}:preview`, wantsPreview)
+  const plan = resolveCanvasImageDisplay({
+    url: full,
+    thumbnail: thumb,
+    inViewport,
+    measured,
+    viewportSettled,
+    allowFullResolution: wantsFull,
+    fullResGranted,
+    previewGranted,
+    displayGranted,
+  })
+  const objectUrl = useCanvasDisplayObjectUrl(plan.mode === 'downscale' ? plan.downscaleUrl : '')
+  if (plan.mode === 'downscale') return objectUrl
+  return plan.src
+}

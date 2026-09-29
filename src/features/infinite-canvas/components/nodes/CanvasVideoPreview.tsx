@@ -9,10 +9,10 @@ import {
   activeCanvasVideoProps,
   getActiveCanvasVideoId,
   nextCanvasVideoInteractionSeq,
-  resolveCanvasImageDisplaySrc,
   setCanvasVideoIntent,
   subscribeActiveCanvasVideo,
 } from '../../utils/canvasMediaBudget'
+import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
 
 interface CanvasVideoPreviewProps {
   nodeId: string
@@ -46,12 +46,10 @@ export function CanvasVideoPreview({
   const lastPreviewClickAt = useRef(0)
   const activeId = useSyncExternalStore(subscribeActiveCanvasVideo, getActiveCanvasVideoId, () => null)
   const showVideo = activeId === nodeId && inViewport && Boolean(url)
-  const poster = resolveCanvasImageDisplaySrc({
+  const poster = useCanvasMediaDisplaySrc({
+    nodeId,
     url: null,
-    thumbnail,
-    inViewport,
-    allowFullResolution: false,
-    fullResGranted: false,
+    thumbnail: suspended ? null : thumbnail,
   })
   const playback = activeCanvasVideoProps(muted)
   const gestureOn = hoverCommitted || playRequested
@@ -110,6 +108,7 @@ export function CanvasVideoPreview({
           draggable={false}
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
           className="h-full w-full object-cover"
           onDragStart={(event) => event.preventDefault()}
         />
