@@ -7,12 +7,19 @@ import type { ImageGenerateOptions } from './types'
 
 export const isDashScopeDirectModel = (model: string) => model.startsWith('wan')
 
-/** Models whose /ai/images/generations path actually consumes `images`. */
+/**
+ * Models whose /ai/images/generations path consumes optional `images`.
+ * No refs stay text-to-image; connected refs are forwarded.
+ * wan2.6-image remains included. qwen and wan2.6-t2i do not accept refs.
+ */
 export const isI2IModel = (model: string) =>
-  model === 'wan2.6-image' || model.startsWith('gpt-image')
+  model === 'wan2.6-image' ||
+  model === 'wan2.7-image' ||
+  model === 'wan2.7-image-pro' ||
+  model.startsWith('gpt-image')
 
 export const UNSUPPORTED_REFERENCE_IMAGE_MESSAGE =
-  '当前模型不支持参考图，请改用万相 2.6 图生图'
+  '当前模型不支持参考图，请改用 GPT Image、万相 2.7 或万相 2.6 图生图'
 
 /** Attach refs for i2i-capable models; never silently drop them. */
 export function resolveImageReferences(

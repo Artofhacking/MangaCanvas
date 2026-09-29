@@ -16,10 +16,15 @@ describe('isI2IModel', () => {
     expect(isI2IModel('gpt-image-2.5-sunburst')).toBe(true)
   })
 
-  it('does not treat text-to-image catalog models as i2i', () => {
+  it('treats 万相 2.7 and Pro as optional-reference models', () => {
+    expect(isI2IModel('wan2.7-image')).toBe(true)
+    expect(isI2IModel('wan2.7-image-pro')).toBe(true)
+  })
+
+  it('does not treat unrelated text-to-image catalog models as i2i', () => {
     expect(isI2IModel('wan2.6-t2i')).toBe(false)
-    expect(isI2IModel('wan2.7-image')).toBe(false)
     expect(isI2IModel('qwen-image-2.0')).toBe(false)
+    expect(isI2IModel('qwen-image-2.0-pro')).toBe(false)
   })
 })
 
@@ -27,12 +32,16 @@ describe('resolveImageReferences', () => {
   it('omits images when the user did not connect any', () => {
     expect(resolveImageReferences('gpt-image-2')).toEqual({})
     expect(resolveImageReferences('gpt-image-2', [])).toEqual({})
+    expect(resolveImageReferences('wan2.7-image', [])).toEqual({})
+    expect(resolveImageReferences('wan2.7-image-pro', [undefined])).toEqual({})
     expect(resolveImageReferences('wan2.6-t2i', [undefined])).toEqual({})
   })
 
-  it('passes connected refs for GPT Image and wan2.6-image', () => {
-    const refs = ['https://example.com/city.png']
+  it('passes connected refs for GPT Image, 万相 2.7, and wan2.6-image', () => {
+    const refs = ['https://example.com/city.png', 'https://example.com/extra.png']
     expect(resolveImageReferences('gpt-image-2', refs)).toEqual({ images: refs })
+    expect(resolveImageReferences('wan2.7-image', refs)).toEqual({ images: refs })
+    expect(resolveImageReferences('wan2.7-image-pro', refs)).toEqual({ images: refs })
     expect(resolveImageReferences('wan2.6-image', refs)).toEqual({ images: refs })
   })
 
