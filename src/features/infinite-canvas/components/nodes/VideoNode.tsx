@@ -18,6 +18,10 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { nextMediaPixelFields } from '../../utils/mediaFrame';
+import { canvasVideoCaptureSrc } from '../../utils/videoPoster';
+import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
+import { useEnsureVideoPoster } from '../../hooks/useEnsureVideoPoster';
 import { CanvasVideoPreview } from './CanvasVideoPreview';
 
 const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
@@ -29,6 +33,8 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [extracting, setExtracting] = useState(false);
   const [muted, setMuted] = useState(true);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
+  const frame = useMediaCardFrame(id, data);
+  useEnsureVideoPoster(id, data);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -76,17 +82,6 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     removeNode(id);
   };
 
-  // 将 OSS URL 转换为代理 URL
-  const getProxyUrl = (url: string): string => {
-    if (url.includes('dashscope-result-sh.oss-cn-shanghai.aliyuncs.com')) {
-      return url.replace('https://dashscope-result-sh.oss-cn-shanghai.aliyuncs.com', '/oss-proxy-sh');
-    }
-    if (url.includes('dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com')) {
-      return url.replace('https://dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com', '/oss-proxy-wlcb');
-    }
-    return url;
-  };
-
   // 提取视频最后一帧
   const handleExtractLastFrame = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -97,7 +92,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       // 创建临时 video 元素，使用代理 URL
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
-      video.src = getProxyUrl(data.url);
+      video.src = canvasVideoCaptureSrc(data.url);
       video.muted = true;
 
       await new Promise<void>((resolve, reject) => {
@@ -140,6 +135,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         {
           label: '尾帧截图',
           url: frameUrl,
+          ...nextMediaPixelFields({ width: video.videoWidth, height: video.videoHeight }),
         }
       );
 
@@ -179,12 +175,12 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
     <div className="relative">
       <MediaPreviewCard
         selected={selected}
-        filled={Boolean(data.url) && !data.loading}
         generating={Boolean(data.loading)}
         label={data.label || '视频节点'}
         icon={<Video />}
         width={VIDEO_PREVIEW_WIDTH}
-        aspectRatio={cssAspectRatio(nodeAspectRatio(data), '16 / 9')}
+        resolution={data.url ? frame.resolution : undefined}
+        aspectRatio={cssAspectRatio(frame.aspect, '16 / 9')}
         isEditingLabel={isEditingLabel}
         editLabel={editLabel}
         onLabelDoubleClick={handleLabelDoubleClick}

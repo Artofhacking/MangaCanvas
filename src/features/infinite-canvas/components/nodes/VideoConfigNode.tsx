@@ -20,6 +20,8 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
+import { useEnsureVideoPoster } from '../../hooks/useEnsureVideoPoster';
 import { CanvasVideoPreview } from './CanvasVideoPreview';
 
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
@@ -40,6 +42,8 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [showPreview, setShowPreview] = useState(false);
   const [muted, setMuted] = useState(true);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
+  const frame = useMediaCardFrame(id, data);
+  useEnsureVideoPoster(id, data);
   const hasMedia = Boolean(data.url);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -113,12 +117,12 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     <>
       <MediaPreviewCard
         selected={selected}
-        filled={hasMedia && !data.loading}
         generating={Boolean(data.loading)}
         label={data.label || '视频节点'}
         icon={<Video />}
         width={VIDEO_PREVIEW_WIDTH}
-        aspectRatio={cssAspectRatio(nodeAspectRatio(data), '16 / 9')}
+        resolution={hasMedia ? frame.resolution : undefined}
+        aspectRatio={cssAspectRatio(frame.aspect, '16 / 9')}
         isEditingLabel={isEditingLabel}
         editLabel={editLabel}
         onLabelDoubleClick={handleLabelDoubleClick}

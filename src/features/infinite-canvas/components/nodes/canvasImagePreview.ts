@@ -1,7 +1,7 @@
 /**
- * Canvas image card thumbnail.
- * Fit the whole frame inside the cell (same idea as the asset detail preview).
- * Empty margins are fine; center-cropping portrait refs is not.
+ * Canvas image card bitmap.
+ * The card is sized to the real frame, so contain fills the cell
+ * without cropping and without a black letterbox well.
  */
 export const canvasImagePreviewMediaClass =
-  'h-full w-full bg-black object-contain object-center'
+  'h-full w-full object-contain object-center'

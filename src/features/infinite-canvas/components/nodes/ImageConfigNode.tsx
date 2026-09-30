@@ -19,6 +19,7 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
 import { CanvasImagePreview } from './CanvasImagePreview';
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
@@ -33,6 +34,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [editLabel, setEditLabel] = useState(data.label || '画面节点');
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
+  const frame = useMediaCardFrame(id, data);
   const hasMedia = Boolean(data.url);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -97,14 +99,14 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
     <>
       <MediaPreviewCard
         selected={selected}
-        filled={hasMedia && !data.loading}
         generating={Boolean(data.loading)}
         label={data.label || '画面节点'}
         icon={<ImageIcon />}
         width={IMAGE_PREVIEW_WIDTH}
+        resolution={hasMedia ? frame.resolution : undefined}
         aspectRatio={
           hasMedia
-            ? cssAspectRatio(nodeAspectRatio(data), IMAGE_EMPTY_ASPECT)
+            ? cssAspectRatio(frame.aspect, IMAGE_EMPTY_ASPECT)
             : IMAGE_EMPTY_ASPECT
         }
         isEditingLabel={isEditingLabel}
@@ -155,6 +157,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             thumbnail={data.thumbnail}
             alt={data.label || '图片'}
             onOpenPreview={() => setShowPreview(true)}
+            onMeasured={frame.reportMeasurement}
           />
         ) : (
           <MediaEmptyGlyph kind="image" />

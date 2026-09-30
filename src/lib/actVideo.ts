@@ -5,6 +5,8 @@ import { videoService } from '@/api/aigc'
 import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
 import { finishGenerationJob, startGenerationJob } from '@/features/infinite-canvas/utils/generationJobs'
 import { persistOpenCanvas } from '@/lib/persistCanvas'
+import { nextMediaPixelFields } from '@/features/infinite-canvas/utils/mediaFrame'
+import { usablePosterUrl } from '@/features/infinite-canvas/utils/videoPoster'
 
 export const ACT_VIDEO_MODEL = 'happyhorse-1.1-r2v'
 export const ACT_VIDEO_SIZE = '1280*720'
@@ -112,6 +114,8 @@ export async function generateActVideo(actId: string) {
       loading: true,
       error: '',
       url: '',
+      thumbnail: '',
+      ...nextMediaPixelFields(null),
       statusLabel: '排队中',
       prompt: videoPrompt,
       model: ACT_VIDEO_MODEL,
@@ -159,6 +163,8 @@ export async function generateActVideo(actId: string) {
     if (signal.aborted || !finishGenerationJob(videoId, signal)) return
     useCanvasStore.getState().updateNode(videoId, {
       url: videoUrl,
+      thumbnail: usablePosterUrl(urls[0]),
+      ...nextMediaPixelFields(null),
       loading: false,
       statusLabel: undefined,
       updatedAt: Date.now(),

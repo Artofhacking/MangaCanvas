@@ -12,6 +12,8 @@ import { useImageGeneration } from './useImageGeneration'
 import { useVideoGeneration } from './useVideoGeneration'
 import { isInlineCanvasMedia } from '@/lib/canvasPayload'
 import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia'
+import { nextMediaPixelFields } from '../utils/mediaFrame'
+import { usablePosterUrl } from '../utils/videoPoster'
 
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_VIDEO_MODEL = 'happyhorse-1.1-t2v'
@@ -108,6 +110,8 @@ export function useNodeGenerateAction(nodeId: string | null) {
           updateNode(nodeId, {
             url: generatedUrl,
             base64: undefined,
+            thumbnail: undefined,
+            ...nextMediaPixelFields(null),
             loading: false,
             error: '',
             progress: undefined,
@@ -147,8 +151,11 @@ export function useNodeGenerateAction(nodeId: string | null) {
         const storedVideoUrl = isInlineCanvasMedia(videoUrl)
           ? await uploadCanvasMediaUrl(videoUrl)
           : videoUrl
+        const poster = usablePosterUrl(inputs.firstFrameImage)
         updateNode(nodeId, {
           url: storedVideoUrl,
+          thumbnail: poster,
+          ...nextMediaPixelFields(null),
           loading: false,
           error: '',
           progress: undefined,

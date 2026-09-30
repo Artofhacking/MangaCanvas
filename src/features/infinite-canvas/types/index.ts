@@ -29,6 +29,9 @@ export interface NodeData {
   createdAt?: number;
   updatedAt?: number;
   thumbnail?: string;
+  /** Decoded pixel size. Sizes the card and the resolution badge. */
+  width?: number;
+  height?: number;
   [key: string]: unknown;
 }
 

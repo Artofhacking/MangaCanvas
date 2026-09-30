@@ -122,16 +122,13 @@ code {
   transform: translate(calc(100% + var(--canvas-handle-outset)), -50%);
 }
 
-/* Image / video preview cards: warm-paper empty stage; filled media keeps a dark well */
+/* Image / video cards sit on the warm paper stage.
+   The frame follows the media, so a filled preview does not turn into a dark well. */
 .media-preview-card {
   --media-stage: var(--surface-container-low);
   --media-stage-fg: var(--on-surface-variant);
   --media-stage-muted: var(--secondary);
   overflow: visible;
-}
-
-.media-preview-card__stage--filled {
-  --media-stage: 0 0% 8%;
 }
 
 /* Dark well while generating so the centered progress chip stays readable */

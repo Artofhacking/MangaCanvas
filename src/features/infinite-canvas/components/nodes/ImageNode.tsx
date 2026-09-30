@@ -24,10 +24,13 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { nextMediaPixelFields, readBlobPixelSize } from '../../utils/mediaFrame';
+import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
 import { CanvasImagePreview } from './CanvasImagePreview';
 
 const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, removeNode, duplicateNode } = useCanvasStore();
+  const frame = useMediaCardFrame(id, data);
   const [uploading, setUploading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -106,13 +109,15 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const handleUpload = useCallback(
     (file: File) => {
       setUploading(true);
-      void uploadCanvasBlob(file)
-        .then((url) => {
+      void Promise.all([uploadCanvasBlob(file), readBlobPixelSize(file)])
+        .then(([url, pixels]) => {
           updateNode(id, {
             url,
             base64: undefined,
+            thumbnail: undefined,
             loading: false,
             label: '上传图片',
+            ...nextMediaPixelFields(pixels),
           });
           message.success('图片上传成功');
         })
@@ -160,21 +165,33 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       sourceAssetId: item.id,
       sourceLibrary: item.library,
       updatedAt: Date.now(),
+      ...nextMediaPixelFields(null),
     });
     message.success(`已使用素材“${item.title}”`);
   }, [id, updateNode]);
 
-  const applyImageToNode = useCallback(async (payload: { url: string; base64?: string; label?: string }) => {
+  const applyImageToNode = useCallback(async (payload: {
+    url: string
+    base64?: string
+    label?: string
+    width?: number
+    height?: number
+  }) => {
     const inline = isInlineCanvasMedia(payload.url)
       ? payload.url
       : (isInlineCanvasMedia(payload.base64) ? payload.base64 : '')
     const url = inline ? await uploadCanvasMediaUrl(inline) : payload.url
+    const pixels = payload.width && payload.height
+      ? { width: payload.width, height: payload.height }
+      : null
     updateNode(id, {
       url,
       base64: undefined,
+      thumbnail: undefined,
       label: payload.label || data.label || '图片节点',
       loading: false,
       updatedAt: Date.now(),
+      ...nextMediaPixelFields(pixels),
     });
   }, [data.label, id, updateNode]);
 
@@ -278,8 +295,14 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         if (!imageType) continue;
 
         const blob = await item.getType(imageType);
+        const pixels = await readBlobPixelSize(blob);
         const url = await uploadCanvasBlob(blob);
-        await applyImageToNode({ url, label: '粘贴图片' });
+        await applyImageToNode({
+          url,
+          label: '粘贴图片',
+          width: pixels?.width,
+          height: pixels?.height,
+        });
         message.success('已替换为剪贴板图片');
         return;
       }
@@ -366,14 +389,14 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       <MediaPreviewCard
         selected={selected}
         dropActive={isDropActive}
-        filled={Boolean(data?.url) && !data?.loading}
         generating={Boolean(data?.loading)}
         label={data.label || '图片节点'}
         icon={<ImageIcon />}
         width={IMAGE_PREVIEW_WIDTH}
+        resolution={data?.url ? frame.resolution : undefined}
         aspectRatio={
           data?.url
-            ? cssAspectRatio(nodeAspectRatio(data), IMAGE_EMPTY_ASPECT)
+            ? cssAspectRatio(frame.aspect, IMAGE_EMPTY_ASPECT)
             : IMAGE_EMPTY_ASPECT
         }
         isEditingLabel={isEditingLabel}
@@ -424,6 +447,7 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             thumbnail={data.thumbnail}
             alt={data.label || '图片'}
             onOpenPreview={() => setShowPreview(true)}
+            onMeasured={frame.reportMeasurement}
           />
         ) : (
           <Upload

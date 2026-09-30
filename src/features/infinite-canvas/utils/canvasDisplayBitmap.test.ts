@@ -3,6 +3,8 @@ import {
   CANVAS_DISPLAY_MAX_EDGE,
   createAsyncLimiter,
   fitDisplayEdge,
+  readCanvasSourceSize,
+  rememberCanvasSourceSize,
   revokeCanvasObjectUrl,
 } from './canvasDisplayBitmap'
 
@@ -42,6 +44,17 @@ describe('display decode limiter', () => {
     await expect(second).rejects.toMatchObject({ name: 'AbortError' })
     releaseGate()
     await expect(first).resolves.toBe('first')
+  })
+})
+
+describe('canvas source size', () => {
+  it('remembers the original pixels learned while downscaling', () => {
+    rememberCanvasSourceSize('https://cdn.example/full.png', 2048.2, 1152.4)
+    expect(readCanvasSourceSize('https://cdn.example/full.png')).toEqual({ width: 2048, height: 1152 })
+    rememberCanvasSourceSize('', 10, 10)
+    rememberCanvasSourceSize('https://cdn.example/empty.png', 0, 10)
+    expect(readCanvasSourceSize('')).toBeNull()
+    expect(readCanvasSourceSize('https://cdn.example/empty.png')).toBeNull()
   })
 })
 

@@ -7,6 +7,8 @@ import { useVideoGeneration } from '../../hooks';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
 import { isInlineCanvasMedia } from '@/lib/canvasPayload';
 import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia';
+import { nextMediaPixelFields } from '../../utils/mediaFrame';
+import { usablePosterUrl } from '../../utils/videoPoster';
 import { isCanceledError } from '@/api/core';
 import { finishGenerationJob, startGenerationJob } from '../../utils/generationJobs';
 import { creditsApi } from '@/api/creditsApi';
@@ -223,6 +225,8 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
           : videoUrl
         updateNode(videoNodeId, {
           url: storedVideoUrl,
+          thumbnail: usablePosterUrl(imageUrl),
+          ...nextMediaPixelFields(null),
           loading: false,
           progress: undefined,
           statusLabel: undefined,

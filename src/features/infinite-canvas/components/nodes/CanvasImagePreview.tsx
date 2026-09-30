@@ -3,6 +3,8 @@ import { Image as ImageIcon } from 'lucide-react'
 import { mediaUrl } from '@/lib/mediaUrl'
 import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction'
 import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
+import { readCanvasSourceSize } from '../../utils/canvasDisplayBitmap'
+import { measurePreviewImage, type MediaMeasurement } from '../../utils/mediaFrame'
 import { canvasImagePreviewMediaClass } from './canvasImagePreview'
 
 interface CanvasImagePreviewProps {
@@ -11,6 +13,7 @@ interface CanvasImagePreviewProps {
   thumbnail?: string | null
   alt?: string
   onOpenPreview: () => void
+  onMeasured?: (measurement: MediaMeasurement) => void
 }
 
 export function CanvasImagePreview({
@@ -19,6 +22,7 @@ export function CanvasImagePreview({
   thumbnail,
   alt,
   onOpenPreview,
+  onMeasured,
 }: CanvasImagePreviewProps) {
   const lastPreviewClickAt = useRef(0)
   // Card chrome only. Preview modal, download, and save-to-library keep `url`.
@@ -35,6 +39,16 @@ export function CanvasImagePreview({
           decoding="async"
           fetchPriority="low"
           className={canvasImagePreviewMediaClass}
+          onLoad={(event) => {
+            const measured = measurePreviewImage({
+              displaySrc: displaySrc || '',
+              originalUrl: url || '',
+              naturalWidth: event.currentTarget.naturalWidth,
+              naturalHeight: event.currentTarget.naturalHeight,
+              cachedSource: readCanvasSourceSize(url || ''),
+            })
+            if (measured) onMeasured?.(measured)
+          }}
           onDragStart={(event) => event.preventDefault()}
         />
       ) : (
