@@ -12,6 +12,7 @@ import {
   preferredVideoPoster,
   videoPosterSeekTime,
 } from '../utils/videoPoster'
+import { readVideoStack } from '../utils/videoStack'
 
 const runVideoPosterJob = createAsyncLimiter(1)
 
@@ -140,7 +141,14 @@ export function useEnsureVideoPoster(
       if (cancelled || controller.signal.aborted || !thumbnail || isInlineCanvasMedia(thumbnail)) return
       const after = latest()
       if (!after || after.url !== url || preferredVideoPoster(after)) return
-      useCanvasStore.getState().updateNode(nodeId, { thumbnail })
+      const stack = readVideoStack(after)
+      const thumbnailUrls = stack.urls.length > 1
+        ? stack.thumbnails.map((item, index) => (index === stack.activeIndex ? thumbnail : item))
+        : undefined
+      useCanvasStore.getState().updateNode(nodeId, {
+        thumbnail,
+        ...(thumbnailUrls ? { thumbnailUrls } : {}),
+      })
     }
 
     void finish().catch(() => {})

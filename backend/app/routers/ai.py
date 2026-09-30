@@ -393,6 +393,7 @@ async def videos(request: Request, user: models.User = Depends(current_user_deta
         raw_names = [raw_names]
     image_names = [str(item) for item in raw_names if item]
     template = body.get("template")
+    batch_id = video_jobs.clean_batch_id(body.get("batchId") or body.get("batch_id"))
 
     if template:
         if not first_frame:
@@ -438,6 +439,7 @@ async def videos(request: Request, user: models.User = Depends(current_user_deta
         images=images,
         image_names=image_names,
         template=template,
+        batch_id=batch_id,
         quote=quoted,
         request_body=body,
         organization_id=(project or {}).get("organization_id"),

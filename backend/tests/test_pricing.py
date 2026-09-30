@@ -100,6 +100,30 @@ def test_script_parse_qwen(db, monkeypatch):
     assert quoted.credits == 4
 
 
+def test_video_n_scales_the_hold(db):
+    one = quote_request(
+        db,
+        model="happyhorse-1.1-t2v",
+        modality="video",
+        duration=5,
+        size="1280*720",
+        resolution="720P",
+    )
+    four = quote_request(
+        db,
+        model="happyhorse-1.1-t2v",
+        modality="video",
+        duration=5,
+        size="1280*720",
+        resolution="720P",
+        n=4,
+    )
+    assert one.credits == 600
+    assert four.credits == 2400
+    assert four.unit_price == one.unit_price
+    assert four.unit_count == one.unit_count
+
+
 def test_illegal_duration(db):
     with pytest.raises(ApiError) as exc:
         quote_request(db, model="happyhorse-1.1-t2v", modality="video", duration=12)

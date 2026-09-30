@@ -87,6 +87,15 @@ export function listImageSizes(modelKey: string, quality?: string, model?: Model
   return labeledSizes(['1024x1024'])
 }
 
+/** Video generation count. The bar always offers these three, defaulting to 1. */
+export const VIDEO_QUANTITY_OPTIONS = [1, 2, 4] as const
+
+export function normalizeVideoQuantity(value: unknown): number {
+  const count = typeof value === 'number' ? value : Number(value)
+  if (count === 2 || count === 4) return count
+  return 1
+}
+
 export function listQuantityOptions(modelKey: string, model?: ModelConfig): number[] {
   const caps = model || resolveImageCapabilities(modelKey)
   const maxN = Math.max(1, Math.min(caps.maxN || 1, 4))
@@ -241,6 +250,9 @@ export function coerceGenerateParams(
     const durs = caps.durs?.map((item) => item.key) || []
     if (durs.length && (typeof node.data.duration !== 'number' || !durs.includes(node.data.duration))) {
       patch.duration = durs[0]
+    }
+    if (typeof node.data.n === 'number' && !VIDEO_QUANTITY_OPTIONS.includes(node.data.n as 1 | 2 | 4)) {
+      patch.n = normalizeVideoQuantity(node.data.n)
     }
     return Object.keys(patch).length ? patch : null
   }

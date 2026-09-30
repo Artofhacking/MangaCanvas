@@ -16,6 +16,8 @@ describe('rewriteCanvasMedia', () => {
         data: {
           url: '/static/a.png',
           imageUrls: ['/static/a.png', 'https://cdn.example/b.png', 2],
+          videoUrls: ['/static/a.mp4', 'https://cdn.example/b.mp4'],
+          thumbnailUrls: ['/static/a.jpg', 'https://cdn.example/b.jpg'],
         },
       }],
     })
@@ -25,6 +27,14 @@ describe('rewriteCanvasMedia', () => {
       'https://app.example/static/a.png',
       'https://cdn.example/b.png',
       2,
+    ])
+    expect(canvas.nodes[0].data.videoUrls).toEqual([
+      'https://app.example/static/a.mp4',
+      'https://cdn.example/b.mp4',
+    ])
+    expect(canvas.nodes[0].data.thumbnailUrls).toEqual([
+      'https://app.example/static/a.jpg',
+      'https://cdn.example/b.jpg',
     ])
   })
 })

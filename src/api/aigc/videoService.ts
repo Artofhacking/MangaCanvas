@@ -86,6 +86,7 @@ async function postJob(options: VideoGenerateOptions, idempotencyKey: string) {
       duration: options.duration,
       template: options.template,
       nodeId: options.nodeId,
+      ...(options.batchId ? { batchId: options.batchId } : {}),
       projectId: resolveProjectId(),
     },
   })

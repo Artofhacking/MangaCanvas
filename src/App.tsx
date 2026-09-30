@@ -48,6 +48,9 @@ const CanvasZoomPreview = import.meta.env.DEV
 const ImageStackPreviewPage = import.meta.env.DEV
   ? lazy(() => import("./pages/dev/ImageStackPreviewPage"))
   : null
+const VideoStackPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/dev/VideoStackPreviewPage"))
+  : null
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
@@ -466,6 +469,9 @@ function App() {
           ) : null}
           {import.meta.env.DEV && ImageStackPreviewPage ? (
             <Route path="/dev/image-stack" element={<ImageStackPreviewPage />} />
+          ) : null}
+          {import.meta.env.DEV && VideoStackPreviewPage ? (
+            <Route path="/dev/video-stack" element={<VideoStackPreviewPage />} />
           ) : null}
 
           <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />

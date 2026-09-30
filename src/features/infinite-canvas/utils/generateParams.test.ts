@@ -6,6 +6,7 @@ import {
   listImageSizes,
   listVideoAspectRatios,
   listVideoResolutions,
+  normalizeVideoQuantity,
 } from './generateParams'
 import type { CustomNode } from '../types'
 
@@ -126,6 +127,38 @@ describe('video capability lookup', () => {
     expect(listVideoAspectRatios('happyhorse-1.1-t2v')).toEqual(['16:9', '9:16'])
     expect(listVideoResolutions('happyhorse-1.1-t2v')).toEqual(['1080P', '720P'])
     expect(listVideoResolutions('doubao-seedance-2-0-fast-260128')).toEqual(['720P'])
+  })
+})
+
+function videoNode(data: Partial<CustomNode['data']>): CustomNode {
+  return {
+    id: 'v1',
+    type: 'videoConfig',
+    position: { x: 0, y: 0 },
+    data: {
+      label: '视频节点',
+      model: 'happyhorse-1.1-t2v',
+      size: '1280*720',
+      resolution: '720P',
+      ratio: '16:9',
+      duration: 5,
+      ...data,
+    },
+  }
+}
+
+describe('video quantity', () => {
+  it('accepts 1, 2 and 4 and treats anything else as one clip', () => {
+    expect(normalizeVideoQuantity(undefined)).toBe(1)
+    expect(normalizeVideoQuantity(1)).toBe(1)
+    expect(normalizeVideoQuantity(2)).toBe(2)
+    expect(normalizeVideoQuantity(4)).toBe(4)
+    expect(normalizeVideoQuantity(3)).toBe(1)
+  })
+
+  it('keeps a valid count and rewrites an invalid one', () => {
+    expect(coerceGenerateParams(videoNode({ n: 4 }))).toBeNull()
+    expect(coerceGenerateParams(videoNode({ n: 3 }))).toEqual({ n: 1 })
   })
 })
 
