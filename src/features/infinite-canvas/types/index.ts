@@ -12,6 +12,15 @@ export interface NodeData {
   imageUrls?: string[];
   /** Index of the front image in `imageUrls`. Kept in sync with `url`. */
   activeImageIndex?: number;
+  /**
+   * Every video from one generation, in return order.
+   * Set only when there is more than one. `url` is the front clip.
+   */
+  videoUrls?: string[];
+  /** Stills lined up with `videoUrls`. Used as the corner cards. */
+  thumbnailUrls?: string[];
+  /** Index of the front clip in `videoUrls`. Kept in sync with `url`. */
+  activeVideoIndex?: number;
   base64?: string;
   loading?: boolean;
   /** Real 0–100 generation percent when the pipeline reports one. */
@@ -217,6 +226,10 @@ export interface VideoGenerationParams {
   resolution?: string;
   template?: string;  // 视频特效模板
   nodeId?: string;
+  /** Shared by the N jobs of one stacked generation so they do not cancel each other. */
+  batchId?: string;
+  /** Skip the per-clip toast. The caller reports one result for the whole batch. */
+  quiet?: boolean;
   signal?: AbortSignal;
 }
 

@@ -22,7 +22,8 @@ import {
 import { nodeAspectRatio } from '../../utils/aspectRatio';
 import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
 import { useEnsureVideoPoster } from '../../hooks/useEnsureVideoPoster';
-import { CanvasVideoPreview } from './CanvasVideoPreview';
+import { readVideoStack } from '../../utils/videoStack';
+import { VideoResultStage } from './VideoStackPreview';
 
 const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -44,7 +45,9 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const frame = useMediaCardFrame(id, data);
   useEnsureVideoPoster(id, data);
-  const hasMedia = Boolean(data.url);
+  const stack = readVideoStack(data);
+  const frontUrl = stack.urls[stack.activeIndex] || '';
+  const hasMedia = Boolean(frontUrl);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,9 +88,9 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!data.url) return;
+    if (!frontUrl) return;
     const link = document.createElement('a');
-    link.href = mediaUrl(data.url);
+    link.href = mediaUrl(frontUrl);
     link.download = `video_${Date.now()}.mp4`;
     link.click();
   };
@@ -106,12 +109,12 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
 
   const handleSaveToMaterials = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!data.url) {
+    if (!frontUrl) {
       message.info('当前节点还没有视频');
       return;
     }
     setShowSaveToMaterialsModal(true);
-  }, [data.url]);
+  }, [frontUrl]);
 
   return (
     <>
@@ -194,30 +197,20 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             label={typeof data.statusLabel === 'string' ? data.statusLabel : undefined}
             onCancel={bindNodeGenerationCancel(id, updateNode)}
           />
-        ) : data.url ? (
-          <div className="relative h-full w-full">
-            <CanvasVideoPreview
-              nodeId={id}
-              url={data.url}
-              thumbnail={data.thumbnail}
-              selected={selected}
-              muted={muted}
-              suspended={showPreview}
-              videoRef={videoRef}
-              onOpenPreview={() => {
-                videoRef.current?.pause();
-                setShowPreview(true);
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleToggleMute}
-              className="nodrag nopan absolute bottom-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm"
-              title={muted ? '打开声音' : '静音'}
-            >
-              {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+        ) : hasMedia ? (
+          <VideoResultStage
+            nodeId={id}
+            data={data}
+            selected={selected}
+            muted={muted}
+            suspended={showPreview}
+            videoRef={videoRef}
+            onOpenPreview={() => {
+              videoRef.current?.pause();
+              setShowPreview(true);
+            }}
+            onToggleMute={handleToggleMute}
+          />
         ) : (
           <MediaEmptyGlyph kind="video" />
         )}
@@ -232,7 +225,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         visible={showPreview}
         onClose={() => setShowPreview(false)}
         type="video"
-        url={data.url || ''}
+        url={frontUrl}
         title={data.label || '视频预览'}
         nodeId={id}
         initialCategory={typeof data.sourceType === 'string' ? data.sourceType : undefined}
@@ -248,7 +241,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       <SaveToMaterialsModal
         open={showSaveToMaterialsModal}
         onClose={() => setShowSaveToMaterialsModal(false)}
-        imageUrl={mediaUrl(data.url) || undefined}
+        imageUrl={mediaUrl(frontUrl) || undefined}
         mediaType="video"
         initialName={data.label || '视频素材'}
         initialCategory={typeof data.sourceType === 'string' ? data.sourceType : undefined}

@@ -180,7 +180,31 @@ def _signal_cancelled(job_ids: list[str]) -> None:
             event.set()
 
 
-def _cancel_others(db: Session, user_id: int, node_id: str, keep_id: str) -> list[tuple[str, int | None, int | None]]:
+def clean_batch_id(raw) -> str | None:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    return text[:64]
+
+
+def _payload_batch_id(payload) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    raw = payload.get("batch_id")
+    if raw is None:
+        return ""
+    return str(raw).strip()
+
+
+def _cancel_others(
+    db: Session,
+    user_id: int,
+    node_id: str,
+    keep_id: str,
+    batch_id: str = "",
+) -> list[tuple[str, int | None, int | None]]:
     rows = (
         db.query(models.VideoGenerationJob)
         .filter(
@@ -193,6 +217,9 @@ def _cancel_others(db: Session, user_id: int, node_id: str, keep_id: str) -> lis
     )
     superseded: list[tuple[str, int | None, int | None]] = []
     for row in rows:
+        # Clips from the same stacked generation share a batch and must all run.
+        if batch_id and _payload_batch_id(row.payload) == batch_id:
+            continue
         row.status = "cancelled"
         row.message = "已取消"
         row.finished_at = now()
@@ -265,7 +292,7 @@ def _insert_job(
     superseded: list[tuple[str, int | None, int | None]] = []
     try:
         if node_id and status == "queued":
-            superseded = _cancel_others(db, user_id, node_id, job.id)
+            superseded = _cancel_others(db, user_id, node_id, job.id, _payload_batch_id(payload))
         db.add(job)
         db.commit()
         db.refresh(job)
@@ -304,6 +331,7 @@ def submit_video_job(
     images: list,
     image_names: list,
     template: str | None,
+    batch_id: str | None,
     quote,
     request_body: dict,
     organization_id: int | None,
@@ -328,6 +356,8 @@ def submit_video_job(
         "image_names": list(image_names or []),
         "template": template,
     }
+    if batch_id:
+        payload["batch_id"] = batch_id
     reservation = None
     if quote is not None:
         reserve_key = client_key or f"req_{secrets.token_hex(12)}"

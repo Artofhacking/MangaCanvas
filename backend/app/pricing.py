@@ -178,7 +178,8 @@ def quote_request(
             unit="video_second",
             unit_count=seconds,
             unit_price=rule.credits_per_unit,
-            credits=rule.credits_per_unit * seconds,
+            # n clips of `seconds` each. Display and the hold scale with n.
+            credits=rule.credits_per_unit * seconds * count,
             quality="",
             resolution=billed_res,
             rule_id=rule.id,

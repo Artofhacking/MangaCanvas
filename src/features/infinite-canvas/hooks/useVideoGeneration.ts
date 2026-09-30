@@ -47,6 +47,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         duration: params.seconds,
         template: params.template,
         nodeId: params.nodeId,
+        batchId: params.batchId,
         signal: params.signal,
         onProgress: (progress) => {
           const label = STATUS_LABEL[progress.status] ?? progress.status;
@@ -55,7 +56,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         },
       });
 
-      message.success('视频生成完成！');
+      if (!params.quiet) message.success('视频生成完成！');
       setLoading(false);
       setStatus('');
       return videoUrl;
@@ -71,7 +72,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
       );
       const errorMessage = is429 ? 'API_RATE_LIMIT' : (err instanceof Error ? err.message : '视频生成失败');
       setError(errorMessage);
-      if (!is429) {
+      if (!params.quiet && !is429) {
         message.error(errorMessage);
       }
       throw new Error(errorMessage);

@@ -36,6 +36,8 @@ import {
   listImageAspectRatios,
   listQuantityOptions,
   listVideoAspectRatios,
+  normalizeVideoQuantity,
+  VIDEO_QUANTITY_OPTIONS,
   listVideoResolutions,
   parseVideoSize,
 } from '../utils/generateParams'
@@ -205,8 +207,10 @@ function GenerateBarModelPicker({
   const showQuality = !isVideo && qualities.length > 1
   const currentQuality = typeof node.data.quality === 'string' ? node.data.quality : qualities[0]?.key
   const qualityLabel = qualities.find((item) => item.key === currentQuality)?.label || currentQuality || '画质'
-  const quantityOptions = listQuantityOptions(currentKey, currentModel)
-  const quantity = typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1
+  const quantityOptions = isVideo ? [...VIDEO_QUANTITY_OPTIONS] : listQuantityOptions(currentKey, currentModel)
+  const quantity = isVideo
+    ? normalizeVideoQuantity(node.data.n)
+    : (typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1)
   const durations = currentModel?.durs || []
   const durationLabel =
     durations.find((item) => item.key === node.data.duration)?.label ||
@@ -354,6 +358,23 @@ function GenerateBarModelPicker({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <DockSelectTrigger className="w-[4.25rem]" icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
+              {quantityOptions.map((qty) => (
+                <DropdownMenuItem
+                  key={qty}
+                  onClick={() => onChange({ n: qty })}
+                  className={menuItemClass(quantity === qty)}
+                >
+                  <Check className={cn('mr-2 h-3.5 w-3.5', quantity === qty ? 'opacity-100' : 'opacity-0')} />
+                  {qty}张
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </>
       ) : (
         <>
@@ -585,6 +606,7 @@ const NodeGenerateBar: React.FC = () => {
               resolution: node.data.resolution,
               duration: Number(node.data.duration || 5),
               imageCount: slots.filter((slot) => !slot.dead).length,
+              n: normalizeVideoQuantity(node.data.n),
               projectId,
             }
           : {
@@ -614,6 +636,7 @@ const NodeGenerateBar: React.FC = () => {
     node?.data.size,
     node?.data.resolution,
     node?.data.duration,
+    node?.data.n,
     node?.type,
     slots,
   ])
@@ -726,7 +749,7 @@ const NodeGenerateBar: React.FC = () => {
             <div className="flex shrink-0 items-center gap-1.5">
               <span
                 className={cn(
-                  'inline-flex w-[4.5rem] shrink-0 items-center justify-end whitespace-nowrap text-[11px] font-semibold tabular-nums',
+                  'inline-flex min-w-[4.5rem] shrink-0 items-center justify-end whitespace-nowrap text-[11px] font-semibold tabular-nums',
                   insufficient ? 'text-red-600' : 'text-[hsl(var(--secondary))]'
                 )}
               >

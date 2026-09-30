@@ -79,18 +79,18 @@ def _data(resp):
     return json.loads(resp.body)["data"]
 
 
-def _body(node_id, key, prompt="run"):
-    return FakeRequest(
-        {
-            "model": "happyhorse-1.1-t2v",
-            "prompt": prompt,
-            "duration": 5,
-            "resolution": "720P",
-            "size": "1280*720",
-            "nodeId": node_id,
-        },
-        headers={"Idempotency-Key": key},
-    )
+def _body(node_id, key, prompt="run", batch=None):
+    payload = {
+        "model": "happyhorse-1.1-t2v",
+        "prompt": prompt,
+        "duration": 5,
+        "resolution": "720P",
+        "size": "1280*720",
+        "nodeId": node_id,
+    }
+    if batch:
+        payload["batchId"] = batch
+    return FakeRequest(payload, headers={"Idempotency-Key": key})
 
 
 def test_upstream_failure_marks_job_failed(user, db, monkeypatch):
@@ -165,6 +165,37 @@ def test_same_node_supersedes_previous_job(user, db, monkeypatch):
 
     _run(scenario())
     db.expire_all()
+    assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 1400
+    assert db.query(models.BillingLedger).filter_by(entry_type="consume").count() == 1
+
+
+def test_same_batch_keeps_sibling_jobs(user, db, monkeypatch):
+    async def fake_gen(**kwargs):
+        return "https://cdn.example/v.mp4"
+
+    async def fake_persist(url):
+        return "/static/uploads/v.mp4"
+
+    monkeypatch.setattr("app.routers.ai.openai_video_generate", fake_gen)
+    monkeypatch.setattr("app.routers.ai.persist_remote_url", fake_persist)
+
+    async def scenario():
+        first = _data(await videos(_body("node-a", "batch-1", prompt="one", batch="stack-a"), user=user))
+        second = _data(await videos(_body("node-a", "batch-2", prompt="two", batch="stack-a"), user=user))
+        assert _data(await video_generation_status(first["job_id"], user=user))["status"] == "queued"
+        assert _data(await video_generation_status(second["job_id"], user=user))["status"] == "queued"
+        third = _data(await videos(_body("node-a", "batch-3", prompt="three", batch="stack-b"), user=user))
+        assert _data(await video_generation_status(first["job_id"], user=user))["status"] == "cancelled"
+        assert _data(await video_generation_status(second["job_id"], user=user))["status"] == "cancelled"
+        assert third["status"] == "queued"
+        await video_jobs.drain()
+        done = _data(await video_generation_status(third["job_id"], user=user))
+        assert done["status"] == "succeeded"
+        assert done["url"] == "/static/uploads/v.mp4"
+
+    _run(scenario())
+    db.expire_all()
+    # Two superseded holds are released. Only the new batch is captured.
     assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 1400
     assert db.query(models.BillingLedger).filter_by(entry_type="consume").count() == 1
 

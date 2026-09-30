@@ -45,6 +45,8 @@ export interface VideoGenerateOptions {
   template?: string
   /** 画布节点 id。同一节点再次生成时，服务端会取消上一次任务。 */
   nodeId?: string
+  /** 同一次多条生成的批次。同一 batch 内的任务互不取消。 */
+  batchId?: string
   signal?: AbortSignal
   onProgress?: (progress: TaskProgress) => void
 }

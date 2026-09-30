@@ -30,6 +30,7 @@ const getDefaultNodeData = (type: string): NodeData => {
         resolution: '720P',
         ratio: '16:9',
         duration: 5,
+        n: 1,
         label: '视频节点',
       };
     case 'video':

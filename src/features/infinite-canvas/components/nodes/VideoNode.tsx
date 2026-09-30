@@ -22,7 +22,8 @@ import { nextMediaPixelFields } from '../../utils/mediaFrame';
 import { canvasVideoCaptureSrc } from '../../utils/videoPoster';
 import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
 import { useEnsureVideoPoster } from '../../hooks/useEnsureVideoPoster';
-import { CanvasVideoPreview } from './CanvasVideoPreview';
+import { readVideoStack } from '../../utils/videoStack';
+import { VideoResultStage } from './VideoStackPreview';
 
 const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { nodes, edges, updateNode, duplicateNode, removeNode, addNode, addEdgeManually } = useCanvasStore();
@@ -35,6 +36,9 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const frame = useMediaCardFrame(id, data);
   useEnsureVideoPoster(id, data);
+  const stack = readVideoStack(data);
+  const frontUrl = stack.urls[stack.activeIndex] || '';
+  const hasMedia = Boolean(frontUrl);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -64,9 +68,9 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!data.url) return;
+    if (!frontUrl) return;
     const link = document.createElement('a');
-    link.href = data.url;
+    link.href = frontUrl;
     link.download = `video_${Date.now()}.mp4`;
     link.click();
   };
@@ -85,14 +89,14 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   // 提取视频最后一帧
   const handleExtractLastFrame = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!data.url || extracting) return;
+    if (!frontUrl || extracting) return;
 
     setExtracting(true);
     try {
       // 创建临时 video 元素，使用代理 URL
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
-      video.src = canvasVideoCaptureSrc(data.url);
+      video.src = canvasVideoCaptureSrc(frontUrl);
       video.muted = true;
 
       await new Promise<void>((resolve, reject) => {
@@ -164,12 +168,12 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   const handleSaveToMaterials = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!data.url) {
+    if (!frontUrl) {
       message.info('当前节点还没有视频');
       return;
     }
     setShowSaveToMaterialsModal(true);
-  }, [data.url]);
+  }, [frontUrl]);
 
   return (
     <div className="relative">
@@ -179,7 +183,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         label={data.label || '视频节点'}
         icon={<Video />}
         width={VIDEO_PREVIEW_WIDTH}
-        resolution={data.url ? frame.resolution : undefined}
+        resolution={hasMedia ? frame.resolution : undefined}
         aspectRatio={cssAspectRatio(frame.aspect, '16 / 9')}
         isEditingLabel={isEditingLabel}
         editLabel={editLabel}
@@ -203,21 +207,21 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
               if (videoRef.current) videoRef.current.pause();
               setShowPreview(true);
             },
-            hidden: !data.url,
+            hidden: !hasMedia,
           },
           {
             key: 'mute',
             label: muted ? '打开声音' : '静音',
             icon: muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />,
             onClick: handleToggleMute,
-            hidden: !data.url,
+            hidden: !hasMedia,
           },
           {
             key: 'extract',
             label: extracting ? '提取中…' : '提取尾帧',
             icon: <ImageIcon className="h-4 w-4" />,
             onClick: handleExtractLastFrame,
-            hidden: !data.url,
+            hidden: !hasMedia,
             disabled: extracting,
           },
           {
@@ -225,9 +229,9 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             label: '保存到素材库',
             icon: <FolderPlus className="h-4 w-4" />,
             onClick: handleSaveToMaterials,
-            hidden: !data.url,
+            hidden: !hasMedia,
           },
-          { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !data.url },
+          { key: 'download', label: '下载', icon: <Download className="h-4 w-4" />, onClick: handleDownload, hidden: !hasMedia },
           { key: 'duplicate', label: '复制', icon: <Copy className="h-4 w-4" />, onClick: handleDuplicate },
           { key: 'delete', label: '删除', icon: <Trash2 className="h-4 w-4" />, onClick: handleDelete, danger: true },
         ]}
@@ -239,30 +243,20 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             label={typeof data.statusLabel === 'string' ? data.statusLabel : undefined}
             onCancel={bindNodeGenerationCancel(id, updateNode)}
           />
-        ) : data.url ? (
-          <div className="relative h-full w-full">
-            <CanvasVideoPreview
-              nodeId={id}
-              url={data.url}
-              thumbnail={data.thumbnail}
-              selected={selected}
-              muted={muted}
-              suspended={showPreview}
-              videoRef={videoRef}
-              onOpenPreview={() => {
-                videoRef.current?.pause();
-                setShowPreview(true);
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleToggleMute}
-              className="nodrag nopan absolute bottom-2.5 right-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm"
-              title={muted ? '打开声音' : '静音'}
-            >
-              {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+        ) : hasMedia ? (
+          <VideoResultStage
+            nodeId={id}
+            data={data}
+            selected={selected}
+            muted={muted}
+            suspended={showPreview}
+            videoRef={videoRef}
+            onOpenPreview={() => {
+              videoRef.current?.pause();
+              setShowPreview(true);
+            }}
+            onToggleMute={handleToggleMute}
+          />
         ) : (
           <MediaEmptyGlyph kind="video" />
         )}
@@ -278,7 +272,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         visible={showPreview}
         onClose={() => setShowPreview(false)}
         type="video"
-        url={data?.url || ''}
+        url={frontUrl}
         title={data.label || '视频预览'}
         nodeId={id}
         initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
@@ -294,7 +288,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       <SaveToMaterialsModal
         open={showSaveToMaterialsModal}
         onClose={() => setShowSaveToMaterialsModal(false)}
-        imageUrl={mediaUrl(data?.url) || undefined}
+        imageUrl={mediaUrl(frontUrl) || undefined}
         mediaType="video"
         initialName={data?.label || '视频素材'}
         initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
