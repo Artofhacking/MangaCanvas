@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .. import billing_service, models, video_jobs
 from ..ai_media import (
     baidu_video_generate,
+    collect_video_refs,
     dashscope_async,
     dashscope_chat,
     extract_media_url,
@@ -15,6 +16,7 @@ from ..ai_media import (
     is_minimax_model,
     is_seedance_model,
     is_vidu_model,
+    happyhorse_dashscope_body,
     minimax_video_generate,
     IMAGE_GENERATION_TIMEOUT_MESSAGE,
     openai_image_generate,
@@ -237,6 +239,11 @@ def _assert_video_channel(model: str) -> None:
     fail(3001, "未配置视频模型 API Key", 503)
 
 
+def _is_happyhorse_model(model: str) -> bool:
+    name = (model or "").lower()
+    return "happyhorse" in name or "happy-horse" in name
+
+
 async def _generate_video_url(
     *,
     model: str,
@@ -249,6 +256,7 @@ async def _generate_video_url(
     images: list,
     image_names: list,
     template: str | None,
+    ratio: str | None = None,
 ) -> str:
     if is_seedance_model(model):
         url = await baidu_video_generate(
@@ -297,11 +305,35 @@ async def _generate_video_url(
             first_frame=first_frame,
             images=images,
             names=image_names,
+            resolution=resolution,
+            ratio=ratio,
         )
         return await persist_remote_url(url)
 
     if not settings.dashscope_api_key:
         fail(3001, "未配置视频模型 API Key", 503)
+
+    if _is_happyhorse_model(model) and not template:
+        refs = collect_video_refs(first_frame, images)
+        payload = await dashscope_async(
+            "/services/aigc/video-generation/video-synthesis",
+            happyhorse_dashscope_body(
+                model=model,
+                prompt=prompt,
+                size=size,
+                duration=duration,
+                image_urls=refs,
+                names=image_names,
+                ratio=ratio,
+                resolution=resolution,
+            ),
+            poll_interval=3,
+            max_attempts=180,
+        )
+        url = extract_media_url(payload)
+        if not url:
+            fail(3001, "生成成功但未找到视频地址", 502)
+        return await persist_remote_url(url)
 
     if template and first_frame:
         payload = await dashscope_async(
@@ -374,6 +406,7 @@ async def videos(request: Request, user: models.User = Depends(current_user_deta
     prompt = body.get("prompt") or ""
     size = str(body.get("size") or "1280*720").replace("x", "*")
     resolution = body.get("resolution") or "720P"
+    ratio = str(body.get("ratio") or "").strip() or None
     try:
         duration = int(body.get("duration") or body.get("seconds") or 5)
     except (TypeError, ValueError):
@@ -433,6 +466,7 @@ async def videos(request: Request, user: models.User = Depends(current_user_deta
         prompt=prompt,
         size=size,
         resolution=str(resolution or ""),
+        ratio=ratio,
         duration=duration,
         first_frame=first_frame,
         last_frame=last_frame,

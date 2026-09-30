@@ -44,6 +44,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         imageNames: params.imageNames,
         size: params.size,
         resolution: params.resolution,
+        ratio: params.ratio,
         duration: params.seconds,
         template: params.template,
         nodeId: params.nodeId,

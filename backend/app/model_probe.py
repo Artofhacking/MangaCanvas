@@ -57,6 +57,10 @@ def _image_caps(*, sizes: list[str], qualities: list[dict], default_size: str, d
     }
 
 
+# Official HappyHorse 1.1 t2v / r2v. i2v has no ratio parameter.
+HAPPYHORSE_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "4:5", "5:4", "9:21", "21:9"]
+
+
 def _video_caps(
     *,
     sizes: list[str] | None = None,
@@ -66,12 +70,15 @@ def _video_caps(
     default_resolution: str,
     default_duration: int = 5,
     supports_aspect: bool = False,
+    ratios: list[str] | None = None,
 ) -> dict:
     parameters: dict = {
         "resolutions": list(resolutions),
         "durations": list(durations),
-        "supports_aspect": supports_aspect,
+        "supports_aspect": supports_aspect or bool(ratios),
     }
+    if ratios:
+        parameters["ratios"] = list(ratios)
     if sizes:
         parameters["sizes"] = list(sizes)
     defaults: dict = {"resolution": default_resolution, "duration": default_duration}
@@ -159,6 +166,7 @@ VIDEO_CATALOG = [
             default_size="1280*720",
             default_resolution="720P",
             supports_aspect=True,
+            ratios=HAPPYHORSE_RATIOS,
         ),
     },
     {
@@ -173,7 +181,13 @@ VIDEO_CATALOG = [
         "name": "HappyHorse 参考图生视频",
         "owned_by": "nexcor",
         "modality": "video",
-        **_video_caps(resolutions=["720P", "1080P"], durations=[5, 10, 15], default_resolution="720P"),
+        **_video_caps(
+            resolutions=["720P", "1080P"],
+            durations=[5, 10, 15],
+            default_resolution="720P",
+            supports_aspect=True,
+            ratios=HAPPYHORSE_RATIOS,
+        ),
     },
     {
         "id": "doubao-seedance-2-0-260128",

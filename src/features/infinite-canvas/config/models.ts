@@ -21,6 +21,21 @@ export const GPT_IMAGE_PRESET_SIZES = [
 
 const gptImagePresetSizeOptions = (): SizeOption[] => labeledSizes([...GPT_IMAGE_PRESET_SIZES])
 
+/** Official HappyHorse 1.1 t2v / r2v ratios. i2v does not accept `ratio`. */
+export const HAPPYHORSE_ASPECT_RATIOS = [
+  '16:9',
+  '9:16',
+  '1:1',
+  '4:3',
+  '3:4',
+  '4:5',
+  '5:4',
+  '9:21',
+  '21:9',
+] as const
+
+const happyHorseRatioOptions = HAPPYHORSE_ASPECT_RATIOS.map((key) => ({ label: key, key }))
+
 export const IMAGE_MODELS: ModelConfig[] = [
   {
     key: 'gpt-image-2',
@@ -187,8 +202,16 @@ export const VIDEO_MODELS: ModelConfig[] = [
       { label: '10秒', key: 10 },
       { label: '15秒', key: 15 },
     ],
+    ratios: happyHorseRatioOptions,
+    resolutions: [
+      { label: '720P', key: '720P' },
+      { label: '1080P', key: '1080P' },
+    ],
+    supportsAspect: true,
     defaultParams: {
       size: '1280*720',
+      ratio: '16:9',
+      resolution: '720P',
       duration: 5,
     },
   },
@@ -197,6 +220,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
     label: 'HappyHorse 图生视频',
     type: 'video',
     async: true,
+    supportsAspect: false,
     resolutions: [
       { label: '720P', key: '720P' },
       { label: '1080P', key: '1080P' },
@@ -216,6 +240,8 @@ export const VIDEO_MODELS: ModelConfig[] = [
     label: 'HappyHorse 参考图生视频',
     type: 'video',
     async: true,
+    ratios: happyHorseRatioOptions,
+    supportsAspect: true,
     resolutions: [
       { label: '720P', key: '720P' },
       { label: '1080P', key: '1080P' },
@@ -226,6 +252,7 @@ export const VIDEO_MODELS: ModelConfig[] = [
       { label: '15秒', key: 15 },
     ],
     defaultParams: {
+      ratio: '16:9',
       resolution: '720P',
       duration: 5,
     },

@@ -42,8 +42,24 @@ def test_video_catalog_declares_duration_and_resolution():
         assert defaults["resolution"] in params["resolutions"]
         assert defaults["duration"] in params["durations"]
         if params.get("supports_aspect"):
-            assert params.get("sizes"), item["id"]
-            assert defaults["size"] in params["sizes"]
+            assert params.get("sizes") or params.get("ratios"), item["id"]
+            if params.get("sizes"):
+                assert defaults["size"] in params["sizes"]
+
+
+def test_happyhorse_ratios_follow_official_docs():
+    official = ["16:9", "9:16", "1:1", "4:3", "3:4", "4:5", "5:4", "9:21", "21:9"]
+    t2v = next(row for row in VIDEO_CATALOG if row["id"] == "happyhorse-1.1-t2v")
+    r2v = next(row for row in VIDEO_CATALOG if row["id"] == "happyhorse-1.1-r2v")
+    i2v = next(row for row in VIDEO_CATALOG if row["id"] == "happyhorse-1.1-i2v")
+    assert t2v["parameters"]["ratios"] == official
+    assert r2v["parameters"]["ratios"] == official
+    assert t2v["parameters"]["supports_aspect"] is True
+    assert r2v["parameters"]["supports_aspect"] is True
+    assert "ratios" not in i2v["parameters"]
+    assert i2v["parameters"]["supports_aspect"] is False
+    assert "720P" in i2v["parameters"]["resolutions"]
+    assert "1080P" in i2v["parameters"]["resolutions"]
 
 
 def test_happyhorse_video_durations_include_15_seconds():

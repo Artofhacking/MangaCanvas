@@ -363,6 +363,43 @@ SEEDANCE_RATIO_BY_SIZE = {
     "1248*1632": "3:4",
 }
 
+# Official HappyHorse 1.1 t2v / r2v ratios. i2v does not accept ratio.
+HAPPYHORSE_RATIOS = (
+    "16:9",
+    "9:16",
+    "1:1",
+    "4:3",
+    "3:4",
+    "4:5",
+    "5:4",
+    "9:21",
+    "21:9",
+)
+HAPPYHORSE_SIZE = {
+    "720P": {
+        "16:9": "1280*720",
+        "9:16": "720*1280",
+        "1:1": "960*960",
+        "4:3": "1088*832",
+        "3:4": "832*1088",
+        "4:5": "576*720",
+        "5:4": "900*720",
+        "21:9": "1680*720",
+        "9:21": "720*1680",
+    },
+    "1080P": {
+        "16:9": "1920*1080",
+        "9:16": "1080*1920",
+        "1:1": "1440*1440",
+        "4:3": "1632*1248",
+        "3:4": "1248*1632",
+        "4:5": "864*1080",
+        "5:4": "1350*1080",
+        "21:9": "2520*1080",
+        "9:21": "1080*2520",
+    },
+}
+
 
 def is_seedance_model(model: str) -> bool:
     name = (model or "").lower()
@@ -450,6 +487,53 @@ def build_nexcor_seedance_video_body(
     return body
 
 
+def happyhorse_variant(ref_count: int) -> str:
+    """0 image URLs → t2v, 1 → i2v, 2+ → r2v. The stored model id does not override this."""
+    if ref_count >= 2:
+        return "happyhorse-1.1-r2v"
+    if ref_count == 1:
+        return "happyhorse-1.1-i2v"
+    return "happyhorse-1.1-t2v"
+
+
+def happyhorse_resolution(resolution: str | None, size: str | None) -> str:
+    res = str(resolution or "").upper().replace(" ", "")
+    if res in {"480P", "720P", "1080P"}:
+        return res
+    raw = str(size or "").lower()
+    if any(token in raw for token in ("1080", "1920", "1632", "1248", "2520", "1350")):
+        return "1080P"
+    return "720P"
+
+
+def _ratio_from_size(size: str | None) -> str | None:
+    key = str(size or "").replace("x", "*").replace("X", "*")
+    if not key:
+        return None
+    if key in SEEDANCE_RATIO_BY_SIZE:
+        return SEEDANCE_RATIO_BY_SIZE[key]
+    for table in HAPPYHORSE_SIZE.values():
+        for ratio, pixels in table.items():
+            if pixels == key:
+                return ratio
+    return None
+
+
+def happyhorse_ratio_value(ratio: str | None, size: str | None) -> str:
+    raw = str(ratio or "").strip()
+    if raw in HAPPYHORSE_RATIOS:
+        return raw
+    derived = _ratio_from_size(size)
+    if derived in HAPPYHORSE_RATIOS:
+        return derived
+    return "16:9"
+
+
+def happyhorse_aligned_size(resolution: str, ratio: str) -> str:
+    table = HAPPYHORSE_SIZE.get(resolution) or HAPPYHORSE_SIZE["720P"]
+    return table.get(ratio) or HAPPYHORSE_SIZE["720P"]["16:9"]
+
+
 def build_happyhorse_video_body(
     *,
     model: str,
@@ -458,25 +542,29 @@ def build_happyhorse_video_body(
     duration: int,
     image_urls: list[str],
     names: list[str] | None = None,
+    ratio: str | None = None,
+    resolution: str | None = None,
 ) -> dict:
+    del model  # variant follows reference count, not the stored id
     refs = [url for url in image_urls if url][:3]
-    if refs and (len(refs) >= 2 or "r2v" in (model or "").lower()):
-        resolved = "happyhorse-1.1-r2v"
-    elif refs:
-        resolved = "happyhorse-1.1-i2v"
-    else:
-        resolved = resolve_video_model(model, False)
+    resolved = happyhorse_variant(len(refs))
     seconds = duration if duration in {5, 10, 15} else 5
     text = (prompt or "cinematic motion").strip()
     if names:
         text = mention_image_roles(text, names)
+    res = happyhorse_resolution(resolution, size)
     body: dict = {
         "model": resolved,
         "prompt": text,
         "duration": seconds,
-        "size": size,
+        "resolution": res,
         "audio": True,
     }
+    # i2v output follows the first frame. A ratio (or a size that implies one) would be a lie.
+    if not resolved.endswith("i2v"):
+        chosen = happyhorse_ratio_value(ratio, size)
+        body["ratio"] = chosen
+        body["size"] = happyhorse_aligned_size(res, chosen)
     if not refs:
         return body
     if resolved.endswith("r2v"):
@@ -491,6 +579,42 @@ def build_happyhorse_video_body(
     body["images"] = [refs[0]]
     body["img_url"] = refs[0]
     return body
+
+
+def happyhorse_dashscope_body(
+    *,
+    model: str,
+    prompt: str,
+    size: str,
+    duration: int,
+    image_urls: list[str],
+    names: list[str] | None = None,
+    ratio: str | None = None,
+    resolution: str | None = None,
+) -> dict:
+    """Official Model Studio video-synthesis body. i2v parameters omit ratio."""
+    flat = build_happyhorse_video_body(
+        model=model,
+        prompt=prompt,
+        size=size,
+        duration=duration,
+        image_urls=image_urls,
+        names=names,
+        ratio=ratio,
+        resolution=resolution,
+    )
+    parameters = {
+        "resolution": flat["resolution"],
+        "duration": flat["duration"],
+        "watermark": False,
+    }
+    if flat.get("ratio"):
+        parameters["ratio"] = flat["ratio"]
+    media = ((flat.get("metadata") or {}).get("input") or {}).get("media")
+    payload_input: dict = {"prompt": flat["prompt"]}
+    if media:
+        payload_input["media"] = media
+    return {"model": flat["model"], "input": payload_input, "parameters": parameters}
 
 
 def resolve_video_model(model: str, has_image: bool) -> str:
@@ -744,6 +868,7 @@ async def openai_video_generate(
     images: list[str] | None = None,
     names: list[str] | None = None,
     resolution: str | None = None,
+    ratio: str | None = None,
 ) -> str:
     if not settings.openai_api_key:
         fail(3001, "未配置视频模型 API Key", 503)
@@ -773,6 +898,8 @@ async def openai_video_generate(
             duration=duration,
             image_urls=resolved_urls,
             names=names,
+            ratio=ratio,
+            resolution=resolution,
         )
     resolved = str(body.get("model") or resolve_video_model(model, bool(refs)))
     base = settings.openai_base_url.rstrip("/")

@@ -11,6 +11,7 @@ from app.ai_media import (
     IMAGE_GENERATION_TIMEOUT_MESSAGE,
     OPENAI_IMAGE_DEADLINE_SECONDS,
     build_happyhorse_video_body,
+    happyhorse_dashscope_body,
     build_nexcor_seedance_video_body,
     mention_image_roles,
     openai_image_generate,
@@ -57,6 +58,9 @@ def test_happyhorse_r2v_keeps_all_refs_and_audio():
         names=["老林", "塑料菜袋", "老张"],
     )
     assert body["model"] == "happyhorse-1.1-r2v"
+    assert body["ratio"] == "16:9"
+    assert body["resolution"] == "720P"
+    assert body["size"] == "1280*720"
     assert body["audio"] is True
     assert body["images"] == ["https://img/a.png", "https://img/b.png", "https://img/c.png"]
     assert body["reference_images"] == body["images"]
@@ -99,8 +103,74 @@ def test_happyhorse_single_image_stays_i2v():
     )
     assert body["model"] == "happyhorse-1.1-i2v"
     assert body["audio"] is True
+    assert "ratio" not in body
+    assert "size" not in body
+    assert body["resolution"] == "720P"
     assert body["img_url"] == "https://img/a.png"
     assert body["metadata"]["input"]["media"][0]["type"] == "first_frame"
+
+
+def test_happyhorse_ratio_follows_reference_count():
+    t2v = build_happyhorse_video_body(
+        model="happyhorse-1.1-r2v",
+        prompt="空镜",
+        size="1280*720",
+        duration=5,
+        image_urls=[],
+        ratio="21:9",
+        resolution="1080P",
+    )
+    assert t2v["model"] == "happyhorse-1.1-t2v"
+    assert t2v["ratio"] == "21:9"
+    assert t2v["resolution"] == "1080P"
+    assert t2v["size"] == "2520*1080"
+
+    i2v = build_happyhorse_video_body(
+        model="happyhorse-1.1-r2v",
+        prompt="开门",
+        size="1280*720",
+        duration=5,
+        image_urls=["https://img/a.png"],
+        ratio="16:9",
+    )
+    assert i2v["model"] == "happyhorse-1.1-i2v"
+    assert "ratio" not in i2v
+
+    r2v = build_happyhorse_video_body(
+        model="happyhorse-1.1-t2v",
+        prompt="双人",
+        size="1280*720",
+        duration=5,
+        image_urls=["https://img/a.png", "https://img/b.png"],
+        ratio="4:5",
+        resolution="720P",
+    )
+    assert r2v["model"] == "happyhorse-1.1-r2v"
+    assert r2v["ratio"] == "4:5"
+    assert r2v["size"] == "576*720"
+    dash = happyhorse_dashscope_body(
+        model="happyhorse-1.1-t2v",
+        prompt="双人",
+        size="1280*720",
+        duration=5,
+        image_urls=["https://img/a.png", "https://img/b.png"],
+        ratio="4:5",
+        resolution="720P",
+    )
+    assert dash["model"] == "happyhorse-1.1-r2v"
+    assert dash["parameters"]["ratio"] == "4:5"
+    assert dash["input"]["media"][0]["type"] == "reference_image"
+    i2v_dash = happyhorse_dashscope_body(
+        model="happyhorse-1.1-t2v",
+        prompt="开门",
+        size="1280*720",
+        duration=5,
+        image_urls=["https://img/a.png"],
+        ratio="16:9",
+    )
+    assert i2v_dash["model"] == "happyhorse-1.1-i2v"
+    assert "ratio" not in i2v_dash["parameters"]
+    assert i2v_dash["input"]["media"][0]["type"] == "first_frame"
 
 
 def test_multi_ref_no_longer_hijacks_disabled_vidu():

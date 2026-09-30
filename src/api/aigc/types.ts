@@ -40,6 +40,8 @@ export interface VideoGenerateOptions {
   imageNames?: string[]
   size?: string
   resolution?: string
+  /** HappyHorse t2v / r2v. Omitted for i2v, where aspect follows the first frame. */
+  ratio?: string
   duration?: number
   /** 视频特效模板 ID */
   template?: string

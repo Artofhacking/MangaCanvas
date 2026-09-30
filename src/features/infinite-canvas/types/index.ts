@@ -224,6 +224,8 @@ export interface VideoGenerationParams {
   size?: string;
   seconds?: number;
   resolution?: string;
+  /** Sent for HappyHorse t2v / r2v. Absent when the clip follows the first frame. */
+  ratio?: string;
   template?: string;  // 视频特效模板
   nodeId?: string;
   /** Shared by the N jobs of one stacked generation so they do not cancel each other. */
