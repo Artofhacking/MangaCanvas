@@ -33,6 +33,9 @@ export function rewriteCanvasMedia<T extends { nodes?: Array<{ data?: Record<str
         next[key] = mediaUrl(next[key] as string)
       }
     }
+    if (Array.isArray(next.imageUrls)) {
+      next.imageUrls = next.imageUrls.map((item) => (typeof item === "string" ? mediaUrl(item) : item))
+    }
     return { ...node, data: next }
   })
   return { ...canvas, nodes }

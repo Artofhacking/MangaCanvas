@@ -20,20 +20,23 @@ import { useCanvasViewportSettled } from './useCanvasViewportSettled'
  */
 export function useCanvasMediaDisplaySrc(input: {
   nodeId: string
+  /** Box used for viewport and measurement. Stacked candidates share the parent node. */
+  layoutNodeId?: string
   url?: string | null
   thumbnail?: string | null
 }): string {
+  const layoutNodeId = input.layoutNodeId || input.nodeId
   const viewportSettled = useCanvasViewportSettled()
   const zoom = useStore((state) => state.transform[2])
   const overviewZoom = useSyncExternalStore(subscribeCanvasOverviewZoom, getCanvasOverviewZoom, () => null)
   const allowFullResolution = allowsCanvasFullResolution(zoom, overviewZoom)
   const measured = useStore((state) => {
-    const node = state.nodeInternals.get(input.nodeId)
+    const node = state.nodeInternals.get(layoutNodeId)
     const width = node?.width
     const height = node?.height
     return typeof width === 'number' && width > 0 && typeof height === 'number' && height > 0
   })
-  const inViewport = useCanvasNodeInViewport(input.nodeId, CANVAS_IMAGE_MIN_VISIBLE_RATIO)
+  const inViewport = useCanvasNodeInViewport(layoutNodeId, CANVAS_IMAGE_MIN_VISIBLE_RATIO)
   const full = mediaUrl((input.url || '').trim())
   const thumb = mediaUrl((input.thumbnail || '').trim())
   const distinctThumb = Boolean(thumb && thumb !== full)

@@ -5,6 +5,13 @@ export interface NodeData {
   label: string;
   content?: string;
   url?: string;
+  /**
+   * Every image from one generation, in return order.
+   * Set only when there is more than one. `url` is the front image.
+   */
+  imageUrls?: string[];
+  /** Index of the front image in `imageUrls`. Kept in sync with `url`. */
+  activeImageIndex?: number;
   base64?: string;
   loading?: boolean;
   /** Real 0–100 generation percent when the pipeline reports one. */
