@@ -5,7 +5,7 @@ import { isCanceledError } from '@/api/core'
 import { remapModelId, resolveImageCapabilities, resolveVideoCapabilities } from '../config/modelCapabilities'
 import { useModelsStore } from '@/store/modelsStore'
 import { useCanvasStore } from '../stores/canvasStore'
-import { finishGenerationJob, startGenerationJob } from '../utils/generationJobs'
+import { finishGenerationJob, hasGenerationJob, startGenerationJob } from '../utils/generationJobs'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from '../utils/generateSlots'
 import { resolveMentionsForSend } from '../utils/promptMentions'
 import { useImageGeneration } from './useImageGeneration'
@@ -81,6 +81,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
       loading: true,
       error: '',
       progress: undefined,
+      statusLabel: isImage ? undefined : '排队中',
       model,
       modelLabel,
     })
@@ -130,8 +131,15 @@ export function useNodeGenerateAction(nodeId: string | null) {
         seconds: typeof node.data.duration === 'number' ? node.data.duration : 5,
         size: typeof node.data.size === 'string' ? node.data.size : undefined,
         resolution: typeof node.data.resolution === 'string' ? node.data.resolution : undefined,
+        nodeId,
         signal,
-      }, applyProgress)
+      }, (status, percent) => {
+        if (signal.aborted) return
+        updateNode(nodeId, {
+          ...(status ? { statusLabel: status } : {}),
+          ...(typeof percent === 'number' && Number.isFinite(percent) ? { progress: percent } : {}),
+        })
+      })
 
       if (signal.aborted || !finishGenerationJob(nodeId, signal)) return
 
@@ -144,28 +152,36 @@ export function useNodeGenerateAction(nodeId: string | null) {
           loading: false,
           error: '',
           progress: undefined,
+          statusLabel: undefined,
           updatedAt: Date.now(),
           executed: true,
           outputNodeId: nodeId,
         })
       } else {
-        updateNode(nodeId, { loading: false, error: '生成失败', progress: undefined })
+        updateNode(nodeId, { loading: false, error: '生成失败', progress: undefined, statusLabel: undefined })
         message.error('生成失败')
       }
     } catch (err: unknown) {
-      if (signal.aborted || isCanceledError(err)) {
-        updateNode(nodeId, { loading: false, error: '', progress: undefined })
+      if (signal.aborted) return
+      if (isCanceledError(err)) {
+        updateNode(nodeId, { loading: false, error: '', progress: undefined, statusLabel: undefined })
         return
       }
       if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
-        updateNode(nodeId, { loading: false, progress: undefined })
+        updateNode(nodeId, { loading: false, progress: undefined, statusLabel: undefined })
         message.warning('请求过于频繁，请稍后重试')
       } else {
-        updateNode(nodeId, { loading: false, error: toErrorMessage(err, '生成失败'), progress: undefined })
+        updateNode(nodeId, {
+          loading: false,
+          error: toErrorMessage(err, '生成失败'),
+          progress: undefined,
+          statusLabel: undefined,
+        })
       }
     } finally {
       const ownsJob = finishGenerationJob(nodeId, signal)
-      setSending(false)
+      const superseded = signal.aborted && hasGenerationJob(nodeId)
+      if (!superseded) setSending(false)
       if (ownsJob) {
         const current = useCanvasStore.getState().nodes.find((item) => item.id === nodeId)
         if (current?.data.loading) {
@@ -173,6 +189,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
           updateNode(nodeId, {
             loading: false,
             progress: undefined,
+            statusLabel: undefined,
             error: existing || '生成失败',
           })
         }

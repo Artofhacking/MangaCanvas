@@ -7,11 +7,11 @@ import type { VideoGenerationParams } from '../types';
 import type { GenerationProgressHandler } from './useImageGeneration';
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
-  PENDING: '任务排队中...',
-  RUNNING: '视频生成中...',
-  SUCCEEDED: '生成完成！',
+  PENDING: '排队中',
+  RUNNING: '生成中',
+  SUCCEEDED: '生成完成',
   FAILED: '生成失败',
-  UNKNOWN: '处理中...',
+  UNKNOWN: '生成中',
 };
 
 interface UseVideoGenerationReturn {
@@ -46,6 +46,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         resolution: params.resolution,
         duration: params.seconds,
         template: params.template,
+        nodeId: params.nodeId,
         signal: params.signal,
         onProgress: (progress) => {
           const label = STATUS_LABEL[progress.status] ?? progress.status;

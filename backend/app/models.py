@@ -382,3 +382,31 @@ class BillingUserProjectQuota(Base):
     quota_limit: Mapped[int] = mapped_column(BigInteger, default=0)
     quota_consumed: Mapped[int] = mapped_column(BigInteger, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class VideoGenerationJob(Base):
+    """Async video generation. The HTTP submit returns immediately; a worker polls upstream."""
+
+    __tablename__ = "video_generation_jobs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_video_job_user_key"),
+        Index("ix_video_jobs_status_created", "status", "created_at"),
+        Index("ix_video_jobs_user_node_status", "user_id", "node_id", "status"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    node_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued")
+    progress: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model: Mapped[str] = mapped_column(String(128))
+    payload: Mapped[dict] = mapped_column(JSON)
+    reservation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reservation_attempt: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    billing_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

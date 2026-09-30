@@ -9,6 +9,8 @@ export interface NodeData {
   loading?: boolean;
   /** Real 0–100 generation percent when the pipeline reports one. */
   progress?: number;
+  /** Short generation phase shown on the media chip, e.g. 排队中 / 生成中. */
+  statusLabel?: string;
   error?: string;
   model?: string;
   size?: string;
@@ -204,6 +206,7 @@ export interface VideoGenerationParams {
   seconds?: number;
   resolution?: string;
   template?: string;  // 视频特效模板
+  nodeId?: string;
   signal?: AbortSignal;
 }
 

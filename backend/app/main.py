@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy import inspect, text
 
-from . import billing_service
+from . import billing_service, video_jobs
 from .body_limit import RequestSizeLimitMiddleware
 from .config import settings
 from .db import Base, SessionLocal, engine
@@ -69,14 +69,29 @@ async def lifespan(_app: FastAPI):
             except asyncio.TimeoutError:
                 continue
 
+    async def _video_loop():
+        while not stop.is_set():
+            try:
+                await video_jobs.worker_tick()
+            except Exception:
+                pass
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=2)
+            except asyncio.TimeoutError:
+                continue
+
     task = asyncio.create_task(_sweep_loop())
+    video_task = asyncio.create_task(_video_loop())
     try:
         yield
     finally:
         stop.set()
         task.cancel()
+        video_task.cancel()
         with suppress(asyncio.CancelledError):
             await task
+        with suppress(asyncio.CancelledError):
+            await video_task
 
 
 app = FastAPI(title="MangaCanvas API", version="2.0", redirect_slashes=False, lifespan=lifespan)

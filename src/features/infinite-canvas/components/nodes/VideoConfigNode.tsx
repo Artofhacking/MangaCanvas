@@ -187,6 +187,7 @@ const VideoConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
           <MediaStageLoading
             kind="video"
             progress={readNodeProgress(data)}
+            label={typeof data.statusLabel === 'string' ? data.statusLabel : undefined}
             onCancel={bindNodeGenerationCancel(id, updateNode)}
           />
         ) : data.url ? (

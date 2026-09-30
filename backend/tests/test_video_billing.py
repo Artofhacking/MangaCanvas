@@ -8,7 +8,8 @@ from sqlalchemy.orm import sessionmaker
 from app import models
 from app.db import Base
 from app.errors import ApiError
-from app.routers.ai import videos
+from app import video_jobs
+from app.routers.ai import video_generation_status, videos
 from app.seed import seed_price_rules
 
 
@@ -66,7 +67,17 @@ def user(db):
 def patch_sessions(monkeypatch, Session):
     monkeypatch.setattr("app.billing_service.SessionLocal", Session)
     monkeypatch.setattr("app.routers.ai.SessionLocal", Session)
+    monkeypatch.setattr("app.video_jobs.SessionLocal", Session)
     monkeypatch.setattr("app.deps.SessionLocal", Session)
+
+
+def _data(resp):
+    return json.loads(resp.body)["data"]
+
+
+def _finish(job_id, user):
+    _run(video_jobs.drain())
+    return _data(_run(video_generation_status(job_id, user=user)))
 
 
 def _run(coro):
@@ -101,7 +112,10 @@ def test_video_capture_on_success(user, db, monkeypatch):
     monkeypatch.setattr("app.routers.ai.settings.openai_api_key", "sk-test")
     monkeypatch.setattr("app.routers.ai.settings.billing_enabled", True)
 
+    calls = {"n": 0}
+
     async def fake_gen(**kwargs):
+        calls["n"] += 1
         return "https://cdn.example/v.mp4"
 
     async def fake_persist(url):
@@ -126,9 +140,44 @@ def test_video_capture_on_success(user, db, monkeypatch):
     )
     data = json.loads(resp.body)
     assert data["code"] == 0
-    assert data["data"]["billing"]["charged"] == 600
+    assert calls["n"] == 0
+    assert data["data"]["status"] == "queued"
+    assert data["data"]["job_id"]
+    assert "url" not in data["data"]
     db.expire_all()
     assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 1400
+    assert db.query(models.BillingLedger).count() == 0
+
+    done = _finish(data["data"]["job_id"], user)
+    assert calls["n"] == 1
+    assert done["status"] == "succeeded"
+    assert done["url"] == "/static/uploads/generated/v.mp4"
+    assert done["billing"]["charged"] == 600
+    db.expire_all()
+    assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 1400
+    assert db.query(models.BillingLedger).filter_by(entry_type="consume").count() == 1
+
+    again = _data(
+        _run(
+            videos(
+                FakeRequest(
+                    {
+                        "model": "happyhorse-1.1-t2v",
+                        "prompt": "run",
+                        "duration": 5,
+                        "resolution": "720P",
+                        "size": "1280*720",
+                    },
+                    headers={"Idempotency-Key": "vid-1"},
+                ),
+                user=user,
+            )
+        )
+    )
+    assert again["job_id"] == data["data"]["job_id"]
+    assert again["status"] == "succeeded"
+    db.expire_all()
+    assert db.query(models.BillingLedger).filter_by(entry_type="consume").count() == 1
 
 
 def test_r2v_and_persist_failure_releases(user, db, monkeypatch):
@@ -143,7 +192,7 @@ def test_r2v_and_persist_failure_releases(user, db, monkeypatch):
 
     monkeypatch.setattr("app.routers.ai.openai_video_generate", fake_gen)
     monkeypatch.setattr("app.routers.ai.persist_remote_url", boom)
-    with pytest.raises(ApiError) as exc:
+    submitted = _data(
         _run(
             videos(
                 FakeRequest(
@@ -159,7 +208,11 @@ def test_r2v_and_persist_failure_releases(user, db, monkeypatch):
                 user=user,
             )
         )
-    assert exc.value.code == 3001
+    )
+    assert submitted["status"] == "queued"
+    done = _finish(submitted["job_id"], user)
+    assert done["status"] == "failed"
+    assert "persist fail" in (done["message"] or "")
     db.expire_all()
     assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 2000
     row = db.query(models.BillingReservation).filter_by(idempotency_key="vid-fail").one()
@@ -224,6 +277,11 @@ def test_seedance_uses_baidu_when_enabled(user, monkeypatch):
     )
     data = json.loads(resp.body)
     assert data["code"] == 0
+    assert data["data"]["status"] == "queued"
+    assert seen == {}
+    done = _finish(data["data"]["job_id"], user)
+    assert done["status"] == "succeeded"
+    assert done["url"].endswith("s.mp4")
     assert seen["model"] == "doubao-seedance-2-0-260128"
 
 
