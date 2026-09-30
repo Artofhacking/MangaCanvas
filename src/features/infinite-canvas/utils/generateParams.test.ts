@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyImageRatio,
+  applyVideoRatio,
   coerceGenerateParams,
+  countVideoRequestReferences,
   listImageAspectRatios,
   listImageSizes,
   listVideoAspectRatios,
   listVideoResolutions,
   normalizeVideoQuantity,
+  videoAspectSuppressedByReferences,
 } from './generateParams'
-import type { CustomNode } from '../types'
+import { collectGenerateInputs } from './generateSlots'
+import type { CustomEdge, CustomNode } from '../types'
 
 function imageNode(data: Partial<CustomNode['data']>): CustomNode {
   return {
@@ -127,6 +131,97 @@ describe('video capability lookup', () => {
     expect(listVideoAspectRatios('happyhorse-1.1-t2v')).toEqual(['16:9', '9:16'])
     expect(listVideoResolutions('happyhorse-1.1-t2v')).toEqual(['1080P', '720P'])
     expect(listVideoResolutions('doubao-seedance-2-0-fast-260128')).toEqual(['720P'])
+  })
+
+  it('still writes the t2v size map when the user picks 16:9 or 9:16', () => {
+    expect(applyVideoRatio('720P', '16:9')).toEqual({
+      size: '1280*720',
+      resolution: '720P',
+      ratio: '16:9',
+    })
+    expect(applyVideoRatio('720P', '9:16')).toEqual({
+      size: '720*1280',
+      resolution: '720P',
+      ratio: '9:16',
+    })
+    expect(applyVideoRatio('1080P', '9:16')).toEqual({
+      size: '1080*1920',
+      resolution: '1080P',
+      ratio: '9:16',
+    })
+  })
+})
+
+function imageRef(id: string, url?: string): CustomNode {
+  return {
+    id,
+    type: 'image',
+    position: { x: 0, y: 0 },
+    data: { label: id, ...(url ? { url } : {}) },
+  }
+}
+
+function edgeToVideo(id: string, source: string, slotOrder: number): CustomEdge {
+  return { id, source, target: 'v1', data: { slotOrder } }
+}
+
+describe('video aspect with reference images', () => {
+  it('hides aspect once attached images would be sent on a HappyHorse request', () => {
+    const one = collectGenerateInputs('v1', [videoNode(), imageRef('a', 'https://img/a.png')], [
+      edgeToVideo('e1', 'a', 1),
+    ])
+    expect(countVideoRequestReferences(one.firstFrameImage, one.refImages)).toBe(1)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', one)).toBe(true)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-i2v', one)).toBe(true)
+
+    const three = collectGenerateInputs(
+      'v1',
+      [
+        videoNode(),
+        imageRef('a', 'https://img/a.png'),
+        imageRef('b', 'https://img/b.png'),
+        imageRef('c', 'https://img/c.png'),
+      ],
+      [edgeToVideo('e1', 'a', 1), edgeToVideo('e2', 'b', 2), edgeToVideo('e3', 'c', 3)]
+    )
+    expect(countVideoRequestReferences(three.firstFrameImage, three.refImages)).toBe(3)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', three)).toBe(true)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-r2v', three)).toBe(true)
+  })
+
+  it('keeps the t2v aspect control when nothing image-like would be sent', () => {
+    const empty = collectGenerateInputs('v1', [videoNode()], [])
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', empty)).toBe(false)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-i2v', empty)).toBe(false)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-r2v', empty)).toBe(false)
+
+    const textOnly = collectGenerateInputs(
+      'v1',
+      [
+        videoNode(),
+        {
+          id: 'note',
+          type: 'text',
+          position: { x: 0, y: 0 },
+          data: { label: '旁白', content: '夜色' },
+        },
+      ],
+      [edgeToVideo('e1', 'note', 1)]
+    )
+    expect(countVideoRequestReferences(textOnly.firstFrameImage, textOnly.refImages)).toBe(0)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', textOnly)).toBe(false)
+
+    const unloaded = collectGenerateInputs('v1', [videoNode(), imageRef('a')], [edgeToVideo('e1', 'a', 1)])
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', unloaded)).toBe(false)
+  })
+
+  it('keeps aspect for models that still send size when references are attached', () => {
+    const inputs = collectGenerateInputs('v1', [videoNode(), imageRef('a', 'https://img/a.png')], [
+      edgeToVideo('e1', 'a', 1),
+    ])
+    expect(videoAspectSuppressedByReferences('doubao-seedance-2-0-260128', inputs)).toBe(false)
+    expect(videoAspectSuppressedByReferences('MiniMax-H3', inputs)).toBe(false)
+    expect(videoAspectSuppressedByReferences('viduq3-pro', inputs)).toBe(false)
   })
 })
 

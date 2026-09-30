@@ -1,4 +1,4 @@
-import { isT2VModel } from '@/api/aigc'
+import { isMiniMaxModel, isSeedanceModel, isT2VModel, isViduModel } from '@/api/aigc'
 import {
   remapModelId,
   resolveImageCapabilities,
@@ -76,6 +76,50 @@ export function listVideoAspectRatios(modelKey: string, model?: ModelConfig): st
   if (caps.sizes?.length) return uniqueAspectRatios(caps.sizes)
   if (caps.supportsAspect === false) return []
   return [...ASPECT_RATIOS]
+}
+
+/** Same cap as backend `collect_video_refs` for HappyHorse. */
+const VIDEO_REFERENCE_LIMIT = 3
+
+/**
+ * Image URLs `collectGenerateInputs` gathers for a video node: the first frame,
+ * then the other attached reference images. An @mention only matters when it
+ * points at one of those images; a text mention does not add a URL.
+ */
+export function countVideoRequestReferences(
+  firstFrameImage?: string,
+  refImages?: readonly string[]
+): number {
+  const refs: string[] = []
+  for (const item of [firstFrameImage, ...(refImages || [])]) {
+    const url = (item || '').trim()
+    if (!url || refs.includes(url)) continue
+    refs.push(url)
+    if (refs.length >= VIDEO_REFERENCE_LIMIT) break
+  }
+  return refs.length
+}
+
+/**
+ * HappyHorse sends any reference image to i2v (one) or r2v (two or more).
+ * Those catalogs expose resolution only, so a dock aspect label would be a lie.
+ * Seedance / MiniMax / Vidu keep their own size or ratio and stay selectable.
+ * Zero refs stays on the t2v size map even if the stored id says i2v/r2v.
+ */
+export function videoReferenceModeDropsAspect(modelKey: string, referenceCount: number): boolean {
+  if (referenceCount <= 0) return false
+  if (isSeedanceModel(modelKey) || isMiniMaxModel(modelKey) || isViduModel(modelKey)) return false
+  return true
+}
+
+export function videoAspectSuppressedByReferences(
+  modelKey: string,
+  inputs: { firstFrameImage?: string; refImages?: readonly string[] }
+): boolean {
+  return videoReferenceModeDropsAspect(
+    modelKey,
+    countVideoRequestReferences(inputs.firstFrameImage, inputs.refImages)
+  )
 }
 
 export function listImageSizes(modelKey: string, quality?: string, model?: ModelConfig): SizeOption[] {
