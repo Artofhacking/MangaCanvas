@@ -4,6 +4,8 @@
  * is revoked when the card drops it. Lightbox / download never use this URL.
  */
 
+import { mediaUrl } from '@/lib/mediaUrl'
+
 export const CANVAS_DISPLAY_MAX_EDGE = 256
 export const CANVAS_DISPLAY_MAX_SOURCE_BYTES = 12 * 1024 * 1024
 export const CANVAS_DISPLAY_DECODE_CONCURRENCY = 1
@@ -14,6 +16,38 @@ export function fitDisplayEdge(width: number, height: number, maxEdge = CANVAS_D
   return {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
+  }
+}
+
+const sourceSizes = new Map<string, { width: number; height: number }>()
+const sourceSizeListeners = new Set<() => void>()
+
+function sourceSizeKey(url: string): string {
+  const trimmed = url.trim()
+  return mediaUrl(trimmed) || trimmed
+}
+
+/** Original pixel size learned while downscaling a card bitmap. */
+export function rememberCanvasSourceSize(url: string, width: number, height: number) {
+  if (!url || !(width > 0) || !(height > 0)) return
+  const next = { width: Math.round(width), height: Math.round(height) }
+  const key = sourceSizeKey(url)
+  if (!key) return
+  const prev = sourceSizes.get(key)
+  if (prev && prev.width === next.width && prev.height === next.height) return
+  sourceSizes.set(key, next)
+  sourceSizeListeners.forEach((listener) => listener())
+}
+
+export function readCanvasSourceSize(url: string): { width: number; height: number } | null {
+  if (!url) return null
+  return sourceSizes.get(sourceSizeKey(url)) ?? null
+}
+
+export function subscribeCanvasSourceSize(listener: () => void) {
+  sourceSizeListeners.add(listener)
+  return () => {
+    sourceSizeListeners.delete(listener)
   }
 }
 
@@ -133,6 +167,7 @@ export async function loadCanvasDisplayObjectUrl(url: string, signal: AbortSigna
     if (signal.aborted) throw abortError()
     const source = await createImageBitmap(blob)
     try {
+      rememberCanvasSourceSize(url, source.width, source.height)
       const edge = fitDisplayEdge(source.width, source.height)
       const canvas = document.createElement('canvas')
       canvas.width = edge.width

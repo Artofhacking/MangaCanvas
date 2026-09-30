@@ -57,6 +57,7 @@ import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWo
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
 import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
+import { nextMediaPixelFields, readBlobPixelSize } from './utils/mediaFrame';
 import {
   persistWorkflowCanvasNavState,
   projectAssetsPath,
@@ -615,11 +616,16 @@ const CanvasInner: React.FC = () => {
 
           const viewportCenterX = -viewport.x / viewport.zoom + (window.innerWidth / 2) / viewport.zoom;
           const viewportCenterY = -viewport.y / viewport.zoom + (window.innerHeight / 2) / viewport.zoom;
-          void uploadCanvasBlob(file)
-            .then((url) => {
+          void Promise.all([uploadCanvasBlob(file), readBlobPixelSize(file)])
+            .then(([url, pixels]) => {
               addNode('image',
                 { x: viewportCenterX - 140, y: viewportCenterY - 100 },
-                { url, label: '粘贴图片', loading: false }
+                {
+                  url,
+                  label: '粘贴图片',
+                  loading: false,
+                  ...nextMediaPixelFields(pixels),
+                }
               );
               message.success('图片已粘贴');
             })

@@ -13,6 +13,7 @@ import {
   subscribeActiveCanvasVideo,
 } from '../../utils/canvasMediaBudget'
 import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
+import { canvasVideoPreviewMediaClass, canvasVideoPreviewStageClass } from './canvasVideoPreview'
 
 interface CanvasVideoPreviewProps {
   nodeId: string
@@ -81,7 +82,7 @@ export function CanvasVideoPreview({
 
   return (
     <div
-      className="relative h-full w-full bg-black"
+      className={canvasVideoPreviewStageClass}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -95,7 +96,7 @@ export function CanvasVideoPreview({
           playsInline={playback.playsInline}
           poster={poster ? mediaUrl(poster) : undefined}
           draggable={false}
-          className="h-full w-full object-cover"
+          className={canvasVideoPreviewMediaClass}
           onDragStart={(event) => event.preventDefault()}
           onCanPlay={(event) => {
             event.currentTarget.play().catch(() => {})
@@ -109,7 +110,7 @@ export function CanvasVideoPreview({
           loading="lazy"
           decoding="async"
           fetchPriority="low"
-          className="h-full w-full object-cover"
+          className={canvasVideoPreviewMediaClass}
           onDragStart={(event) => event.preventDefault()}
         />
       ) : null}

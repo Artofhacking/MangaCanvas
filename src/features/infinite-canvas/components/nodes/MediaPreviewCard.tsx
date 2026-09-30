@@ -62,8 +62,8 @@ interface MediaPreviewCardProps {
   layout?: 'cover' | 'flow'
   /** Optional label node (e.g. plot mentions). Falls back to `label` text. */
   labelContent?: React.ReactNode
-  /** True when the card shows generated/uploaded media (keeps a dark well behind it). */
-  filled?: boolean
+  /** Pixel size such as 2048×1152, shown in the header when known. */
+  resolution?: string
   /** Darker preview well while a generation job is in flight. */
   generating?: boolean
   children: React.ReactNode
@@ -158,7 +158,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
   className,
   layout = 'cover',
   labelContent,
-  filled,
+  resolution,
   generating,
   children,
 }) => {
@@ -169,8 +169,8 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
 
   return (
     <div className={cn('media-preview-card group/media-card relative', className)} style={{ width }}>
-      <div className="mb-1.5 flex h-6 items-center justify-between gap-2 px-0.5">
-        <div className="flex min-w-0 items-center gap-1.5 text-[hsl(var(--on-surface-variant))]">
+      <div className="mb-1.5 flex h-6 items-center gap-2 px-0.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[hsl(var(--on-surface-variant))]">
           <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5">
             {icon}
           </span>
@@ -196,6 +196,11 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
             </span>
           )}
         </div>
+        {resolution ? (
+          <span className="shrink-0 text-[12px] font-medium tabular-nums tracking-wide text-[hsl(var(--on-surface-variant))]">
+            {resolution}
+          </span>
+        ) : null}
         {visibleActions.length > 0 ? (
           <div
             className={cn(
@@ -252,7 +257,6 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
           className={cn(
             'relative w-full overflow-hidden rounded-[20px] border transition-[border-color,box-shadow] duration-200',
             isFlow ? 'min-h-[200px]' : 'h-full',
-            filled && 'media-preview-card__stage--filled',
             generating && 'media-preview-card__stage--generating',
             dropActive
               ? 'border-[hsl(var(--primary))] shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
