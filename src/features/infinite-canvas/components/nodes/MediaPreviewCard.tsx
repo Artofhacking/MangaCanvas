@@ -101,23 +101,26 @@ export function MediaEmptyGlyph({ kind }: { kind: 'image' | 'video' }) {
 export function MediaStageLoading({
   kind,
   progress,
+  label,
   onCancel,
 }: {
   kind: 'image' | 'video'
   progress?: number
+  /** Overrides the default 生成中 label. Video jobs pass 排队中 / 生成中. */
+  label?: string
   onCancel?: () => void
 }) {
-  const label = formatGeneratingLabel(progress)
+  const text = label?.trim() || formatGeneratingLabel(progress)
 
   return (
     <div
       className="relative flex h-full w-full items-center justify-center overflow-hidden"
       role="status"
       aria-live="polite"
-      aria-label={kind === 'video' ? '视频生成中' : '图片生成中'}
+      aria-label={label?.trim() ? text : kind === 'video' ? '视频生成中' : '图片生成中'}
     >
       <div className="media-generating-chip nodrag nopan nowheel pointer-events-auto flex items-center gap-2.5 whitespace-nowrap rounded-full px-4 py-[9px] text-[13px] font-medium leading-none tracking-wide">
-        <span>{label}</span>
+        <span>{text}</span>
         {onCancel ? (
           <button
             type="button"

@@ -43,6 +43,8 @@ export interface VideoGenerateOptions {
   duration?: number
   /** 视频特效模板 ID */
   template?: string
+  /** 画布节点 id。同一节点再次生成时，服务端会取消上一次任务。 */
+  nodeId?: string
   signal?: AbortSignal
   onProgress?: (progress: TaskProgress) => void
 }

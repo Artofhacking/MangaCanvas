@@ -52,6 +52,6 @@ export function bindNodeGenerationCancel(
   if (!hasGenerationJob(nodeId)) return undefined
   return () => {
     if (!cancelGenerationJob(nodeId)) return
-    updateNode(nodeId, { loading: false, error: '', progress: undefined })
+    updateNode(nodeId, { loading: false, error: '', progress: undefined, statusLabel: undefined })
   }
 }

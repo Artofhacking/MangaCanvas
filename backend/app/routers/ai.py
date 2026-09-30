@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from .. import billing_service, models
+from .. import billing_service, models, video_jobs
 from ..ai_media import (
     baidu_video_generate,
     dashscope_async,
@@ -406,72 +406,54 @@ async def videos(request: Request, user: models.User = Depends(current_user_deta
     _assert_video_channel(str(model))
 
     project = resolve_project_detached(user, body.get("projectId"))
-    reservation = None
-    captured = False
-    stop = asyncio.Event()
-    beat = None
-    try:
-        if settings.billing_enabled:
-            quote_db = SessionLocal()
-            try:
-                quoted = quote_request(
-                    quote_db,
-                    model=str(model),
-                    modality="video",
-                    size=size,
-                    resolution=resolution,
-                    duration=duration,
-                    image_count=len(images),
-                    template=template,
-                )
-            finally:
-                quote_db.close()
-            reservation = billing_service.reserve(
-                user_id=user.id,
-                quote=quoted,
-                request_body=body,
-                reference_type="ai_video",
-                organization_id=(project or {}).get("organization_id"),
-                project_id=(project or {}).get("id"),
-                idempotency_key=_idempotency_key(request, body),
+    quoted = None
+    if settings.billing_enabled:
+        quote_db = SessionLocal()
+        try:
+            quoted = quote_request(
+                quote_db,
+                model=str(model),
+                modality="video",
+                size=size,
+                resolution=resolution,
+                duration=duration,
+                image_count=len(images),
+                template=template,
             )
-            if reservation.status == "captured" and reservation.response_payload:
-                captured = True
-                payload = dict(reservation.response_payload)
-                payload.pop("billing", None)
-                replay = billing_service.CaptureResult(False, 0, True, True, payload)
-                return ok(_with_fresh_billing(payload, user.id, replay, reservation))
-            beat = asyncio.create_task(_heartbeat_loop(reservation, stop))
+        finally:
+            quote_db.close()
 
-        persisted = await _generate_video_url(
-            model=str(model),
-            prompt=prompt,
-            size=size,
-            resolution=str(resolution or ""),
-            duration=duration,
-            first_frame=first_frame,
-            last_frame=last_frame,
-            images=images,
-            image_names=image_names,
-            template=template,
-        )
-        media = {"url": persisted}
-        if reservation is not None:
-            cap = billing_service.capture(reservation.id, reservation.attempt, response_payload=media)
-            captured = True
-            return ok(_with_fresh_billing(media, user.id, cap, reservation))
-        return ok(media)
-    except ApiError:
-        raise
-    except Exception as exc:
-        note_upstream_result(str(model), 0, str(exc))
-        fail(3001, f"视频生成失败: {exc}", 502)
-    finally:
-        stop.set()
-        if beat is not None:
-            beat.cancel()
-        if reservation is not None and not captured:
-            billing_service.release(reservation.id, reservation.attempt, reason="finally")
+    # Quote and channel checks run before any hold. Unsupported params fail closed.
+    job = video_jobs.submit_video_job(
+        user_id=user.id,
+        node_id=body.get("nodeId") or body.get("node_id"),
+        idempotency_key=_idempotency_key(request, body),
+        model=str(model),
+        prompt=prompt,
+        size=size,
+        resolution=str(resolution or ""),
+        duration=duration,
+        first_frame=first_frame,
+        last_frame=last_frame,
+        images=images,
+        image_names=image_names,
+        template=template,
+        quote=quoted,
+        request_body=body,
+        organization_id=(project or {}).get("organization_id"),
+        project_id=(project or {}).get("id"),
+    )
+    return ok(video_jobs.public_view(job))
+
+
+@router.get("/videos/generations/{job_id}")
+async def video_generation_status(job_id: str, user: models.User = Depends(current_user_detached)):
+    return ok(video_jobs.get_public(user.id, job_id))
+
+
+@router.post("/videos/generations/{job_id}/cancel")
+async def cancel_video_generation(job_id: str, user: models.User = Depends(current_user_detached)):
+    return ok(video_jobs.cancel_for_user(user.id, job_id))
 
 
 @router.post("/persist-media")

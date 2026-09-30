@@ -182,6 +182,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
       {
         label: getTemplateLabel(localTemplate),
         loading: true,
+        statusLabel: '排队中',
         model: 'happyhorse-1.1-i2v',
         modelLabel: 'HappyHorse 图生视频',
         template: localTemplate,
@@ -201,12 +202,14 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         first_frame_image: imageUrl,
         resolution: localResolution as string,
         template: localTemplate as string,
+        nodeId: videoNodeId,
         signal,
-      }, (_status, percent) => {
+      }, (status, percent) => {
         if (signal.aborted) return
-        if (typeof percent === 'number' && Number.isFinite(percent)) {
-          updateNode(videoNodeId, { progress: percent })
-        }
+        updateNode(videoNodeId, {
+          ...(status ? { statusLabel: status } : {}),
+          ...(typeof percent === 'number' && Number.isFinite(percent) ? { progress: percent } : {}),
+        })
       });
 
       if (signal.aborted || !finishGenerationJob(videoNodeId, signal)) {
@@ -218,14 +221,21 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         const storedVideoUrl = isInlineCanvasMedia(videoUrl)
           ? await uploadCanvasMediaUrl(videoUrl)
           : videoUrl
-        updateNode(videoNodeId, { url: storedVideoUrl, loading: false, progress: undefined, updatedAt: Date.now() });
+        updateNode(videoNodeId, {
+          url: storedVideoUrl,
+          loading: false,
+          progress: undefined,
+          statusLabel: undefined,
+          updatedAt: Date.now(),
+        });
       } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined });
+        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined, statusLabel: undefined });
       }
       persistOpenCanvas();
     } catch (err: unknown) {
-      if (signal.aborted || isCanceledError(err)) {
-        updateNode(videoNodeId, { loading: false, error: '', progress: undefined });
+      if (signal.aborted) return
+      if (isCanceledError(err)) {
+        updateNode(videoNodeId, { loading: false, error: '', progress: undefined, statusLabel: undefined });
       } else if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
         removeNode(videoNodeId);
         message.warning('请求过于频繁，请稍后重试');
@@ -233,7 +243,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         removeNode(videoNodeId);
         message.warning('积分不足');
       } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined });
+        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined, statusLabel: undefined });
       }
       persistOpenCanvas();
     } finally {

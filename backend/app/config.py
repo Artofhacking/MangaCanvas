@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     allow_registration: bool = False
     billing_enabled: bool = False
     billing_enforce_quotas: bool = False
+    # In-process video worker. Extra submits stay queued; they are not dropped.
+    video_job_max_running_per_user: int = 2
+    video_job_max_running_global: int = 8
     allow_placeholder: bool = False
     upload_dir: Path = ROOT / "uploads"
     feishu_app_id: str = ""

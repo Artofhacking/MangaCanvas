@@ -1,7 +1,9 @@
 import { message } from 'antd'
 
+import { isCanceledError } from '@/api/core'
 import { videoService } from '@/api/aigc'
 import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
+import { finishGenerationJob, startGenerationJob } from '@/features/infinite-canvas/utils/generationJobs'
 import { persistOpenCanvas } from '@/lib/persistCanvas'
 
 export const ACT_VIDEO_MODEL = 'happyhorse-1.1-r2v'
@@ -104,17 +106,13 @@ export async function generateActVideo(actId: string) {
     .map((edge) => store.nodes.find((node) => node.id === edge.target && node.type === 'video'))
     .find((node) => node)
 
-  if (existingVideo?.data.loading) {
-    message.info('这一幕正在生成视频')
-    return
-  }
-
   let videoId = existingVideo?.id
   if (videoId) {
     store.updateNode(videoId, {
       loading: true,
       error: '',
       url: '',
+      statusLabel: '排队中',
       prompt: videoPrompt,
       model: ACT_VIDEO_MODEL,
       modelLabel: '本幕视频',
@@ -132,12 +130,14 @@ export async function generateActVideo(actId: string) {
         size: ACT_VIDEO_SIZE,
         resolution: ACT_VIDEO_RESOLUTION,
         duration: ACT_VIDEO_DURATION,
+        statusLabel: '排队中',
       }
     )
     useCanvasStore.getState().addEdgeManually({ source: actId, target: videoId })
   }
   persistOpenCanvas()
 
+  const signal = startGenerationJob(videoId)
   try {
     const videoUrl = await videoService.generate({
       model: ACT_VIDEO_MODEL,
@@ -148,10 +148,24 @@ export async function generateActVideo(actId: string) {
       size: ACT_VIDEO_SIZE,
       resolution: ACT_VIDEO_RESOLUTION,
       duration: ACT_VIDEO_DURATION,
+      nodeId: videoId,
+      signal,
+      onProgress: (progress) => {
+        if (signal.aborted) return
+        const statusLabel = progress.status === 'PENDING' ? '排队中' : progress.status === 'RUNNING' ? '生成中' : undefined
+        if (statusLabel) useCanvasStore.getState().updateNode(videoId, { statusLabel })
+      },
     })
-    useCanvasStore.getState().updateNode(videoId, { url: videoUrl, loading: false, updatedAt: Date.now() })
+    if (signal.aborted || !finishGenerationJob(videoId, signal)) return
+    useCanvasStore.getState().updateNode(videoId, {
+      url: videoUrl,
+      loading: false,
+      statusLabel: undefined,
+      updatedAt: Date.now(),
+    })
     persistOpenCanvas()
   } catch (error) {
+    if (signal.aborted || isCanceledError(error)) return
     if (error instanceof Error && error.message === 'API_RATE_LIMIT') {
       useCanvasStore.getState().removeNode(videoId)
       persistOpenCanvas()
@@ -160,8 +174,11 @@ export async function generateActVideo(actId: string) {
     }
     useCanvasStore.getState().updateNode(videoId, {
       loading: false,
+      statusLabel: undefined,
       error: error instanceof Error ? error.message : '生成失败',
     })
     persistOpenCanvas()
+  } finally {
+    finishGenerationJob(videoId, signal)
   }
 }
