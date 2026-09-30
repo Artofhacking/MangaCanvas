@@ -19,8 +19,10 @@ import {
   cssAspectRatio,
 } from './MediaPreviewCard';
 import { nodeAspectRatio } from '../../utils/aspectRatio';
+import { bringStackImageForward, readImageStack } from '../../utils/imageStack';
+import { nextMediaPixelFields } from '../../utils/mediaFrame';
 import { useMediaCardFrame } from '../../hooks/useMediaCardFrame';
-import { CanvasImagePreview } from './CanvasImagePreview';
+import { ImageStackPreview } from './ImageStackPreview';
 
 const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected }) => {
   const { updateNode, duplicateNode, removeNode } = useCanvasStore(
@@ -35,7 +37,21 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
   const frame = useMediaCardFrame(id, data);
-  const hasMedia = Boolean(data.url);
+  const stack = readImageStack(data);
+  const hasMedia = stack.urls.length > 0;
+
+  const activateStackImage = useCallback((index: number) => {
+    const current = useCanvasStore.getState().nodes.find((node) => node.id === id);
+    if (!current) return;
+    const next = bringStackImageForward(current.data, index);
+    if (!next) return;
+    updateNode(id, {
+      url: next.url,
+      activeImageIndex: next.activeIndex,
+      thumbnail: undefined,
+      ...nextMediaPixelFields(null),
+    });
+  }, [id, updateNode]);
 
   const handleLabelDoubleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -150,14 +166,16 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
             progress={readNodeProgress(data)}
             onCancel={bindNodeGenerationCancel(id, updateNode)}
           />
-        ) : data.url ? (
-          <CanvasImagePreview
+        ) : hasMedia ? (
+          <ImageStackPreview
             nodeId={id}
-            url={data.url}
+            urls={stack.urls}
+            activeIndex={stack.activeIndex}
             thumbnail={data.thumbnail}
             alt={data.label || '图片'}
             onOpenPreview={() => setShowPreview(true)}
             onMeasured={frame.reportMeasurement}
+            onActivate={activateStackImage}
           />
         ) : (
           <MediaEmptyGlyph kind="image" />

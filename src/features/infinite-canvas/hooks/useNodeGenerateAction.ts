@@ -12,11 +12,29 @@ import { useImageGeneration } from './useImageGeneration'
 import { useVideoGeneration } from './useVideoGeneration'
 import { isInlineCanvasMedia } from '@/lib/canvasPayload'
 import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia'
+import { buildGeneratedImageNodePatch } from '../utils/imageStack'
 import { nextMediaPixelFields } from '../utils/mediaFrame'
 import { usablePosterUrl } from '../utils/videoPoster'
 
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_VIDEO_MODEL = 'happyhorse-1.1-t2v'
+
+async function persistGeneratedImageUrls(urls: readonly string[], signal: AbortSignal): Promise<string[]> {
+  const stored: string[] = []
+  for (const item of urls) {
+    if (signal.aborted) return stored
+    const trimmed = item.trim()
+    if (!trimmed) continue
+    try {
+      const next = isInlineCanvasMedia(trimmed) ? await uploadCanvasMediaUrl(trimmed) : trimmed
+      const clean = next.trim()
+      if (clean) stored.push(clean)
+    } catch {
+      // Keep the candidates that did upload.
+    }
+  }
+  return stored
+}
 
 function toErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message && err.message !== 'API_RATE_LIMIT') {
@@ -90,6 +108,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
 
     try {
       if (isImage) {
+        const requested = typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1
         const result = await generateImage({
           model,
           prompt: inputs.prompt,
@@ -97,33 +116,25 @@ export function useNodeGenerateAction(nodeId: string | null) {
           quality: typeof node.data.quality === 'string' ? node.data.quality : undefined,
           image: inputs.refImages[0],
           images: inputs.refImages.length ? inputs.refImages : undefined,
-          n: typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1,
+          n: requested,
           signal,
         }, applyProgress)
 
+        if (signal.aborted) return
+
+        const returned = (result || []).filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        const stored = await persistGeneratedImageUrls(returned, signal)
         if (signal.aborted || !finishGenerationJob(nodeId, signal)) return
 
-        if (result && result.length > 0) {
-          const generatedUrl = isInlineCanvasMedia(result[0])
-            ? await uploadCanvasMediaUrl(result[0])
-            : result[0]
-          updateNode(nodeId, {
-            url: generatedUrl,
-            base64: undefined,
-            thumbnail: undefined,
-            ...nextMediaPixelFields(null),
-            loading: false,
-            error: '',
-            progress: undefined,
-            updatedAt: Date.now(),
-            executed: true,
-            outputNodeId: nodeId,
-          })
-          message.success('图片生成成功！')
-        } else {
-          updateNode(nodeId, { loading: false, error: '生成失败', progress: undefined })
-          message.error('生成失败')
-        }
+        const outcome = buildGeneratedImageNodePatch({
+          urls: stored,
+          requestedCount: requested,
+          nodeId,
+        })
+        updateNode(nodeId, outcome.patch)
+        if (outcome.notice.level === 'success') message.success(outcome.notice.text)
+        else if (outcome.notice.level === 'warning') message.warning(outcome.notice.text)
+        else message.error(outcome.notice.text)
         return
       }
 

@@ -45,6 +45,9 @@ const GenerateDockPreview = import.meta.env.DEV
 const CanvasZoomPreview = import.meta.env.DEV
   ? lazy(() => import("./pages/dev/CanvasZoomPreview"))
   : null
+const ImageStackPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/dev/ImageStackPreviewPage"))
+  : null
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
@@ -460,6 +463,9 @@ function App() {
           ) : null}
           {import.meta.env.DEV && CanvasZoomPreview ? (
             <Route path="/dev/canvas-zoom" element={<CanvasZoomPreview />} />
+          ) : null}
+          {import.meta.env.DEV && ImageStackPreviewPage ? (
+            <Route path="/dev/image-stack" element={<ImageStackPreviewPage />} />
           ) : null}
 
           <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />
