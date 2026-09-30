@@ -39,8 +39,11 @@ import {
   listVideoAspectRatios,
   normalizeVideoQuantity,
   VIDEO_QUANTITY_OPTIONS,
+  listVideoRequestImages,
   listVideoResolutions,
   parseVideoSize,
+  resolveImageRequestModel,
+  routedVideoModelKey,
   videoAspectSuppressedByReferences,
 } from '../utils/generateParams'
 import { aspectRatioIconSize } from '../utils/aspectRatio'
@@ -72,8 +75,8 @@ import { cn } from '@/lib/utils'
  */
 const BAR_WIDTH = 760
 const BAR_ESTIMATED_HEIGHT = 168
-/** Shown when attached reference images would route HappyHorse to i2v/r2v. */
-const VIDEO_REFERENCE_ASPECT_HINT = '有参考图时不保证所选比例，成片跟随参考构图'
+/** HappyHorse i2v has no ratio; output follows the first frame. */
+const VIDEO_REFERENCE_ASPECT_HINT = '输出跟首帧'
 const DOCK_MENU =
   'z-[80] min-w-[10.5rem] overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl'
 
@@ -148,11 +151,15 @@ function GenerateBarModelPicker({
   node,
   onChange,
   suppressVideoAspect = false,
+  videoReferenceCount = 0,
+  imageReferenceCount = 0,
 }: {
   node: CustomNode
   onChange: (data: Partial<CustomNode['data']>) => void
-  /** Reference images on this request route off the t2v aspect catalog. */
+  /** Exactly one HappyHorse image URL: hide ratio, output follows the first frame. */
   suppressVideoAspect?: boolean
+  videoReferenceCount?: number
+  imageReferenceCount?: number
 }) {
   const isVideo = node.type === 'videoConfig'
   const {
@@ -204,26 +211,33 @@ function GenerateBarModelPicker({
     ? findVideoPickerModel(pickerModels, currentKey)
     : pickerModels.find((item) => item.key === currentKey)
   const currentModel = selected
+  const imageRequestKey = isVideo
+    ? currentKey
+    : resolveImageRequestModel(currentKey, imageReferenceCount, liveIds)
+  const imageRequestModel =
+    pickerModels.find((item) => item.key === imageRequestKey) ||
+    (imageRequestKey === currentModel?.key ? currentModel : undefined)
   const imageRatios = useMemo(
     () =>
       isVideo
         ? []
         : listImageAspectRatios(
-            currentKey,
+            imageRequestKey,
             typeof node.data.quality === 'string' ? node.data.quality : undefined,
-            currentModel
+            imageRequestModel
           ),
-    [currentKey, currentModel, isVideo, node.data.quality]
+    [imageRequestKey, imageRequestModel, isVideo, node.data.quality]
   )
   const imageRatio = typeof node.data.size === 'string' ? getSizeRatio(node.data.size) : (node.data.ratio || '1:1')
   const videoParsed = parseVideoSize(typeof node.data.size === 'string' ? node.data.size : undefined)
   const videoResolution =
     (typeof node.data.resolution === 'string' && node.data.resolution) || videoParsed.resolution
   const videoRatio = (typeof node.data.ratio === 'string' && node.data.ratio) || videoParsed.ratio
-  const availableResolutions = listVideoResolutions(currentKey, currentModel)
-  const videoRatios = listVideoAspectRatios(currentKey, currentModel)
-  const showVideoAspect =
-    !suppressVideoAspect && Boolean(currentModel?.supportsAspect) && videoRatios.length > 0
+  const aspectKey = isVideo ? routedVideoModelKey(currentKey, videoReferenceCount) : currentKey
+  const aspectModel = aspectKey === currentModel?.key ? currentModel : undefined
+  const availableResolutions = listVideoResolutions(aspectKey, aspectModel)
+  const videoRatios = listVideoAspectRatios(aspectKey, aspectModel)
+  const showVideoAspect = !suppressVideoAspect && videoRatios.length > 0
   const qualities = currentModel?.qualities || []
   const showQuality = !isVideo && qualities.length > 1
   const currentQuality = typeof node.data.quality === 'string' ? node.data.quality : qualities[0]?.key
@@ -243,11 +257,19 @@ function GenerateBarModelPicker({
       onChange(applyModelDefaults(node.type, pickerModels[0].key, node, liveIds, pickerModels[0]))
       return
     }
-    const coerced = coerceGenerateParams(node, liveIds, currentModel)
+    const requestNode =
+      !isVideo && imageRequestKey !== currentKey
+        ? { ...node, data: { ...node.data, model: imageRequestKey } }
+        : node
+    const coerced = coerceGenerateParams(requestNode, liveIds, isVideo ? currentModel : imageRequestModel)
     if (coerced) onChange(coerced)
   }, [
     currentKey,
     currentModel,
+    imageRequestKey,
+    imageRequestModel,
+    imageReferenceCount,
+    isVideo,
     selected,
     liveIds,
     loading,
@@ -346,9 +368,10 @@ function GenerateBarModelPicker({
                   onClick={() =>
                     onChange(
                       applyVideoResolution(
-                        currentKey,
+                        aspectKey,
                         res,
-                        typeof node.data.size === 'string' ? node.data.size : undefined
+                        typeof node.data.size === 'string' ? node.data.size : undefined,
+                        videoRatio
                       )
                     )
                   }
@@ -409,10 +432,10 @@ function GenerateBarModelPicker({
                   key={ratio}
                   onClick={() => {
                     const next = applyImageRatio(
-                      currentKey,
+                      imageRequestKey,
                       typeof node.data.quality === 'string' ? node.data.quality : undefined,
                       ratio,
-                      currentModel
+                      imageRequestModel
                     )
                     if (next) onChange(next)
                   }}
@@ -576,12 +599,21 @@ const NodeGenerateBar: React.FC = () => {
     () => (selectedId ? getIncomingReferenceSlots(selectedId, nodes, edges) : []),
     [edges, nodes, selectedId]
   )
+  const connectedInputs = useMemo(
+    () => (selectedId ? collectGenerateInputs(selectedId, nodes, edges) : null),
+    [edges, nodes, selectedId]
+  )
+  const videoReferenceCount =
+    node?.type === 'videoConfig' && connectedInputs
+      ? listVideoRequestImages(connectedInputs.firstFrameImage, connectedInputs.refImages).length
+      : 0
+  const imageReferenceCount =
+    node?.type === 'imageConfig' && connectedInputs ? connectedInputs.refImages.length : 0
   const suppressVideoAspect = useMemo(() => {
-    if (!selectedId || node?.type !== 'videoConfig') return false
-    const inputs = collectGenerateInputs(selectedId, nodes, edges)
+    if (!selectedId || node?.type !== 'videoConfig' || !connectedInputs) return false
     const modelKey = typeof node.data.model === 'string' ? node.data.model : ''
-    return videoAspectSuppressedByReferences(modelKey, inputs)
-  }, [edges, node?.data.model, node?.type, nodes, selectedId])
+    return videoAspectSuppressedByReferences(modelKey, connectedInputs)
+  }, [connectedInputs, node?.data.model, node?.type, selectedId])
 
   useEffect(() => {
     setDraftPrompt(typeof node?.data.prompt === 'string' ? node.data.prompt : '')
@@ -632,7 +664,7 @@ const NodeGenerateBar: React.FC = () => {
               size: node.data.size,
               resolution: node.data.resolution,
               duration: Number(node.data.duration || 5),
-              imageCount: slots.filter((slot) => !slot.dead).length,
+              imageCount: videoReferenceCount,
               n: normalizeVideoQuantity(node.data.n),
               projectId,
             }
@@ -666,6 +698,7 @@ const NodeGenerateBar: React.FC = () => {
     node?.data.n,
     node?.type,
     slots,
+    videoReferenceCount,
   ])
 
   const handlePromptChange = (value: string) => {
@@ -781,6 +814,8 @@ const NodeGenerateBar: React.FC = () => {
                 node={node}
                 onChange={handleModelChange}
                 suppressVideoAspect={suppressVideoAspect}
+                videoReferenceCount={videoReferenceCount}
+                imageReferenceCount={imageReferenceCount}
               />
             </div>
             <div className="flex shrink-0 items-center gap-1.5">

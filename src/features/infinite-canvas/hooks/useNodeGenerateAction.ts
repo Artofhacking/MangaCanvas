@@ -16,7 +16,13 @@ import { createRandomUuid } from '@/lib/randomUuid'
 import { buildGeneratedImageNodePatch } from '../utils/imageStack'
 import { collectVideoBatch } from '../utils/videoBatch'
 import { buildGeneratedVideoNodePatch } from '../utils/videoStack'
-import { normalizeVideoQuantity } from '../utils/generateParams'
+import {
+  imageSizeForRequest,
+  listVideoRequestImages,
+  normalizeVideoQuantity,
+  resolveImageRequestModel,
+  videoRequestParams,
+} from '../utils/generateParams'
 import { usablePosterUrl } from '../utils/videoPoster'
 
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
@@ -78,9 +84,12 @@ export function useNodeGenerateAction(nodeId: string | null) {
       .getModelsByModality(isImage ? 'image' : 'video')
       .map((item) => item.id)
     const storedModel = typeof node.data.model === 'string' ? node.data.model : ''
-    const model = isImage
+    const selectedModel = isImage
       ? remapModelId(storedModel || DEFAULT_IMAGE_MODEL, liveIds, 'image')
       : remapModelId(storedModel || DEFAULT_VIDEO_MODEL, liveIds, 'video')
+    const model = isImage
+      ? resolveImageRequestModel(selectedModel, inputs.refImages.length, liveIds)
+      : selectedModel
 
     if (isImage && inputs.refImages.length && !isI2IModel(model)) {
       message.error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE)
@@ -112,11 +121,17 @@ export function useNodeGenerateAction(nodeId: string | null) {
     try {
       if (isImage) {
         const requested = typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1
+        const imageQuality = typeof node.data.quality === 'string' ? node.data.quality : undefined
         const result = await generateImage({
           model,
           prompt: inputs.prompt,
-          size: typeof node.data.size === 'string' ? node.data.size : '1024x1024',
-          quality: typeof node.data.quality === 'string' ? node.data.quality : undefined,
+          size: imageSizeForRequest(
+            model,
+            imageQuality,
+            typeof node.data.size === 'string' ? node.data.size : undefined,
+            typeof node.data.ratio === 'string' ? node.data.ratio : undefined
+          ),
+          quality: imageQuality,
           image: inputs.refImages[0],
           images: inputs.refImages.length ? inputs.refImages : undefined,
           n: requested,
@@ -143,14 +158,24 @@ export function useNodeGenerateAction(nodeId: string | null) {
 
       const requested = normalizeVideoQuantity(node.data.n)
       const poster = usablePosterUrl(inputs.firstFrameImage)
+      const videoImages = listVideoRequestImages(inputs.firstFrameImage, inputs.refImages)
+      const videoFields = videoRequestParams({
+        model,
+        referenceCount: videoImages.length,
+        ratio: typeof node.data.ratio === 'string' ? node.data.ratio : undefined,
+        resolution: typeof node.data.resolution === 'string' ? node.data.resolution : undefined,
+        size: typeof node.data.size === 'string' ? node.data.size : undefined,
+      })
       const videoParams = {
         model,
         prompt: inputs.prompt || '',
-        first_frame_image: inputs.firstFrameImage,
+        first_frame_image: videoImages[0] || inputs.firstFrameImage,
         last_frame_image: inputs.lastFrameImage,
+        images: videoImages.length ? videoImages : undefined,
         seconds: typeof node.data.duration === 'number' ? node.data.duration : 5,
-        size: typeof node.data.size === 'string' ? node.data.size : undefined,
-        resolution: typeof node.data.resolution === 'string' ? node.data.resolution : undefined,
+        size: videoFields.size,
+        resolution: videoFields.resolution,
+        ratio: videoFields.ratio,
         nodeId,
         signal,
       }

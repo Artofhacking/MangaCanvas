@@ -16,13 +16,18 @@ export const RESOLUTIONS = ['1080P', '720P'] as const
 export type AspectRatio = (typeof ASPECT_RATIOS)[number]
 export type Resolution = (typeof RESOLUTIONS)[number]
 
-export const VIDEO_SIZE_MAP: Record<Resolution, Record<AspectRatio, string>> = {
+/** Pixel sizes the dock writes beside an official ratio. HappyHorse itself sends `ratio`. */
+export const VIDEO_SIZE_MAP: Record<Resolution, Record<string, string>> = {
   '720P': {
     '16:9': '1280*720',
     '9:16': '720*1280',
     '1:1': '960*960',
     '4:3': '1088*832',
     '3:4': '832*1088',
+    '4:5': '576*720',
+    '5:4': '900*720',
+    '21:9': '1680*720',
+    '9:21': '720*1680',
   },
   '1080P': {
     '16:9': '1920*1080',
@@ -30,6 +35,10 @@ export const VIDEO_SIZE_MAP: Record<Resolution, Record<AspectRatio, string>> = {
     '1:1': '1440*1440',
     '4:3': '1632*1248',
     '3:4': '1248*1632',
+    '4:5': '864*1080',
+    '5:4': '1350*1080',
+    '21:9': '2520*1080',
+    '9:21': '1080*2520',
   },
 }
 
@@ -38,13 +47,12 @@ export function getShortLabelFromModel(modelLabel: string): string {
   return match ? match[0] : '文生图'
 }
 
-export function parseVideoSize(size?: string): { resolution: Resolution; ratio: AspectRatio } {
+export function parseVideoSize(size?: string): { resolution: string; ratio: string } {
   if (size) {
     for (const resolution of RESOLUTIONS) {
-      for (const ratio of ASPECT_RATIOS) {
-        if (VIDEO_SIZE_MAP[resolution][ratio] === size) {
-          return { resolution, ratio }
-        }
+      const table = VIDEO_SIZE_MAP[resolution]
+      for (const [ratio, key] of Object.entries(table)) {
+        if (key === size) return { resolution, ratio }
       }
     }
   }
@@ -52,19 +60,22 @@ export function parseVideoSize(size?: string): { resolution: Resolution; ratio: 
 }
 
 export function videoSizeFor(resolution: string, ratio: string): string {
-  const mapped = VIDEO_SIZE_MAP[resolution as Resolution]?.[ratio as AspectRatio]
+  const mapped = VIDEO_SIZE_MAP[resolution as Resolution]?.[ratio]
   return mapped || VIDEO_SIZE_MAP['720P']['16:9']
 }
 
-export function listVideoResolutions(modelKey: string, model?: ModelConfig): Resolution[] {
+export function listVideoResolutions(modelKey: string, model?: ModelConfig): string[] {
   const caps = model || resolveVideoCapabilities(modelKey)
-  const fromResolutions = (caps.resolutions || [])
-    .map((item) => item.key)
-    .filter((item): item is Resolution => RESOLUTIONS.includes(item as Resolution))
-  if (fromResolutions.length) return fromResolutions
+  const fromResolutions = (caps.resolutions || []).map((item) => item.key).filter(Boolean)
+  if (fromResolutions.length) {
+    const known = RESOLUTIONS.filter((item) => fromResolutions.includes(item))
+    const extra = fromResolutions.filter((item) => !RESOLUTIONS.includes(item as Resolution))
+    return [...known, ...extra]
+  }
   const fromSizes = new Set<Resolution>()
   for (const size of caps.sizes || []) {
-    fromSizes.add(parseVideoSize(size.key).resolution)
+    const parsed = parseVideoSize(size.key).resolution
+    if (RESOLUTIONS.includes(parsed as Resolution)) fromSizes.add(parsed as Resolution)
   }
   if (fromSizes.size) return RESOLUTIONS.filter((item) => fromSizes.has(item))
   return ['720P']
@@ -86,10 +97,11 @@ const VIDEO_REFERENCE_LIMIT = 3
  * then the other attached reference images. An @mention only matters when it
  * points at one of those images; a text mention does not add a URL.
  */
-export function countVideoRequestReferences(
+/** Image URLs that `collect_video_refs` will actually send. Text mentions add nothing. */
+export function listVideoRequestImages(
   firstFrameImage?: string,
   refImages?: readonly string[]
-): number {
+): string[] {
   const refs: string[] = []
   for (const item of [firstFrameImage, ...(refImages || [])]) {
     const url = (item || '').trim()
@@ -97,18 +109,72 @@ export function countVideoRequestReferences(
     refs.push(url)
     if (refs.length >= VIDEO_REFERENCE_LIMIT) break
   }
-  return refs.length
+  return refs
+}
+
+export function countVideoRequestReferences(
+  firstFrameImage?: string,
+  refImages?: readonly string[]
+): number {
+  return listVideoRequestImages(firstFrameImage, refImages).length
+}
+
+export interface VideoRequestFields {
+  ratio?: string
+  resolution?: string
+  size?: string
 }
 
 /**
- * HappyHorse sends any reference image to i2v (one) or r2v (two or more).
- * Those catalogs expose resolution only, so a dock aspect label would be a lie.
- * Seedance / MiniMax / Vidu keep their own size or ratio and stay selectable.
- * Zero refs stays on the t2v size map even if the stored id says i2v/r2v.
+ * Fields the video request should carry.
+ * HappyHorse t2v / r2v include `ratio`. i2v omits it so the frame can follow the first image.
  */
+export function videoRequestParams(input: {
+  model: string
+  referenceCount: number
+  ratio?: string
+  resolution?: string
+  size?: string
+}): VideoRequestFields {
+  const routed = routedVideoModelKey(input.model, input.referenceCount)
+  const parsed = parseVideoSize(input.size)
+  const resolution = input.resolution || parsed.resolution
+  if (!routed.startsWith('happyhorse-')) {
+    return { resolution, size: input.size }
+  }
+  if (videoReferenceModeDropsAspect(input.model, input.referenceCount)) {
+    return { resolution, size: input.size }
+  }
+  const ratios = listVideoAspectRatios(routed)
+  const preferred = (input.ratio || '').trim()
+  const ratio = ratios.includes(preferred)
+    ? preferred
+    : ratios.includes(parsed.ratio)
+      ? parsed.ratio
+      : ratios[0] || '16:9'
+  return { ratio, resolution, size: videoSizeFor(resolution, ratio) }
+}
+
+function keepsOwnVideoAspect(modelKey: string): boolean {
+  return isSeedanceModel(modelKey) || isMiniMaxModel(modelKey) || isViduModel(modelKey)
+}
+
+/**
+ * HappyHorse mode follows image URLs, not the stored id:
+ * 0 → t2v (ratio), 1 → i2v (no ratio; aspect follows the first frame), 2+ → r2v (ratio).
+ * Seedance / MiniMax / Vidu keep their own ratio even when references are attached.
+ */
+export function routedVideoModelKey(modelKey: string, referenceCount: number): string {
+  if (keepsOwnVideoAspect(modelKey)) return modelKey
+  if (referenceCount >= 2) return 'happyhorse-1.1-r2v'
+  if (referenceCount === 1) return 'happyhorse-1.1-i2v'
+  return 'happyhorse-1.1-t2v'
+}
+
+/** Hide the ratio control only for HappyHorse i2v (exactly one image URL). */
 export function videoReferenceModeDropsAspect(modelKey: string, referenceCount: number): boolean {
-  if (referenceCount <= 0) return false
-  if (isSeedanceModel(modelKey) || isMiniMaxModel(modelKey) || isViduModel(modelKey)) return false
+  if (referenceCount !== 1) return false
+  if (keepsOwnVideoAspect(modelKey)) return false
   return true
 }
 
@@ -148,6 +214,36 @@ export function listQuantityOptions(modelKey: string, model?: ModelConfig): numb
 
 export function listImageAspectRatios(modelKey: string, quality?: string, model?: ModelConfig): string[] {
   return uniqueAspectRatios(listImageSizes(modelKey, quality, model))
+}
+
+/**
+ * wan2.6-t2i and wan2.6-image publish different size lists.
+ * Attached reference images use the img2img catalog when that model is available,
+ * so the dock only offers sizes the request will send.
+ */
+export function resolveImageRequestModel(
+  modelKey: string,
+  referenceCount: number,
+  liveIds: readonly string[] = []
+): string {
+  if (referenceCount > 0 && modelKey === 'wan2.6-t2i') {
+    if (liveIds.length === 0 || liveIds.includes('wan2.6-image')) return 'wan2.6-image'
+  }
+  return modelKey
+}
+
+export function imageSizeForRequest(
+  modelKey: string,
+  quality: string | undefined,
+  size: string | undefined,
+  ratio: string | undefined,
+  model?: ModelConfig
+): string {
+  const sizes = listImageSizes(modelKey, quality, model)
+  if (size && sizes.some((item) => item.key === size)) return size
+  const wanted = (ratio || (size ? getSizeRatio(size) : '')).trim()
+  const match = wanted ? sizes.find((item) => getSizeRatio(item.key) === wanted) : undefined
+  return match?.key || sizes[0]?.key || size || '1024x1024'
 }
 
 export function formatParamStub(node: CustomNode): string {
@@ -221,12 +317,18 @@ export function applyImageRatio(
   return { size: matching.key, ratio }
 }
 
-export function applyVideoResolution(modelKey: string, resolution: string, currentSize?: string): Partial<NodeData> {
-  const { ratio } = parseVideoSize(currentSize)
-  const next = isT2VModel(modelKey)
-    ? { size: videoSizeFor(resolution, ratio), resolution, ratio }
-    : { resolution }
-  return next
+export function applyVideoResolution(
+  modelKey: string,
+  resolution: string,
+  currentSize?: string,
+  currentRatio?: string
+): Partial<NodeData> {
+  const parsed = parseVideoSize(currentSize)
+  const ratio = currentRatio || parsed.ratio
+  const writesSize =
+    isT2VModel(modelKey) || modelKey.includes('r2v') || modelKey.toLowerCase().includes('happyhorse')
+  if (!writesSize) return { resolution }
+  return { size: videoSizeFor(resolution, ratio), resolution, ratio }
 }
 
 export function applyVideoRatio(resolution: string, ratio: string): Partial<NodeData> {

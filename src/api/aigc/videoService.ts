@@ -83,6 +83,7 @@ async function postJob(options: VideoGenerateOptions, idempotencyKey: string) {
       imageNames: options.imageNames,
       size: options.size,
       resolution: options.resolution,
+      ...(options.ratio ? { ratio: options.ratio } : {}),
       duration: options.duration,
       template: options.template,
       nodeId: options.nodeId,
