@@ -63,8 +63,12 @@ import { cn } from '@/lib/utils'
  * Reserved dock width. Triggers are fixed-width pills and the frame is this
  * wide, so model / ratio / quality / count (and the video equivalents) cannot
  * grow or shrink the panel.
+ *
+ * Video is the wide row: 角色库 + model + ratio + resolution + duration + count.
+ * 688px hid the count pill under the row's horizontal overflow (only the copy
+ * icon stayed in view). 760px keeps 「1张 / 2张 / 4张」 fully visible.
  */
-const BAR_WIDTH = 688
+const BAR_WIDTH = 760
 const BAR_ESTIMATED_HEIGHT = 168
 const DOCK_MENU =
   'z-[80] min-w-[10.5rem] overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl'
@@ -92,8 +96,10 @@ const DockSelectTrigger = React.forwardRef<
     loading?: boolean
     disabled?: boolean
     wide?: boolean
+    /** Short fixed label (1张 / 2张 / 4张) that must stay fully readable. */
+    fitLabel?: boolean
   } & React.ComponentPropsWithoutRef<'button'>
->(({ icon, label, loading, disabled, wide, className, ...props }, ref) => (
+>(({ icon, label, loading, disabled, wide, fitLabel, className, ...props }, ref) => (
   <Button
     ref={ref}
     type="button"
@@ -103,12 +109,19 @@ const DockSelectTrigger = React.forwardRef<
     {...props}
     className={cn(
       'h-8 shrink-0 justify-start gap-1 overflow-hidden rounded-full px-2 py-0 text-[11px] font-medium text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-low))] [&_svg]:size-3',
-      wide ? 'w-[10.5rem]' : 'w-[5rem]',
+      fitLabel ? 'w-[4.75rem]' : wide ? 'w-[10.5rem]' : 'w-[5rem]',
       className
     )}
   >
     {icon ? <span className="shrink-0 text-[hsl(var(--secondary))]">{icon}</span> : null}
-    <span className="min-w-0 flex-1 truncate text-left whitespace-nowrap">{loading ? '加载模型…' : label}</span>
+    <span
+      className={cn(
+        'whitespace-nowrap text-left',
+        fitLabel ? 'shrink-0' : 'min-w-0 flex-1 truncate'
+      )}
+    >
+      {loading ? '加载模型…' : label}
+    </span>
     {loading ? (
       <Loader2 className="h-3 w-3 shrink-0 animate-spin text-[hsl(var(--secondary))]" />
     ) : (
@@ -360,7 +373,7 @@ function GenerateBarModelPicker({
           ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <DockSelectTrigger className="w-[4.25rem]" icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
+              <DockSelectTrigger fitLabel icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
               {quantityOptions.map((qty) => (
@@ -426,7 +439,7 @@ function GenerateBarModelPicker({
           {quantityOptions.length > 1 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <DockSelectTrigger className="w-[4.25rem]" icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
+                <DockSelectTrigger fitLabel icon={<Copy className="h-3 w-3" />} label={`${quantity}张`} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
                 {quantityOptions.map((qty) => (

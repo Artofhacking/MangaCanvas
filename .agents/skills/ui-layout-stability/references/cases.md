@@ -295,3 +295,27 @@ Move the permanent viewport scrollbar to `html { overflow-y: scroll }`. While `b
 - `src/index.css`
 - `src/lib/scrollLockAnchor.ts`
 - `src/main.tsx`
+
+## Case 012: Video generate dock count label clips down to an icon
+
+### Symptom
+
+On a canvas 视频节点, the generate dock count control showed only the copy icon. 「1张 / 2张 / 4张」 was missing. The same control on a 画面节点 still showed the count. Opening the menu still listed 1 / 2 / 4, and choosing one still wrote `n`.
+
+### Root cause
+
+The count pill is a fixed width and the label fits inside that pill. The video row is wider than the scrollport inside the reserved dock: 角色库 + model + ratio + resolution + duration + count overflowed the 688px frame by about 50px. That row scrolls with a hidden scrollbar, so the overflow is clipped rather than wrapped. The count pill sits at the end, and the clipped 50px is exactly the 「N张」 label and chevron. Only the leading icon stays in the visible port.
+
+### Fix
+
+Keep one shared reserved width so the frame still does not jump between image and video, but size it for the wide video row (`BAR_WIDTH` 760). Give the count trigger a fixed `4.75rem` pill and a non-shrinking label, so 「1张 / 2张 / 4张」 stay fully readable on both docks. Other triggers stay fixed-width. Count options and `n` are unchanged.
+
+### Why this fix fit the project
+
+- Case 009 already locks the dock to one reserved width with fixed pills. The reserved width has to cover the widest row; 688 was short once video count joined ratio, resolution, and duration.
+- The label is two characters. Letting that pill truncate, or hiding it in a scrollbar-less overflow, makes the control look icon-only.
+- The menu stays on the portaled `DropdownMenu`, so opening it still does not change the frame width.
+
+### Implementation reference
+
+- `src/features/infinite-canvas/components/NodeGenerateBar.tsx`
