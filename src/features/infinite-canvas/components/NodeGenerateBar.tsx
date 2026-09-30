@@ -21,6 +21,7 @@ import { useImageModels, useVideoModels } from '../hooks/useModels'
 import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
 import { useNodeGenerateAction } from '../hooks/useNodeGenerateAction'
 import {
+  collectGenerateInputs,
   getIncomingReferenceSlots,
   isGenerateNodeType,
   type ReferenceSlot,
@@ -40,6 +41,7 @@ import {
   VIDEO_QUANTITY_OPTIONS,
   listVideoResolutions,
   parseVideoSize,
+  videoAspectSuppressedByReferences,
 } from '../utils/generateParams'
 import { aspectRatioIconSize } from '../utils/aspectRatio'
 import { resolveGenerateBarModelNotice } from '../utils/generateBarModelNotice'
@@ -70,6 +72,8 @@ import { cn } from '@/lib/utils'
  */
 const BAR_WIDTH = 760
 const BAR_ESTIMATED_HEIGHT = 168
+/** Shown when attached reference images would route HappyHorse to i2v/r2v. */
+const VIDEO_REFERENCE_ASPECT_HINT = '有参考图时不保证所选比例，成片跟随参考构图'
 const DOCK_MENU =
   'z-[80] min-w-[10.5rem] overflow-y-auto rounded-xl border-[hsl(var(--outline-variant))]/30 bg-[hsl(var(--surface-container-lowest))] p-1.5 shadow-xl'
 
@@ -143,9 +147,12 @@ function menuItemClass(active: boolean) {
 function GenerateBarModelPicker({
   node,
   onChange,
+  suppressVideoAspect = false,
 }: {
   node: CustomNode
   onChange: (data: Partial<CustomNode['data']>) => void
+  /** Reference images on this request route off the t2v aspect catalog. */
+  suppressVideoAspect?: boolean
 }) {
   const isVideo = node.type === 'videoConfig'
   const {
@@ -215,7 +222,8 @@ function GenerateBarModelPicker({
   const videoRatio = (typeof node.data.ratio === 'string' && node.data.ratio) || videoParsed.ratio
   const availableResolutions = listVideoResolutions(currentKey, currentModel)
   const videoRatios = listVideoAspectRatios(currentKey, currentModel)
-  const showVideoAspect = Boolean(currentModel?.supportsAspect) && videoRatios.length > 0
+  const showVideoAspect =
+    !suppressVideoAspect && Boolean(currentModel?.supportsAspect) && videoRatios.length > 0
   const qualities = currentModel?.qualities || []
   const showQuality = !isVideo && qualities.length > 1
   const currentQuality = typeof node.data.quality === 'string' ? node.data.quality : qualities[0]?.key
@@ -568,6 +576,12 @@ const NodeGenerateBar: React.FC = () => {
     () => (selectedId ? getIncomingReferenceSlots(selectedId, nodes, edges) : []),
     [edges, nodes, selectedId]
   )
+  const suppressVideoAspect = useMemo(() => {
+    if (!selectedId || node?.type !== 'videoConfig') return false
+    const inputs = collectGenerateInputs(selectedId, nodes, edges)
+    const modelKey = typeof node.data.model === 'string' ? node.data.model : ''
+    return videoAspectSuppressedByReferences(modelKey, inputs)
+  }, [edges, node?.data.model, node?.type, nodes, selectedId])
 
   useEffect(() => {
     setDraftPrompt(typeof node?.data.prompt === 'string' ? node.data.prompt : '')
@@ -744,6 +758,12 @@ const NodeGenerateBar: React.FC = () => {
             }
           />
 
+          {suppressVideoAspect ? (
+            <p className="mt-2 text-[11px] leading-4 text-[hsl(var(--secondary))]">
+              {VIDEO_REFERENCE_ASPECT_HINT}
+            </p>
+          ) : null}
+
           <div className="mt-2 flex min-w-0 items-center gap-1.5">
             <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <div className="flex shrink-0 items-center gap-1.5">
@@ -757,7 +777,11 @@ const NodeGenerateBar: React.FC = () => {
                 </button>
               </div>
               <DockDivider />
-              <GenerateBarModelPicker node={node} onChange={handleModelChange} />
+              <GenerateBarModelPicker
+                node={node}
+                onChange={handleModelChange}
+                suppressVideoAspect={suppressVideoAspect}
+              />
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <span
