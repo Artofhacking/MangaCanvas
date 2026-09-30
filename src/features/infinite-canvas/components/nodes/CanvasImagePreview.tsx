@@ -3,6 +3,7 @@ import { Image as ImageIcon } from 'lucide-react'
 import { mediaUrl } from '@/lib/mediaUrl'
 import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction'
 import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
+import { canvasImagePreviewMediaClass } from './canvasImagePreview'
 
 interface CanvasImagePreviewProps {
   nodeId: string
@@ -33,7 +34,7 @@ export function CanvasImagePreview({
           loading="lazy"
           decoding="async"
           fetchPriority="low"
-          className="h-full w-full object-cover"
+          className={canvasImagePreviewMediaClass}
           onDragStart={(event) => event.preventDefault()}
         />
       ) : (
