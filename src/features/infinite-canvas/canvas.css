@@ -140,6 +140,21 @@ code {
   overflow: visible;
 }
 
+.audio-wave-bar {
+  transform-origin: center bottom;
+  animation: audio-wave-bar 0.9s ease-in-out infinite;
+}
+
+@keyframes audio-wave-bar {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 /* Dark well while generating so the centered progress chip stays readable */
 .media-preview-card__stage--generating {
   --media-stage: 0 0% 16%;

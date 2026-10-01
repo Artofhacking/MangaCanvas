@@ -51,6 +51,9 @@ const ImageStackPreviewPage = import.meta.env.DEV
 const VideoStackPreviewPage = import.meta.env.DEV
   ? lazy(() => import("./pages/dev/VideoStackPreviewPage"))
   : null
+const AudioNodePreview = import.meta.env.DEV
+  ? lazy(() => import("./pages/dev/AudioNodePreview"))
+  : null
 import {
   IDENTITY_CHANGE_EVENT,
   canAccessProjectRoutes,
@@ -472,6 +475,9 @@ function App() {
           ) : null}
           {import.meta.env.DEV && VideoStackPreviewPage ? (
             <Route path="/dev/video-stack" element={<VideoStackPreviewPage />} />
+          ) : null}
+          {import.meta.env.DEV && AudioNodePreview ? (
+            <Route path="/dev/audio-node" element={<AudioNodePreview />} />
           ) : null}
 
           <Route path="/projects" element={<RequireAuth><AppHomeRedirect /></RequireAuth>} />

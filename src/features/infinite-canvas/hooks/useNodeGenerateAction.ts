@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { message } from 'antd'
-import { isI2IModel, UNSUPPORTED_REFERENCE_IMAGE_MESSAGE } from '@/api/aigc'
+import { audioService, isI2IModel, UNSUPPORTED_REFERENCE_IMAGE_MESSAGE } from '@/api/aigc'
 import { isCanceledError } from '@/api/core'
 import { remapModelId, resolveImageCapabilities, resolveVideoCapabilities } from '../config/modelCapabilities'
 import { useModelsStore } from '@/store/modelsStore'
@@ -26,6 +26,14 @@ import {
   videoRequestParams,
 } from '../utils/generateParams'
 import { usablePosterUrl } from '../utils/videoPoster'
+import {
+  audioGenerateBlockedMessage,
+  audioModeLabel,
+  buildCanvasAudioRequest,
+  readAudioMode,
+  audioModelsForMode,
+  type CanvasAudioRequestBody,
+} from '../utils/audioMode'
 
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_VIDEO_MODEL = 'happyhorse-1.1-t2v'
@@ -87,14 +95,37 @@ export function useNodeGenerateAction(nodeId: string | null) {
     })
 
     const isImage = node.type === 'imageConfig'
+    const isAudio = node.type === 'audio'
+    if (isAudio) {
+      const mode = readAudioMode(node.data.audioMode)
+      const audioState = useModelsStore.getState().audio
+      if (!audioState || audioState.status === 'idle' || audioState.status === 'loading') {
+        message.info('正在加载音频模型…')
+        return
+      }
+      if (audioState.status === 'error') {
+        message.error(audioState.error || '音频模型列表加载失败')
+        return
+      }
+      const catalog = audioState.models.filter((item) => item.isEnabled !== false)
+      const available = audioModelsForMode(catalog, mode)
+      if (!available.length) {
+        message.info(audioGenerateBlockedMessage(mode, catalog.length))
+        return
+      }
+    }
     const liveIds = useModelsStore
       .getState()
-      .getModelsByModality(isImage ? 'image' : 'video')
+      .getModelsByModality(isAudio ? 'audio' : isImage ? 'image' : 'video')
       .map((item) => item.id)
     const storedModel = typeof node.data.model === 'string' ? node.data.model : ''
-    const selectedModel = isImage
-      ? remapModelId(storedModel || DEFAULT_IMAGE_MODEL, liveIds, 'image')
-      : remapModelId(storedModel || DEFAULT_VIDEO_MODEL, liveIds, 'video')
+    const audioCatalog = isAudio ? audioModelsForMode(useModelsStore.getState().getModelsByModality('audio'), readAudioMode(node.data.audioMode)) : []
+    const audioIds = audioCatalog.map((item) => item.id)
+    const selectedModel = isAudio
+      ? (audioIds.length ? remapModelId(storedModel || audioIds[0], audioIds, 'audio') : '')
+      : isImage
+        ? remapModelId(storedModel || DEFAULT_IMAGE_MODEL, liveIds, 'image')
+        : remapModelId(storedModel || DEFAULT_VIDEO_MODEL, liveIds, 'video')
     const model = isImage
       ? resolveImageRequestModel(selectedModel, inputs.refImages.length, liveIds)
       : selectedModel
@@ -103,10 +134,27 @@ export function useNodeGenerateAction(nodeId: string | null) {
       message.error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE)
       return
     }
+    const audioMode = isAudio ? readAudioMode(node.data.audioMode) : null
+    const audioRequest = audioMode
+      ? buildCanvasAudioRequest({
+          mode: audioMode,
+          model,
+          prompt: inputs.prompt,
+          lyrics: inputs.textSnippets.join('\n\n'),
+          voiceId: typeof node.data.voiceId === 'string' ? node.data.voiceId : undefined,
+        })
+      : null
+    if (audioRequest && !audioRequest.ok) {
+      message.info(audioRequest.message)
+      return
+    }
+    const audioBody: CanvasAudioRequestBody | null = audioRequest && audioRequest.ok ? audioRequest.body : null
     const liveName = useModelsStore.getState().getModelById(model)?.name
-    const modelLabel = isImage
-      ? (liveName || resolveImageCapabilities(model).label || model)
-      : (liveName || resolveVideoCapabilities(model).label || model)
+    const modelLabel = isAudio
+      ? (liveName || audioModeLabel(readAudioMode(node.data.audioMode)))
+      : isImage
+        ? (liveName || resolveImageCapabilities(model).label || model)
+        : (liveName || resolveVideoCapabilities(model).label || model)
 
     const signal = startGenerationJob(nodeId)
     const workflowId = useCanvasStore.getState().currentProjectId
@@ -121,13 +169,42 @@ export function useNodeGenerateAction(nodeId: string | null) {
       loading: true,
       error: '',
       progress: undefined,
-      statusLabel: isImage ? undefined : '排队中',
-      ...(isImage ? {} : { videoJobIds: [] }),
+      statusLabel: isImage ? undefined : isAudio ? '生成中' : '排队中',
+      ...(node.type === 'videoConfig' ? { videoJobIds: [] } : {}),
       model,
       modelLabel,
     })
 
     try {
+      if (isAudio && audioBody) {
+        const generatedUrl = await audioService.generate({
+          ...audioBody,
+          signal,
+        })
+        if (signal.aborted) return
+        const stored = await persistGeneratedMediaUrls([generatedUrl], signal)
+        if (signal.aborted || !finishGenerationJob(nodeId, signal)) return
+        const url = stored[0]
+        if (!url) {
+          updateNode(nodeId, { loading: false, error: '生成成功但未返回音频', progress: undefined, statusLabel: undefined })
+          message.error('生成成功但未返回音频')
+          return
+        }
+        updateNode(nodeId, {
+          url,
+          loading: false,
+          error: '',
+          progress: undefined,
+          statusLabel: undefined,
+          model,
+          modelLabel,
+          audioMode: audioMode || readAudioMode(node.data.audioMode),
+          ...(audioBody.voiceId ? { voiceId: audioBody.voiceId } : {}),
+        })
+        message.success('音频已生成')
+        return
+      }
+
       if (isImage) {
         const requested = typeof node.data.n === 'number' && node.data.n > 0 ? node.data.n : 1
         const imageQuality = typeof node.data.quality === 'string' ? node.data.quality : undefined
@@ -266,7 +343,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
     } catch (err: unknown) {
       if (signal.aborted) return
       // Refresh aborts the fetch without aborting our signal. Keep the job id so the next open can resume.
-      const keepVideoJob = !isImage && (
+      const keepVideoJob = node.type === 'videoConfig' && (
         isCanceledError(err) ||
         (err instanceof Error && err.message.includes('视频生成超时'))
       )

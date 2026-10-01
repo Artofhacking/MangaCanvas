@@ -24,6 +24,9 @@ export const REFERENCE_PICK_VIDEO_MESSAGE = '视频暂不支持作为参考'
 export const REFERENCE_PICK_EMPTY_MESSAGE = '该节点还没有画面'
 export const REFERENCE_PICK_SELF_MESSAGE = '不能引用当前节点'
 export const REFERENCE_PICK_TYPE_MESSAGE = '该类型暂不支持作为参考'
+export const REFERENCE_PICK_AUDIO_TYPE_MESSAGE = '音频节点可引用文本或音频'
+export const REFERENCE_PICK_AUDIO_EMPTY_MESSAGE = '该节点还没有音频'
+export const REFERENCE_PICK_TEXT_EMPTY_MESSAGE = '该文本还没有内容'
 export const REFERENCE_PICK_VIDEO_LIMIT_MESSAGE = `视频参考最多 ${VIDEO_REFERENCE_LIMIT} 张`
 
 export type ReferencePickVisual = 'pickable' | 'connected' | 'blocked'
@@ -56,6 +59,38 @@ function isVideoSource(node: CustomNode): boolean {
 
 function incomingEdge(sourceId: string, targetId: string, edges: CustomEdge[]): CustomEdge | undefined {
   return edges.find((edge) => edge.source === sourceId && edge.target === targetId)
+}
+
+function assessAudioTargetPick(source: CustomNode): ReferencePickAssessment {
+  if (source.type === 'text') {
+    const content = typeof source.data.content === 'string' ? source.data.content.trim() : ''
+    if (!content) {
+      return {
+        visual: 'blocked',
+        block: 'no-media',
+        message: REFERENCE_PICK_TEXT_EMPTY_MESSAGE,
+        chip: REFERENCE_PICK_TEXT_EMPTY_MESSAGE,
+      }
+    }
+    return { visual: 'pickable', chip: '点击添加参考' }
+  }
+  if (source.type === 'audio' || source.type === 'sound') {
+    if (!readNodeMediaUrl(source)) {
+      return {
+        visual: 'blocked',
+        block: 'no-media',
+        message: REFERENCE_PICK_AUDIO_EMPTY_MESSAGE,
+        chip: REFERENCE_PICK_AUDIO_EMPTY_MESSAGE,
+      }
+    }
+    return { visual: 'pickable', chip: '点击添加参考' }
+  }
+  return {
+    visual: 'blocked',
+    block: 'type',
+    message: REFERENCE_PICK_AUDIO_TYPE_MESSAGE,
+    chip: REFERENCE_PICK_AUDIO_TYPE_MESSAGE,
+  }
 }
 
 /**
@@ -110,6 +145,10 @@ export function assessReferencePick(input: {
       visual: 'connected',
       chip: '已参考 · 点击断开',
     }
+  }
+
+  if (target.type === 'audio') {
+    return assessAudioTargetPick(source)
   }
 
   if (isVideoSource(source)) {
