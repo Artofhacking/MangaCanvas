@@ -10,6 +10,7 @@ import pytest
 from app.ai_media import (
     IMAGE_GENERATION_TIMEOUT_MESSAGE,
     OPENAI_IMAGE_DEADLINE_SECONDS,
+    baidu_video_generate,
     build_happyhorse_video_body,
     happyhorse_dashscope_body,
     happyhorse_variant,
@@ -20,6 +21,7 @@ from app.ai_media import (
     openai_video_generate,
     resolve_vidu_r2v_model,
     resolve_video_model,
+    seedance_task_ratio,
     vidu_subject_name,
     vidu_video_generate,
     video_image_data_uri,
@@ -33,6 +35,13 @@ def test_r2v_never_uses_q3_pro():
     assert resolve_vidu_r2v_model("happyhorse-1.1-r2v") == "viduq2"
     assert resolve_vidu_r2v_model("viduq2") == "viduq2"
     assert resolve_vidu_r2v_model("viduq3") == "viduq3"
+
+
+def test_seedance_first_frame_ratio_follows_the_image():
+    assert seedance_task_ratio("1280*720", has_frame=False) == "16:9"
+    assert seedance_task_ratio("720*1280", has_frame=False) == "9:16"
+    assert seedance_task_ratio("1280*720", has_frame=True) == "adaptive"
+    assert "seedance_task_ratio" in inspect.getsource(baidu_video_generate)
 
 
 def test_subject_name_keeps_chinese():

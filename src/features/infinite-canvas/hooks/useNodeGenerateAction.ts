@@ -14,6 +14,7 @@ import { useImageGeneration } from './useImageGeneration'
 import { useVideoGeneration } from './useVideoGeneration'
 import { isInlineCanvasMedia } from '@/lib/canvasPayload'
 import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia'
+import { formatAiError } from '@/lib/formatAiError'
 import { createRandomUuid } from '@/lib/randomUuid'
 import { buildGeneratedImageNodePatch } from '../utils/imageStack'
 import { collectVideoBatch } from '../utils/videoBatch'
@@ -58,7 +59,7 @@ async function persistGeneratedMediaUrls(urls: readonly string[], signal: AbortS
 
 function toErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message && err.message !== 'API_RATE_LIMIT') {
-    return err.message
+    return formatAiError(err.message, fallback)
   }
   return fallback
 }

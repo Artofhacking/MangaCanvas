@@ -42,6 +42,14 @@ describe('imageGenerationErrorMessage', () => {
     expect(imageGenerationErrorMessage(new Error('The read operation timed out'))).toBe(IMAGE_GENERATION_TIMEOUT_MESSAGE)
   })
 
+  it('turns an upstream JSON body into a short Chinese hint', () => {
+    const text = imageGenerationErrorMessage(
+      new Error('生成任务提交失败: {"code":"InvalidParameter","message":"The size is not supported","type":"BadRequest"}')
+    )
+    expect(text).toBe('生成任务提交失败。分辨率或尺寸不被该模型支持，请调整后重试。')
+    expect(text).not.toContain('{')
+  })
+
   it('leaves model rejection and cancel messages alone', () => {
     expect(imageGenerationErrorMessage(new Error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE))).toBe(
       UNSUPPORTED_REFERENCE_IMAGE_MESSAGE

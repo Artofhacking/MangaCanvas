@@ -3,6 +3,7 @@ import { isCanceledError } from '@/api/core/error'
 import { requestData } from '@/api/core/response'
 import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
 import { resolveProjectId } from '@/lib/session'
+import { formatAiError } from '@/lib/formatAiError'
 import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 
 export const isMiniMaxTtsModel = (model: string) => /^speech-/i.test(model)
@@ -45,7 +46,7 @@ function audioHistoryPrompt(options: AudioGenerateOptions) {
 
 function audioErrorMessage(error: unknown) {
   if (isCanceledError(error) || (error instanceof Error && error.name === 'AbortError')) return '已取消'
-  if (error instanceof Error && error.message) return error.message
+  if (error instanceof Error && error.message) return formatAiError(error.message, '生成失败')
   return '生成失败'
 }
 

@@ -1,3 +1,4 @@
+import { formatAiError } from '@/lib/formatAiError'
 import type { NodeData } from '../types'
 import { buildGeneratedVideoNodePatch } from './videoStack'
 
@@ -93,14 +94,14 @@ export function videoResumeOutcome(input: {
     if (job.status === 'succeeded') {
       const url = typeof job.url === 'string' ? job.url.trim() : ''
       if (url) urls.push(url)
-      else failures.push(job.message?.trim() || '生成成功但未找到视频 URL')
+      else failures.push(formatAiError(job.message?.trim() || '', '生成成功但未找到视频 URL'))
       continue
     }
     if (job.status === 'cancelled') {
       cancelled += 1
       continue
     }
-    failures.push(job.message?.trim() || '视频生成失败')
+    failures.push(formatAiError(job.message?.trim() || '', '视频生成失败'))
   }
 
   if (active > 0) {

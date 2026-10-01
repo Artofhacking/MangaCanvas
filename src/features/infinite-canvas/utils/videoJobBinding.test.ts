@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { FIRST_FRAME_RATIO_HINT } from '@/lib/formatAiError'
 import {
   appendVideoJobId,
   graphWithoutGenerationTransients,
@@ -91,5 +92,18 @@ describe('video job binding', () => {
       error: '上游拒绝',
       videoJobIds: undefined,
     })
+  })
+
+  it('shows a Chinese hint instead of the upstream JSON body', () => {
+    const outcome = videoResumeOutcome({
+      nodeId: 'clip',
+      jobs: [{
+        jobId: 'a',
+        status: 'failed',
+        message: '视频任务提交失败: {"error":{"code":"InvalidParameter.TaskTypeConstraint","message":"The parameter ratio specified in the request is not valid. For first-frame or first-last-frame generation, the output ratio follows the first-frame image.","type":"BadRequest"}}',
+      }],
+    })
+    expect(outcome.patch.error).toContain(FIRST_FRAME_RATIO_HINT)
+    expect(String(outcome.patch.error)).not.toContain('{')
   })
 })

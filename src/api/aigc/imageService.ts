@@ -3,6 +3,7 @@ import { HttpError, isCanceledError } from '@/api/core/error'
 import { requestData } from '@/api/core/response'
 import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
 import { resolveProjectId } from '@/lib/session'
+import { formatAiError } from '@/lib/formatAiError'
 import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import type { ImageGenerateOptions } from './types'
 
@@ -39,7 +40,7 @@ export function imageGenerationErrorMessage(error: unknown, fallback = '生成�
   ) {
     return IMAGE_GENERATION_TIMEOUT_MESSAGE
   }
-  return message || fallback
+  return formatAiError(message || fallback, fallback)
 }
 
 function axiosStatus(error: unknown): number | undefined {

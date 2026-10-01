@@ -6,6 +6,7 @@ import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
 import { finishGenerationJob, startGenerationJob } from '@/features/infinite-canvas/utils/generationJobs'
 import { rememberNodeVideoJob } from '@/features/infinite-canvas/utils/resumeVideoJobs'
 import { isUserCancelAbort } from '@/lib/generationAbort'
+import { formatAiError } from '@/lib/formatAiError'
 import { persistOpenCanvas } from '@/lib/persistCanvas'
 import { nextMediaPixelFields } from '@/features/infinite-canvas/utils/mediaFrame'
 import { usablePosterUrl } from '@/features/infinite-canvas/utils/videoPoster'
@@ -202,7 +203,7 @@ export async function generateActVideo(actId: string) {
     useCanvasStore.getState().updateNode(videoId, {
       loading: false,
       statusLabel: undefined,
-      error: error instanceof Error ? error.message : '生成失败',
+      error: formatAiError(error, '生成失败'),
       ...(timedOut ? {} : { videoJobIds: undefined }),
     })
     persistOpenCanvas()
