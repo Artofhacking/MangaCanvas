@@ -12,6 +12,7 @@ from app.ai_media import (
     OPENAI_IMAGE_DEADLINE_SECONDS,
     build_happyhorse_video_body,
     happyhorse_dashscope_body,
+    happyhorse_variant,
     build_nexcor_seedance_video_body,
     mention_image_roles,
     openai_image_generate,
@@ -171,6 +172,15 @@ def test_happyhorse_ratio_follows_reference_count():
     assert i2v_dash["model"] == "happyhorse-1.1-i2v"
     assert "ratio" not in i2v_dash["parameters"]
     assert i2v_dash["input"]["media"][0]["type"] == "first_frame"
+
+
+def test_happyhorse_variant_follows_reference_count():
+    assert happyhorse_variant(0) == "happyhorse-1.1-t2v"
+    assert happyhorse_variant(1) == "happyhorse-1.1-i2v"
+    assert happyhorse_variant(2) == "happyhorse-1.1-r2v"
+    assert happyhorse_variant(3) == "happyhorse-1.1-r2v"
+    assert resolve_video_model("happyhorse-1.1-r2v", True) == "happyhorse-1.1-r2v"
+    assert resolve_video_model("happy-horse-1.1-r2v", False) == "happyhorse-1.1-r2v"
 
 
 def test_multi_ref_no_longer_hijacks_disabled_vidu():

@@ -51,6 +51,24 @@ def test_happyhorse_r2v_720p(db):
     assert quoted.model_id == "happyhorse-1.1-r2v"
     assert quoted.resolution == "720p"
     assert quoted.credits == 600
+    one = quote_request(
+        db,
+        model="happyhorse-1.1-t2v",
+        modality="video",
+        duration=5,
+        resolution="720P",
+        image_count=1,
+    )
+    assert one.model_id == "happyhorse-1.1-i2v"
+    none = quote_request(
+        db,
+        model="happyhorse-1.1-r2v",
+        modality="video",
+        duration=5,
+        resolution="720P",
+        image_count=0,
+    )
+    assert none.model_id == "happyhorse-1.1-t2v"
 
 
 def test_body_1080p_hits_seed_1080p(db):

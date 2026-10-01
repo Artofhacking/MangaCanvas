@@ -295,6 +295,18 @@ describe('video aspect with reference images', () => {
     })).toEqual({ ratio: '4:5', resolution: '720P', size: '576*720' })
   })
 
+  it('selects t2v, i2v, or r2v from the HappyHorse reference count', () => {
+    expect(routedVideoModelKey('happyhorse-1.1-r2v', 0)).toBe('happyhorse-1.1-t2v')
+    expect(routedVideoModelKey('happyhorse-1.1-t2v', 0)).toBe('happyhorse-1.1-t2v')
+    expect(routedVideoModelKey('happyhorse-1.1-t2v', 1)).toBe('happyhorse-1.1-i2v')
+    expect(routedVideoModelKey('happyhorse-1.1-i2v', 1)).toBe('happyhorse-1.1-i2v')
+    expect(routedVideoModelKey('happyhorse-1.1-t2v', 2)).toBe('happyhorse-1.1-r2v')
+    expect(routedVideoModelKey('happyhorse-1.1-i2v', 3)).toBe('happyhorse-1.1-r2v')
+    expect(routedVideoModelKey('doubao-seedance-2-0-260128', 2)).toBe('doubao-seedance-2-0-260128')
+    expect(routedVideoModelKey('MiniMax-H3', 3)).toBe('MiniMax-H3')
+    expect(routedVideoModelKey('viduq3-pro', 2)).toBe('viduq3-pro')
+  })
+
   it('keeps the t2v aspect control when nothing image-like would be sent', () => {
     const empty = collectGenerateInputs('v1', [videoNode()], [])
     expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', empty)).toBe(false)
