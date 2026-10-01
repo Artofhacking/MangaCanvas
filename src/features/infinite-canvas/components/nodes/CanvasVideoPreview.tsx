@@ -108,7 +108,6 @@ export function CanvasVideoPreview({
     >
       {showVideo ? (
         <video
-          key={url || 'canvas-video'}
           ref={videoRef}
           src={mediaUrl(url)}
           controls={canvasVideoUsesNativeControls}
@@ -174,8 +173,8 @@ export function CanvasVideoPreview({
       )}
       {showVideo ? (
         <CanvasVideoSeekBar
-          key={url || 'canvas-video'}
           videoRef={videoRef}
+          src={url || ''}
           insets={seekBarInsets}
           onScrubbingChange={(scrubbing) => {
             scrubbingRef.current = scrubbing

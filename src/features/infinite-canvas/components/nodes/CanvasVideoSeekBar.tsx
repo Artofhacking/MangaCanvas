@@ -10,6 +10,8 @@ import {
 
 interface CanvasVideoSeekBarProps {
   videoRef: RefObject<HTMLVideoElement>
+  /** Front clip address. Rebinds the clock when the stack switches clips. */
+  src: string
   insets: { left: number; right: number }
   /** Keeps the inline decoder mounted while a drag leaves the card. */
   onScrubbingChange?: (scrubbing: boolean) => void
@@ -24,7 +26,7 @@ function blockCanvasGesture(event: { stopPropagation: () => void; preventDefault
  * Slim playback scrub for the inline canvas player.
  * The element is only mounted while this node owns the single decoder.
  */
-export function CanvasVideoSeekBar({ videoRef, insets, onScrubbingChange }: CanvasVideoSeekBarProps) {
+export function CanvasVideoSeekBar({ videoRef, src, insets, onScrubbingChange }: CanvasVideoSeekBarProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const scrubbingRef = useRef(false)
   const onScrubbingChangeRef = useRef(onScrubbingChange)
@@ -59,7 +61,7 @@ export function CanvasVideoSeekBar({ videoRef, insets, onScrubbingChange }: Canv
       video.removeEventListener('seeked', sync)
       video.removeEventListener('emptied', sync)
     }
-  }, [videoRef])
+  }, [src, videoRef])
 
   const commitSeek = (time: number | null) => {
     const video = videoRef.current
