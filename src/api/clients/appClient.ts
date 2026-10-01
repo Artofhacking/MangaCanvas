@@ -32,6 +32,7 @@ export const appClient = createHttpClient({
     if (
       /\/ai\/images\/generations/.test(url) ||
       /\/ai\/videos\/generations/.test(url) ||
+      /\/ai\/audios\/generations/.test(url) ||
       /\/ai\/chat\/completions/.test(url) ||
       /\/scripts\/parse/.test(url)
     ) {

@@ -1,6 +1,7 @@
 import asyncio
 
 from app.model_probe import (
+    AUDIO_CATALOG,
     GPT_IMAGE_2_SIZES,
     IMAGE_CATALOG,
     VIDEO_CATALOG,
@@ -70,13 +71,15 @@ def test_happyhorse_video_durations_include_15_seconds():
 
 
 def test_catalog_ids_are_the_shared_id_space():
-    ids = [item["id"] for item in [*IMAGE_CATALOG, *VIDEO_CATALOG, *TEXT_CATALOG]]
+    ids = [item["id"] for item in [*IMAGE_CATALOG, *VIDEO_CATALOG, *TEXT_CATALOG, *AUDIO_CATALOG]]
     assert len(ids) == len(set(ids))
     assert "gpt-image-2.5-flare" in ids
     assert "happyhorse-1.1-i2v" in ids
     assert "happyhorse-1.1-r2v" in ids
     assert "doubao-seedance-2-0-260128" in ids
     assert "doubao-seedance-2-5-260628" in ids
+    assert "speech-2.8-hd" in ids
+    assert "music-3.0" in ids
 
 
 def test_available_models_keeps_parameters_and_skips_dead_ids(monkeypatch):
@@ -225,3 +228,81 @@ def test_video_live_ids_exclude_seedance_when_baidu_off_even_with_nexcor(monkeyp
     live = asyncio.run(_live_ids("video"))
     assert "happyhorse-1.1-t2v" in live
     assert not any("seedance" in model_id for model_id in live)
+
+
+def test_audio_catalog_is_tts_and_music_only():
+    ids = [item["id"] for item in AUDIO_CATALOG]
+    assert ids == ["speech-2.8-hd", "speech-2.8-turbo", "music-3.0"]
+    assert [item["parameters"]["task"] for item in AUDIO_CATALOG] == ["tts", "tts", "music"]
+    assert all(item["owned_by"] == "minimax" and item["modality"] == "audio" for item in AUDIO_CATALOG)
+    hd = AUDIO_CATALOG[0]
+    assert hd["defaultParams"]["voice_id"] == "Chinese (Mandarin)_Lyrical_Voice"
+    assert hd["parameters"]["voices"]
+    assert not any("sfx" in item["id"] or item["parameters"]["task"] == "sfx" for item in AUDIO_CATALOG)
+    assert not any(item["id"] in ids for item in VIDEO_CATALOG)
+
+
+def test_available_models_lists_audio_when_minimax_live(monkeypatch):
+    _cache.clear()
+    monkeypatch.setattr("app.model_probe.settings.minimax_enabled", True)
+    monkeypatch.setattr("app.model_probe.settings.minimax_api_key", "minimax-test")
+
+    async def fake_live(kind: str) -> set[str]:
+        if kind == "audio":
+            return {item["id"] for item in AUDIO_CATALOG}
+        return set()
+
+    monkeypatch.setattr("app.model_probe._live_ids", fake_live)
+    rows = asyncio.run(available_models("audio"))
+    assert [row["id"] for row in rows] == ["speech-2.8-hd", "speech-2.8-turbo", "music-3.0"]
+    assert rows[0]["parameters"]["task"] == "tts"
+    assert rows[-1]["parameters"]["task"] == "music"
+    assert rows[0]["isEnabled"] is True
+
+
+def test_available_models_hides_audio_when_minimax_off_even_if_live(monkeypatch):
+    _cache.clear()
+    monkeypatch.setattr("app.model_probe.settings.minimax_enabled", False)
+    monkeypatch.setattr("app.model_probe.settings.minimax_api_key", "")
+
+    async def fake_live(kind: str) -> set[str]:
+        if kind == "audio":
+            return {item["id"] for item in AUDIO_CATALOG}
+        return set()
+
+    monkeypatch.setattr("app.model_probe._live_ids", fake_live)
+    assert asyncio.run(available_models("audio")) == []
+
+
+def test_audio_live_ids_use_key_check_and_skip_post(monkeypatch):
+    monkeypatch.setattr("app.model_probe.settings.minimax_enabled", True)
+    monkeypatch.setattr("app.model_probe.settings.minimax_api_key", "minimax-test")
+
+    async def fake_key() -> bool:
+        return True
+
+    async def fake_post(*_args, **_kwargs):
+        raise AssertionError("audio catalog must not POST-probe")
+
+    monkeypatch.setattr("app.model_probe._minimax_key_live", fake_key)
+    monkeypatch.setattr("app.model_probe._post", fake_post)
+    live = asyncio.run(_live_ids("audio"))
+    assert live == {item["id"] for item in AUDIO_CATALOG}
+
+
+def test_audio_live_ids_empty_when_key_dead_or_disabled(monkeypatch):
+    monkeypatch.setattr("app.model_probe.settings.minimax_enabled", True)
+    monkeypatch.setattr("app.model_probe.settings.minimax_api_key", "minimax-test")
+
+    async def dead_key() -> bool:
+        return False
+
+    monkeypatch.setattr("app.model_probe._minimax_key_live", dead_key)
+    assert asyncio.run(_live_ids("audio")) == set()
+
+    async def should_not_probe() -> bool:
+        raise AssertionError("disabled MiniMax must not probe")
+
+    monkeypatch.setattr("app.model_probe.settings.minimax_enabled", False)
+    monkeypatch.setattr("app.model_probe._minimax_key_live", should_not_probe)
+    assert asyncio.run(_live_ids("audio")) == set()

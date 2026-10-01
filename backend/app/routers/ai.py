@@ -13,11 +13,17 @@ from ..ai_media import (
     dashscope_chat,
     extract_media_url,
     resolve_chat_endpoint,
+    build_minimax_music_body,
+    build_minimax_tts_body,
+    infer_audio_model,
     is_minimax_model,
+    is_minimax_music_model,
+    is_minimax_tts_model,
     is_seedance_model,
     is_vidu_model,
     happyhorse_dashscope_body,
     minimax_video_generate,
+    submit_minimax_audio,
     IMAGE_GENERATION_TIMEOUT_MESSAGE,
     openai_image_generate,
     openai_quality,
@@ -562,10 +568,137 @@ async def chat(request: Request, user: models.User = Depends(current_user_detach
             billing_service.release(reservation.id, reservation.attempt, reason="finally")
 
 
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _request_flag(body: dict, *keys: str) -> bool:
+    for key in keys:
+        if key in body:
+            return _as_bool(body.get(key))
+    return False
+
+
+@router.post("/audios/generations")
+async def audios(request: Request, user: models.User = Depends(current_user_detached)):
+    """Standalone TTS / music. Response matches image generations plus a top-level url.
+
+    Body: model, prompt, text, lyrics, voiceId, speed, vol, pitch, emotion,
+    instrumental, lyricsOptimizer, projectId, n=1.
+    SFX has no MiniMax model; unknown ids return 1001.
+    """
+    body = await request.json()
+    lyrics = str(body.get("lyrics") or "")
+    instrumental = _request_flag(body, "instrumental", "isInstrumental", "is_instrumental")
+    lyrics_optimizer = _request_flag(body, "lyricsOptimizer", "lyrics_optimizer")
+    model = infer_audio_model(body.get("model"), lyrics=lyrics, instrumental=instrumental)
+    try:
+        count = int(body.get("n") or 1)
+    except (TypeError, ValueError):
+        fail(1001, "音频暂不支持 n>1", 400)
+    if count != 1:
+        fail(1001, "音频暂不支持 n>1", 400)
+    if is_minimax_tts_model(model):
+        task = "tts"
+        upstream = build_minimax_tts_body(
+            model=model,
+            text=str(body.get("text") or body.get("prompt") or ""),
+            voice_id=body.get("voiceId") or body.get("voice_id"),
+            speed=body.get("speed"),
+            vol=body.get("vol"),
+            pitch=body.get("pitch"),
+            emotion=body.get("emotion"),
+        )
+    elif is_minimax_music_model(model):
+        task = "music"
+        prompt = str(body.get("prompt") or "")
+        if not prompt.strip():
+            prompt = str(body.get("text") or "")
+        upstream = build_minimax_music_body(
+            model=model,
+            prompt=prompt,
+            lyrics=lyrics,
+            instrumental=instrumental,
+            lyrics_optimizer=lyrics_optimizer,
+        )
+    else:
+        fail(1001, "未知音频模型", 400)
+    if not settings.minimax_enabled:
+        fail(3001, "MiniMax 音频渠道已禁用", 503)
+    if not settings.minimax_api_key:
+        fail(3001, "未配置 MiniMax API Key", 503)
+
+    project = resolve_project_detached(user, body.get("projectId"))
+    reservation = None
+    captured = False
+    stop = asyncio.Event()
+    beat = None
+    try:
+        if settings.billing_enabled:
+            quote_db = SessionLocal()
+            try:
+                quoted = quote_request(
+                    quote_db,
+                    model=model,
+                    modality="audio",
+                    n=1,
+                )
+            finally:
+                quote_db.close()
+            reservation = billing_service.reserve(
+                user_id=user.id,
+                quote=quoted,
+                request_body=body,
+                reference_type="ai_audio",
+                organization_id=(project or {}).get("organization_id"),
+                project_id=(project or {}).get("id"),
+                idempotency_key=_idempotency_key(request, body),
+            )
+            if reservation.status == "captured" and reservation.response_payload:
+                captured = True
+                payload = dict(reservation.response_payload)
+                payload.pop("billing", None)
+                replay = billing_service.CaptureResult(False, 0, True, True, payload)
+                return ok(_with_fresh_billing(payload, user.id, replay, reservation))
+            beat = asyncio.create_task(_heartbeat_loop(reservation, stop))
+
+        url = await submit_minimax_audio(model, upstream)
+        media = {
+            "created": int(time.time()),
+            "model": model,
+            "task": task,
+            "data": [{"url": url}],
+            "url": url,
+        }
+        if reservation is not None:
+            cap = billing_service.capture(reservation.id, reservation.attempt, response_payload=media)
+            captured = True
+            return ok(_with_fresh_billing(media, user.id, cap, reservation))
+        return ok(media)
+    except ApiError:
+        raise
+    except (httpx.TimeoutException, TimeoutError):
+        note_upstream_result(model, 0, "timeout")
+        fail(3001, "音频生成超时，请稍后重试", 504)
+    except Exception as exc:
+        note_upstream_result(model, 0, str(exc))
+        fail(3001, f"生成任务失败: {exc}", 502)
+    finally:
+        stop.set()
+        if beat is not None:
+            beat.cancel()
+        if reservation is not None and not captured:
+            billing_service.release(reservation.id, reservation.attempt, reason="finally")
+
+
 @router.get("/models")
 async def models_list(modality: str | None = None, _user: models.User = Depends(current_user)):
     kind = (modality or "").strip().lower() or None
-    if kind not in {None, "image", "video", "text"}:
+    if kind not in {None, "image", "video", "text", "audio"}:
         kind = None
     return ok({"list": await available_models(kind)})
 

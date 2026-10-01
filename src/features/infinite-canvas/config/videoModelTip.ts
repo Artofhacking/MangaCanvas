@@ -69,6 +69,8 @@ export function videoModelTip(key?: string | null, label?: string | null): strin
   const normalizedKey = normalizeKey(key)
   const normalizedLabel = normalizeLabel(label)
   if (!normalizedKey && !normalizedLabel) return ''
+  // Standalone TTS / music ids share the MiniMax account but are not Hailuo video.
+  if (normalizedKey.startsWith('speech-') || normalizedKey.startsWith('music-')) return ''
 
   const byKey = normalizedKey
     ? VIDEO_MODEL_FAMILIES.find((family) => family.key(normalizedKey))

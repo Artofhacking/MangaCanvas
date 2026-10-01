@@ -20,7 +20,7 @@
 | 渠道 | 开关（默认 0） | 重新启用 |
 | --- | --- | --- |
 | 百度云 Seedance | `BAIDU_ENABLED` | `BAIDU_ENABLED=1` + `BAIDU_API_KEY` |
-| MiniMax H3 | `MINIMAX_ENABLED` | `MINIMAX_ENABLED=1` |
+| MiniMax 视频 / 音频 | `MINIMAX_ENABLED` | `MINIMAX_ENABLED=1` |
 | Vidu Q3 | `VIDU_ENABLED` | `VIDU_ENABLED=1` |
 
 接入代码仍在，Key 可留在 `.env`。画布 picker 以 live `/ai/models` 为准，静态目录 `enabled: false` 不再挡住已返回的行。
@@ -67,7 +67,21 @@ Seedance **只走百度 AI 网关**（不是 nexcor，也不是火山方舟直�
 - 查询：`GET /v2/query/video_generation/{task_id}`，成功时视频在 `task.content.url`
 - 可用探测：`GET /v1/models` 鉴权成功即可。**禁止 POST 探测**
 
-文生 `ratio` 必填且不能 `adaptive`；图生（首帧）`ratio` 固定 `adaptive`。
+文生 `ratio` 必填且不能 `adaptive`；图生（首帧）`ratio` 固定 `adaptive`。视频请求体不设置 `audio` / `generate_audio`。
+
+同一把 `MINIMAX_API_KEY` 和 `MINIMAX_ENABLED` 也开放独立音频。`GET /ai/models?modality=audio` 在开关打开且 `GET /v1/models` 鉴权成功时返回下面三行；**没有音效模型**，不要补假的 SFX id。音乐接口自 2026-08-20 起不对新用户开放，有权限的旧账号仍走这条目录。
+
+| 模型 id | 任务 | 画布名称 | 上游 |
+| --- | --- | --- | --- |
+| `speech-2.8-hd` | 配音 `tts` | Speech 2.8 HD 配音 | `POST /v1/t2a_v2` |
+| `speech-2.8-turbo` | 配音 `tts` | Speech 2.8 Turbo 配音 | `POST /v1/t2a_v2` |
+| `music-3.0` | 音乐 `music` | Music 3.0 音乐 | `POST /v1/music_generation` |
+
+- 本仓库调用：`POST /ai/audios/generations`（非流式，`stream: false`，`output_format: url`；若上游仍回 hex，后端解码后落盘）
+- 配音文本上限 10000 字。默认音色 `Chinese (Mandarin)_Lyrical_Voice`，可用 `voiceId` 换成系统音色或克隆音色
+- 音乐：有歌词，或 `instrumental: true`（只要风格描述），或 `lyricsOptimizer: true` 且有风格描述
+- 成功响应与图片一样带 `data[].url`，并额外给顶层 `url`，供画布挂到 `audio` 节点。链接会先转存到 `/static/uploads/generated/`
+- 探测与视频相同：只做 `GET /v1/models` 鉴权。**禁止 POST 探测**
 
 ## Vidu（Q3 视频）
 

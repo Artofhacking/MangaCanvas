@@ -7,6 +7,7 @@ import { labeledSizes } from '../utils/aspectRatio';
  * Live `parameters.sizes` always wins; this list is last-resort only.
  * Video picker subtitles are family tips in `videoModelTip.ts`, not per-id copy here.
  * Image picker subtitles are per-model tips in `imageModelTip.ts`, not per-id copy here.
+ * Audio picker subtitles are family tips in `audioModelTip.ts`, not per-id copy here.
  */
 
 /** Mirrors backend `GPT_IMAGE_2_SIZES` — one pixel size per common ratio. */
@@ -467,9 +468,36 @@ export function remapVideoModel(key: string | undefined, liveIds: readonly strin
 
 export const CHAT_MODELS: ModelConfig[] = [];
 
+/** Last-resort map for live `/ai/models?modality=audio`. Not a picker source. No SFX row. */
+export const AUDIO_MODELS: ModelConfig[] = [
+  {
+    key: 'speech-2.8-hd',
+    label: 'Speech 2.8 HD 配音',
+    type: 'audio',
+    async: true,
+    task: 'tts',
+    defaultParams: { voiceId: 'Chinese (Mandarin)_Lyrical_Voice' },
+  },
+  {
+    key: 'speech-2.8-turbo',
+    label: 'Speech 2.8 Turbo 配音',
+    type: 'audio',
+    async: true,
+    task: 'tts',
+    defaultParams: { voiceId: 'Chinese (Mandarin)_Lyrical_Voice' },
+  },
+  {
+    key: 'music-3.0',
+    label: 'Music 3.0 音乐',
+    type: 'audio',
+    async: true,
+    task: 'music',
+  },
+]
+
 // Helper functions
 export function getModelByKey(key: string): ModelConfig | undefined {
-  return [...IMAGE_MODELS, ...VIDEO_MODELS, ...CHAT_MODELS].find((m) => m.key === key);
+  return [...IMAGE_MODELS, ...VIDEO_MODELS, ...AUDIO_MODELS, ...CHAT_MODELS].find((m) => m.key === key);
 }
 
 export function getImageModel(key: string): ModelConfig | undefined {
@@ -482,4 +510,8 @@ export function getVideoModel(key: string): ModelConfig | undefined {
 
 export function getChatModel(key: string): ModelConfig | undefined {
   return CHAT_MODELS.find((m) => m.key === key);
+}
+
+export function getAudioModel(key: string): ModelConfig | undefined {
+  return AUDIO_MODELS.find((m) => m.key === key);
 }

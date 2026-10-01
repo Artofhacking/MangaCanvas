@@ -21,6 +21,7 @@ RETRY_AFTER = {"Retry-After": "5"}
 TTL = {
     "image": timedelta(minutes=12),
     "video": timedelta(minutes=20),
+    "audio": timedelta(minutes=12),
     "text": timedelta(minutes=3),
     "script_parse": timedelta(minutes=5),
 }

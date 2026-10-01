@@ -26,3 +26,4 @@ export {
 } from './imageService'
 export { videoService, isT2VModel, isI2VModel, isKF2VModel, isVideoModel, isSeedanceModel, isMiniMaxModel, isViduModel } from './videoService'
 export { chatService } from './chatService'
+export { audioService, isMiniMaxMusicModel, isMiniMaxTtsModel } from './audioService'

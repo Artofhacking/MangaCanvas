@@ -53,7 +53,7 @@ VITE_APP_API_BASE_URL=/api/v1
 
 - nexcor HappyHorse：`OPENAI_API_KEY` / `OPENAI_BASE_URL`
 - 百度网关 Seedance：`BAIDU_API_KEY` / `BAIDU_BASE_URL`（默认关闭，`BAIDU_ENABLED=1` 才开放）
-- MiniMax H3：`MINIMAX_API_KEY` / `MINIMAX_BASE_URL`（默认关闭，`MINIMAX_ENABLED=1` 才开放）
+- MiniMax H3 视频，以及同开关下的配音 `speech-2.8-hd` / `speech-2.8-turbo`、音乐 `music-3.0`：`MINIMAX_API_KEY` / `MINIMAX_BASE_URL`（默认关闭，`MINIMAX_ENABLED=1` 才开放）
 - Vidu Q3：`VIDU_API_KEY` / `VIDU_BASE_URL`（默认关闭，`VIDU_ENABLED=1` 才开放）
 - 百度云 VOD 密钥：`BAIDU_VOD_AK` / `BAIDU_VOD_SK`（已配置，播放域名未接）
 

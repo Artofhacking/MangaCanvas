@@ -49,6 +49,8 @@ describe('videoModelTip', () => {
     expect(videoModelTip('not-a-video-model', '未知现场模型')).toBe('')
     expect(videoModelTip('gpt-image-2', 'GPT Image 2 文生图')).toBe('')
     expect(videoModelTip('wan2.7-image', '万相 2.7 文生图')).toBe('')
+    expect(videoModelTip('speech-2.8-hd', 'Speech 2.8 HD 配音')).toBe('')
+    expect(videoModelTip('music-3.0', 'Music 3.0 音乐')).toBe('')
     expect(videoModelTip('', '')).toBe('')
     expect(videoModelTip('   ', undefined)).toBe('')
     expect(videoModelTip(undefined, null)).toBe('')

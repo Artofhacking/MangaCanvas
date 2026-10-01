@@ -13,7 +13,7 @@ import {
   resolveVideoCapabilities,
 } from './modelCapabilities'
 
-function live(id: string, name: string, modality: 'image' | 'video', extras: Partial<ModelDTO> = {}): ModelDTO {
+function live(id: string, name: string, modality: 'image' | 'video' | 'audio', extras: Partial<ModelDTO> = {}): ModelDTO {
   return {
     id,
     name,
@@ -251,6 +251,33 @@ describe('video picker family collapse', () => {
     ])
     expect(findVideoPickerModel(picker, 'happyhorse-1.1-i2v')?.key).toBe('happyhorse-1.1-t2v')
     expect(findVideoPickerModel(picker, 'happyhorse-1.1-r2v')?.key).toBe('happyhorse-1.1-t2v')
+  })
+
+  it('shows live audio models and keeps tts voices from the catalog', () => {
+    const picker = liveModelsToPicker(
+      [
+        live('speech-2.8-hd', 'Speech 2.8 HD 配音', 'audio', {
+          parameters: {
+            task: 'tts',
+            voices: [{ label: '抒情', key: 'Chinese (Mandarin)_Lyrical_Voice' }],
+          },
+          defaultParams: { voice_id: 'Chinese (Mandarin)_Lyrical_Voice' },
+        }),
+        live('music-3.0', 'Music 3.0 音乐', 'audio', {
+          parameters: { task: 'music' },
+        }),
+      ],
+      'audio',
+      false
+    )
+    expect(picker.map((item) => item.key)).toEqual(['speech-2.8-hd', 'music-3.0'])
+    expect(picker.map((item) => item.task)).toEqual(['tts', 'music'])
+    expect(picker[0]?.type).toBe('audio')
+    expect(picker[0]?.voices?.[0]?.key).toBe('Chinese (Mandarin)_Lyrical_Voice')
+    expect(picker[0]?.defaultParams?.voiceId).toBe('Chinese (Mandarin)_Lyrical_Voice')
+    expect(liveModelsToPicker([], 'audio', false)).toEqual([])
+    expect(liveModelsToPicker([live('speech-2.8-hd', 'Speech 2.8 HD 配音', 'audio')], 'audio', true)).toEqual([])
+    expect(remapModelId('music', ['music-3.0', 'speech-2.8-hd'], 'audio')).toBe('music-3.0')
   })
 
   it('maps seeddance / Seedance aliases onto catalog ids', () => {

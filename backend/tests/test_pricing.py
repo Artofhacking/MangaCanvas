@@ -156,3 +156,25 @@ def test_seed_does_not_overwrite_price(db):
     db.commit()
     again = db.query(models.BillingPriceRule).filter_by(model_id="gpt-image-2", quality="medium").first()
     assert again.credits_per_unit == 99
+
+
+def test_audio_quotes_flat_credits(db):
+    hd = quote_request(db, model="speech-2.8-hd", modality="audio")
+    assert hd.model_id == "speech-2.8-hd"
+    assert hd.unit == "audio"
+    assert hd.credits == 8
+    turbo = quote_request(db, model="Speech-2.8-Turbo", modality="audio")
+    assert turbo.model_id == "speech-2.8-turbo"
+    assert turbo.credits == 4
+    music = quote_request(db, model="music-3.0", modality="audio")
+    assert music.credits == 20
+    assert music.unit_count == 1
+
+
+def test_audio_quote_rejects_batches_and_unknown_models(db):
+    with pytest.raises(ApiError) as many:
+        quote_request(db, model="speech-2.8-hd", modality="audio", n=2)
+    assert many.value.code == 1001
+    with pytest.raises(ApiError) as unknown:
+        quote_request(db, model="sfx-1", modality="audio")
+    assert unknown.value.code == 1001
