@@ -9,6 +9,7 @@ import {
   IMAGE_STACK_STEP_Y,
   placeStackCandidates,
 } from '../../utils/imageStack'
+import { canvasVideoSeekBarInsets } from '../../utils/canvasVideoSeek'
 import { readVideoStack, videoStackActivationPatch } from '../../utils/videoStack'
 import { CanvasVideoPreview } from './CanvasVideoPreview'
 
@@ -58,6 +59,7 @@ export function VideoStackPreview({
         suspended={suspended}
         videoRef={videoRef}
         onOpenPreview={onOpenPreview}
+        seekBarInsets={canvasVideoSeekBarInsets({ stacked: false, fanWidth: 0 })}
       />
     )
   }
@@ -77,6 +79,7 @@ export function VideoStackPreview({
         suspended={suspended}
         videoRef={videoRef}
         onOpenPreview={onOpenPreview}
+        seekBarInsets={canvasVideoSeekBarInsets({ stacked: true, fanWidth })}
       />
       <div
         className="pointer-events-none absolute left-2.5 top-2.5 z-20 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white"
