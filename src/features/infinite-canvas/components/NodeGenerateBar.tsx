@@ -406,8 +406,7 @@ function GenerateBarModelPicker({
                   className={menuItemClass(videoRatio === ratio)}
                 >
                   <Check className={cn('mr-2 h-3.5 w-3.5', videoRatio === ratio ? 'opacity-100' : 'opacity-0')} />
-                  <RatioGlyph ratio={ratio} />
-                  <span className="ml-2">{ratio}</span>
+                  {ratio}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -439,8 +438,7 @@ function GenerateBarModelPicker({
                 className={menuItemClass(imageRatio === ratio)}
               >
                 <Check className={cn('mr-2 h-3.5 w-3.5', imageRatio === ratio ? 'opacity-100' : 'opacity-0')} />
-                <RatioGlyph ratio={ratio} />
-                <span className="ml-2">{ratio}</span>
+                {ratio}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
