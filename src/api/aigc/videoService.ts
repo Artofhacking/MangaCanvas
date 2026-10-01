@@ -2,6 +2,7 @@ import { appClient } from '@/api/clients/appClient'
 import { HttpError, isCanceledError } from '@/api/core'
 import { requestData } from '@/api/core/response'
 import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
+import { isUserCancelAbort } from '@/lib/generationAbort'
 import { resolveProjectId } from '@/lib/session'
 import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import type { VideoGenerateOptions } from './types'
@@ -23,13 +24,20 @@ const MAX_POLLS = 400
 
 type VideoJobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
-interface VideoJob {
+export interface VideoJobView {
   job_id: string
   status: VideoJobStatus
   progress?: number | null
   message?: string | null
   url?: string
   billing?: BillingPayload
+}
+
+type VideoJob = VideoJobView
+
+export interface VideoWatchOptions {
+  signal?: AbortSignal
+  onProgress?: VideoGenerateOptions['onProgress']
 }
 
 function abortedError() {
@@ -119,7 +127,7 @@ async function readJob(jobId: string, signal?: AbortSignal) {
   })
 }
 
-async function pollJob(jobId: string, options: VideoGenerateOptions) {
+async function watchJob(jobId: string, options: VideoWatchOptions = {}): Promise<VideoJob> {
   let transportErrors = 0
   for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
     throwIfAborted(options.signal)
@@ -128,7 +136,7 @@ async function pollJob(jobId: string, options: VideoGenerateOptions) {
       job = await readJob(jobId, options.signal)
       transportErrors = 0
     } catch (error) {
-      if (isCanceledError(error) || options.signal?.aborted) throw abortedError()
+      if (options.signal?.aborted || isCanceledError(error)) throw abortedError()
       transportErrors += 1
       if (transportErrors >= 5) throw error
       await sleep(POLL_INTERVAL_MS, options.signal)
@@ -142,21 +150,30 @@ async function pollJob(jobId: string, options: VideoGenerateOptions) {
       options.onProgress?.({ status: 'RUNNING', taskId: job.job_id, percent })
     } else if (job.status === 'succeeded') {
       applyBillingPayload(job.billing)
-      if (!job.url) throw new Error(job.message || '生成成功但未找到视频 URL')
       options.onProgress?.({ status: 'SUCCEEDED', taskId: job.job_id })
-      return job.url
+      return job
     } else if (job.status === 'cancelled') {
       applyBillingPayload(job.billing)
-      throw abortedError()
+      return job
     } else {
       applyBillingPayload(job.billing)
       options.onProgress?.({ status: 'FAILED', taskId: job.job_id })
-      throw new Error(job.message || '视频生成失败')
+      return job
     }
 
     await sleep(POLL_INTERVAL_MS, options.signal)
   }
   throw new Error('视频生成超时，请稍后重试')
+}
+
+async function pollJob(jobId: string, options: VideoGenerateOptions) {
+  const job = await watchJob(jobId, options)
+  if (job.status === 'succeeded') {
+    if (!job.url) throw new Error(job.message || '生成成功但未找到视频 URL')
+    return job.url
+  }
+  if (job.status === 'cancelled') throw abortedError()
+  throw new Error(job.message || '视频生成失败')
 }
 
 export const videoService = {
@@ -169,18 +186,22 @@ export const videoService = {
     })
     options.onProgress?.({ status: 'PENDING' })
     let jobId = ''
+    // Refresh and workflow changes abort the local signal only. The cancel API
+    // runs when the user pressed 取消 (`reason === 'user'`).
     const onAbort = () => {
-      if (jobId) cancelJob(jobId)
+      if (jobId && isUserCancelAbort(options.signal)) cancelJob(jobId)
     }
     options.signal?.addEventListener('abort', onAbort)
     try {
       const submitted = await withIdempotentGenerate((idempotencyKey) => submitJob(options, idempotencyKey))
       jobId = submitted.job_id
       applyBillingPayload(submitted.billing)
-      if (options.signal?.aborted) {
+      if (jobId) options.onSubmitted?.(jobId)
+      if (isUserCancelAbort(options.signal)) {
         if (jobId) cancelJob(jobId)
         throw abortedError()
       }
+      if (options.signal?.aborted) throw abortedError()
       if (!jobId) throw new Error('视频任务未返回 job_id')
       if (submitted.status === 'succeeded' && submitted.url) {
         options.onProgress?.({ status: 'SUCCEEDED', taskId: jobId })
@@ -202,5 +223,13 @@ export const videoService = {
     } finally {
       options.signal?.removeEventListener('abort', onAbort)
     }
+  },
+
+  cancel(jobId: string) {
+    if (jobId) cancelJob(jobId)
+  },
+
+  watch(jobId: string, options?: VideoWatchOptions) {
+    return watchJob(jobId, options)
   },
 }

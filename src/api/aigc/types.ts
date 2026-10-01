@@ -51,6 +51,8 @@ export interface VideoGenerateOptions {
   batchId?: string
   signal?: AbortSignal
   onProgress?: (progress: TaskProgress) => void
+  /** Fired once the server has accepted the job, before polling finishes. */
+  onSubmitted?: (jobId: string) => void
 }
 
 // ==================== 聊天 ====================

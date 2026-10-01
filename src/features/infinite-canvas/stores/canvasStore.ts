@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { applyNodeChanges, applyEdgeChanges, addEdge as addReactFlowEdge, NodeChange, EdgeChange, Connection, Node, Edge } from 'reactflow';
 import type { CustomNode, CustomEdge, NodeData, CanvasStore, Project } from '../types';
 import { isGenerateNodeType, nextSlotOrder } from '../utils/generateSlots';
+import { stripNodeGenerationTransients } from '../utils/videoJobBinding';
 
 let nodeId = 0;
 const getNodeId = () => `node_${nodeId++}`;
@@ -233,8 +234,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     newNode.id = newId;
     newNode.position = { x: node.position.x + 100, y: node.position.y + 100 };
     (newNode as unknown as Node).selected = true; // Select the new node
+    const stripped = stripNodeGenerationTransients(newNode);
+    const data = { ...stripped.data };
+    delete data.videoJobIds;
     newNode.data = {
-      ...newNode.data,
+      ...data,
       createdAt: now,
       updatedAt: now,
     };
@@ -318,14 +322,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const canvasData = getProjectCanvas(projectId);
 
     if (canvasData) {
+      const nodes = (canvasData.nodes || []).map((node) => stripNodeGenerationTransients(node));
       set({
-        nodes: canvasData.nodes || [],
+        nodes,
         edges: canvasData.edges || [],
         viewport: canvasData.viewport || { x: 100, y: 50, zoom: 0.8 },
       });
 
       // Update node ID counter
-      const maxId = (canvasData.nodes || []).reduce((max: number, node: CustomNode) => {
+      const maxId = nodes.reduce((max: number, node: CustomNode) => {
         const match = node.id.match(/node_(\d+)/);
         if (match) {
           return Math.max(max, parseInt(match[1], 10));
@@ -337,7 +342,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       // Initialize history
       set({
         history: [{
-          nodes: JSON.parse(JSON.stringify(canvasData.nodes || [])),
+          nodes: JSON.parse(JSON.stringify(nodes)),
           edges: JSON.parse(JSON.stringify(canvasData.edges || [])),
         }],
         historyIndex: 0,

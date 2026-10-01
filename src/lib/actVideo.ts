@@ -4,6 +4,8 @@ import { isCanceledError } from '@/api/core'
 import { videoService } from '@/api/aigc'
 import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
 import { finishGenerationJob, startGenerationJob } from '@/features/infinite-canvas/utils/generationJobs'
+import { rememberNodeVideoJob } from '@/features/infinite-canvas/utils/resumeVideoJobs'
+import { isUserCancelAbort } from '@/lib/generationAbort'
 import { persistOpenCanvas } from '@/lib/persistCanvas'
 import { nextMediaPixelFields } from '@/features/infinite-canvas/utils/mediaFrame'
 import { usablePosterUrl } from '@/features/infinite-canvas/utils/videoPoster'
@@ -117,6 +119,7 @@ export async function generateActVideo(actId: string) {
       thumbnail: '',
       ...nextMediaPixelFields(null),
       statusLabel: '排队中',
+      videoJobIds: [],
       prompt: videoPrompt,
       model: ACT_VIDEO_MODEL,
       modelLabel: '本幕视频',
@@ -135,6 +138,7 @@ export async function generateActVideo(actId: string) {
         resolution: ACT_VIDEO_RESOLUTION,
         duration: ACT_VIDEO_DURATION,
         statusLabel: '排队中',
+        videoJobIds: [],
       }
     )
     useCanvasStore.getState().addEdgeManually({ source: actId, target: videoId })
@@ -142,6 +146,7 @@ export async function generateActVideo(actId: string) {
   persistOpenCanvas()
 
   const signal = startGenerationJob(videoId)
+  const workflowId = useCanvasStore.getState().currentProjectId
   try {
     const videoUrl = await videoService.generate({
       model: ACT_VIDEO_MODEL,
@@ -154,6 +159,10 @@ export async function generateActVideo(actId: string) {
       duration: ACT_VIDEO_DURATION,
       nodeId: videoId,
       signal,
+      onSubmitted: (jobId) => {
+        if (isUserCancelAbort(signal)) return
+        rememberNodeVideoJob(videoId, jobId, workflowId)
+      },
       onProgress: (progress) => {
         if (signal.aborted) return
         const statusLabel = progress.status === 'PENDING' ? '排队中' : progress.status === 'RUNNING' ? '生成中' : undefined
@@ -167,21 +176,34 @@ export async function generateActVideo(actId: string) {
       ...nextMediaPixelFields(null),
       loading: false,
       statusLabel: undefined,
+      videoJobIds: undefined,
       updatedAt: Date.now(),
     })
     persistOpenCanvas()
   } catch (error) {
-    if (signal.aborted || isCanceledError(error)) return
+    if (signal.aborted) return
+    if (isCanceledError(error)) {
+      useCanvasStore.getState().updateNode(videoId, {
+        loading: false,
+        error: '',
+        progress: undefined,
+        statusLabel: undefined,
+      })
+      persistOpenCanvas()
+      return
+    }
     if (error instanceof Error && error.message === 'API_RATE_LIMIT') {
       useCanvasStore.getState().removeNode(videoId)
       persistOpenCanvas()
       message.warning('请求过于频繁，请稍后重试')
       return
     }
+    const timedOut = error instanceof Error && error.message.includes('视频生成超时')
     useCanvasStore.getState().updateNode(videoId, {
       loading: false,
       statusLabel: undefined,
       error: error instanceof Error ? error.message : '生成失败',
+      ...(timedOut ? {} : { videoJobIds: undefined }),
     })
     persistOpenCanvas()
   } finally {

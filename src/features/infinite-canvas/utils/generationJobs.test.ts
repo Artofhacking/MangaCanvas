@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { DETACH_ABORT_REASON, USER_CANCEL_ABORT_REASON } from '@/lib/generationAbort'
 import {
   cancelGenerationJob,
   finishGenerationJob,
   hasGenerationJob,
   startGenerationJob,
+  stopLocalGenerationJobs,
   subscribeGenerationJobs,
 } from './generationJobs'
 
@@ -76,5 +78,19 @@ describe('generation jobs per node', () => {
     } finally {
       unsubscribe()
     }
+  })
+
+  it('marks an explicit cancel differently from a detached poller', () => {
+    const userSignal = startGenerationJob('node-a')
+    expect(cancelGenerationJob('node-a')).toBe(true)
+    expect(userSignal.aborted).toBe(true)
+    expect(userSignal.reason).toBe(USER_CANCEL_ABORT_REASON)
+
+    const detached = startGenerationJob('node-b')
+    stopLocalGenerationJobs()
+    expect(detached.aborted).toBe(true)
+    expect(detached.reason).toBe(DETACH_ABORT_REASON)
+    expect(hasGenerationJob('node-a')).toBe(false)
+    expect(hasGenerationJob('node-b')).toBe(false)
   })
 })

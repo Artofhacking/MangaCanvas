@@ -11,6 +11,7 @@ import {
   type CanvasGraph,
 } from '@/lib/canvasPayload'
 import type { CustomEdge, CustomNode } from '@/features/infinite-canvas/types'
+import { graphWithoutGenerationTransients } from '@/features/infinite-canvas/utils/videoJobBinding'
 
 export const CANVAS_AUTOSAVE_DEBOUNCE_MS = 800
 
@@ -27,8 +28,8 @@ let rerun = false
 let pending: PersistCanvasOptions = {}
 let savedKey = ''
 let blockedKey = ''
-let debounceResolvers: Array<() => void> = []
-let waiters: Array<() => void> = []
+const debounceResolvers: Array<() => void> = []
+const waiters: Array<() => void> = []
 
 export function resetCanvasAutosaveForTests() {
   if (timer) clearTimeout(timer)
@@ -77,7 +78,7 @@ async function saveOnce(): Promise<void> {
     edges: canvas.edges,
     viewport: canvas.viewport,
   }
-  const seenKey = autosaveKey(workflowId, graph)
+  const seenKey = autosaveKey(workflowId, graphWithoutGenerationTransients(graph))
   if (seenKey === savedKey || seenKey === blockedKey) return
 
   let guard = 0
@@ -87,7 +88,7 @@ async function saveOnce(): Promise<void> {
     try {
       replacements = await collectInlineReplacements(graph, uploadCanvasMediaUrl)
     } catch (error) {
-      if (isTooLarge(error)) blockedKey = autosaveKey(workflowId, graph)
+      if (isTooLarge(error)) blockedKey = autosaveKey(workflowId, graphWithoutGenerationTransients(graph))
       return
     }
     const stillThisWorkflow = useCanvasStore.getState().currentProjectId === workflowId
@@ -107,19 +108,20 @@ async function saveOnce(): Promise<void> {
 
   if (graphHasInlineMedia(graph)) return
 
-  const key = autosaveKey(workflowId, graph)
+  const persisted = graphWithoutGenerationTransients(graph)
+  const key = autosaveKey(workflowId, persisted)
   if (key === savedKey || key === blockedKey) return
 
   useCanvasDocumentsStore.getState().updateProjectCanvas(workflowId, {
-    nodes: graph.nodes as CustomNode[],
-    edges: graph.edges as CustomEdge[],
-    viewport: graph.viewport,
+    nodes: persisted.nodes as CustomNode[],
+    edges: persisted.edges as CustomEdge[],
+    viewport: persisted.viewport,
   })
   const response = await workflowsApi.update(numericProjectId, workflowId, {
     canvasData: {
-      nodes: graph.nodes as CustomNode[],
-      edges: graph.edges as CustomEdge[],
-      viewport: graph.viewport,
+      nodes: persisted.nodes as CustomNode[],
+      edges: persisted.edges as CustomEdge[],
+      viewport: persisted.viewport,
     },
   })
   if (!response.success) {
@@ -131,7 +133,7 @@ async function saveOnce(): Promise<void> {
 
   const latest = useCanvasStore.getState()
   if ((pending.workflowId || latest.currentProjectId) === workflowId) {
-    const latestKey = autosaveKey(workflowId, graphFromState())
+    const latestKey = autosaveKey(workflowId, graphWithoutGenerationTransients(graphFromState()))
     if (latestKey !== savedKey) rerun = true
   }
 }

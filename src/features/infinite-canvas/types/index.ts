@@ -27,6 +27,11 @@ export interface NodeData {
   progress?: number;
   /** Short generation phase shown on the media chip, e.g. 排队中 / 生成中. */
   statusLabel?: string;
+  /**
+   * Server video job ids for this node. Persisted with the canvas so a reload can resume polling.
+   * Cleared when every job reaches a terminal state.
+   */
+  videoJobIds?: string[];
   error?: string;
   model?: string;
   size?: string;
@@ -233,6 +238,8 @@ export interface VideoGenerationParams {
   /** Skip the per-clip toast. The caller reports one result for the whole batch. */
   quiet?: boolean;
   signal?: AbortSignal;
+  /** Fired once the server has accepted the job, before polling finishes. */
+  onSubmitted?: (jobId: string) => void;
 }
 
 export interface ChatMessage {

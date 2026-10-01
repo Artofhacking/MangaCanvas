@@ -50,6 +50,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         nodeId: params.nodeId,
         batchId: params.batchId,
         signal: params.signal,
+        onSubmitted: params.onSubmitted,
         onProgress: (progress) => {
           const label = STATUS_LABEL[progress.status] ?? progress.status;
           setStatus(label);
