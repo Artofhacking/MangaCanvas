@@ -618,6 +618,10 @@ PRICE_RULES: list[dict] = [
     {"model_id": "qwen-plus", "modality": "text", "unit": "script_parse", "quality": "", "resolution": "", "credits_per_unit": 4},
     {"model_id": "grok-4.5", "modality": "text", "unit": "chat_request", "quality": "", "resolution": "", "credits_per_unit": 2},
     {"model_id": "grok-4.5", "modality": "text", "unit": "script_parse", "quality": "", "resolution": "", "credits_per_unit": 78},
+    # Flat per generation. Provisional product credits so MINIMAX_ENABLED can bill; not an official rate card.
+    {"model_id": "speech-2.8-hd", "modality": "audio", "unit": "audio", "quality": "", "resolution": "", "credits_per_unit": 8},
+    {"model_id": "speech-2.8-turbo", "modality": "audio", "unit": "audio", "quality": "", "resolution": "", "credits_per_unit": 4},
+    {"model_id": "music-3.0", "modality": "audio", "unit": "audio", "quality": "", "resolution": "", "credits_per_unit": 20},
 ]
 
 

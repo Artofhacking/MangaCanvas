@@ -78,6 +78,12 @@ async def persist_remote_url(url: str) -> str:
             suffix = ".svg"
         elif "mp4" in header:
             suffix = ".mp4"
+        elif "mpeg" in header or "mp3" in header:
+            suffix = ".mp3"
+        elif "wav" in header:
+            suffix = ".wav"
+        elif "flac" in header:
+            suffix = ".flac"
         return persist_bytes(base64.b64decode(payload), suffix)
 
     if _is_local_url(url):
@@ -108,10 +114,18 @@ async def persist_remote_url(url: str) -> str:
             suffix = ".svg"
         elif "mp4" in ctype:
             suffix = ".mp4"
+        elif ctype in {"audio/mpeg", "audio/mp3"}:
+            suffix = ".mp3"
+        elif "wav" in ctype:
+            suffix = ".wav"
+        elif "flac" in ctype:
+            suffix = ".flac"
         elif "webm" in ctype:
             suffix = ".webm"
-        elif url.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".svg", ".mp4", ".webm")):
-            suffix = Path(urlparse(url).path).suffix
+        elif url.lower().split("?")[0].endswith(
+            (".jpg", ".jpeg", ".png", ".webp", ".svg", ".mp4", ".webm", ".mp3", ".wav", ".flac", ".m4a")
+        ):
+            suffix = Path(urlparse(url).path).suffix or ".bin"
         return persist_bytes(resp.content, suffix)
 
 
@@ -326,6 +340,19 @@ MINIMAX_MODEL_IDS = (
     "MiniMax-H3",
     "MiniMax-H3-Max",
 )
+# Standalone audio. These ids must stay out of MINIMAX_MODEL_IDS so video routing
+# does not send speech/music to /v2/video_generation.
+TTS_MODEL_IDS = (
+    "speech-2.8-hd",
+    "speech-2.8-turbo",
+)
+MUSIC_MODEL_IDS = ("music-3.0",)
+# Documented Chinese system voice. Generate accepts any cloned voice id as well.
+DEFAULT_TTS_VOICE_ID = "Chinese (Mandarin)_Lyrical_Voice"
+TTS_EMOTIONS = frozenset({"happy", "sad", "angry", "fearful", "disgusted", "surprised", "calm", "fluent"})
+TTS_TEXT_LIMIT = 10000
+MUSIC_PROMPT_LIMIT = 2000
+MUSIC_LYRICS_LIMIT = 3500
 VIDU_MODEL_IDS = (
     "viduq2",
     "viduq3",
@@ -349,6 +376,8 @@ VIDU_R2V_ALLOWED = {
 _SEEDANCE_CANONICAL = {item.lower(): item for item in SEEDANCE_MODEL_IDS}
 _MINIMAX_CANONICAL = {item.lower(): item for item in MINIMAX_MODEL_IDS}
 _VIDU_CANONICAL = {item.lower(): item for item in VIDU_MODEL_IDS}
+_TTS_CANONICAL = {item.lower(): item for item in TTS_MODEL_IDS}
+_MUSIC_CANONICAL = {item.lower(): item for item in MUSIC_MODEL_IDS}
 
 SEEDANCE_RATIO_BY_SIZE = {
     "1280*720": "16:9",
@@ -406,7 +435,22 @@ def is_seedance_model(model: str) -> bool:
     return name in _SEEDANCE_CANONICAL or "seedance" in name
 
 
+def is_minimax_tts_model(model: str) -> bool:
+    return (model or "").strip().lower() in _TTS_CANONICAL
+
+
+def is_minimax_music_model(model: str) -> bool:
+    return (model or "").strip().lower() in _MUSIC_CANONICAL
+
+
+def is_minimax_audio_model(model: str) -> bool:
+    return is_minimax_tts_model(model) or is_minimax_music_model(model)
+
+
 def is_minimax_model(model: str) -> bool:
+    """Hailuo video ids only. Speech and music stay on the audio endpoint."""
+    if is_minimax_audio_model(model):
+        return False
     name = (model or "").lower()
     return name in _MINIMAX_CANONICAL or name.startswith("minimax") or "hailuo" in name
 
@@ -1117,6 +1161,248 @@ async def minimax_video_generate(
                 fail(3001, f"视频生成失败: {_video_fail_reason(payload)}", 502)
         fail(3001, "视频生成超时，请稍后重试", 504)
     return ""
+
+
+def resolve_audio_model(model: str) -> str:
+    name = (model or "").strip().lower()
+    if name in _TTS_CANONICAL:
+        return _TTS_CANONICAL[name]
+    if name in _MUSIC_CANONICAL:
+        return _MUSIC_CANONICAL[name]
+    fail(1001, "未知音频模型", 400)
+    raise RuntimeError("unreachable")
+
+
+def infer_audio_model(model: str | None, *, lyrics: str = "", instrumental: bool = False) -> str:
+    raw = (model or "").strip()
+    if raw:
+        return resolve_audio_model(raw)
+    if (lyrics or "").strip() or instrumental:
+        return "music-3.0"
+    return "speech-2.8-hd"
+
+
+def _bounded_number(
+    value,
+    *,
+    name: str,
+    low: float,
+    high: float,
+    default: float,
+    integer: bool = False,
+) -> float | int:
+    if value is None or value == "":
+        number = default
+    else:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            fail(1001, f"{name} 无效", 400)
+            raise RuntimeError("unreachable")
+    if number < low or number > high:
+        fail(1001, f"{name} 必须在 {low:g}–{high:g}", 400)
+    if integer:
+        if abs(number - round(number)) > 1e-9:
+            fail(1001, f"{name} 必须是整数", 400)
+        return int(round(number))
+    return number
+
+
+def build_minimax_tts_body(
+    *,
+    model: str,
+    text: str,
+    voice_id: str | None = None,
+    speed: float | None = None,
+    vol: float | None = None,
+    pitch: int | None = None,
+    emotion: str | None = None,
+) -> dict:
+    """Non-streaming T2A. `output_format=url` is valid 24h; hex is accepted on the way back."""
+    script = (text or "").strip()
+    if not script:
+        fail(1001, "配音文本不能为空", 400)
+    if len(script) > TTS_TEXT_LIMIT:
+        fail(1001, "配音文本不能超过 10000 字", 400)
+    voice = (voice_id or "").strip() or DEFAULT_TTS_VOICE_ID
+    if len(voice) > 128:
+        fail(1001, "voice_id 过长", 400)
+    voice_setting: dict = {
+        "voice_id": voice,
+        "speed": _bounded_number(speed, name="speed", low=0.5, high=2, default=1),
+        "vol": _bounded_number(vol, name="vol", low=0.01, high=10, default=1),
+        "pitch": _bounded_number(pitch, name="pitch", low=-12, high=12, default=0, integer=True),
+    }
+    emo = (emotion or "").strip().lower()
+    if emo:
+        if emo not in TTS_EMOTIONS:
+            fail(1001, "不支持的 emotion", 400)
+        voice_setting["emotion"] = emo
+    return {
+        "model": resolve_audio_model(model),
+        "text": script,
+        "stream": False,
+        "output_format": "url",
+        "language_boost": "auto",
+        "voice_setting": voice_setting,
+        "audio_setting": {
+            "sample_rate": 32000,
+            "bitrate": 128000,
+            "format": "mp3",
+            "channel": 1,
+        },
+    }
+
+
+def build_minimax_music_body(
+    *,
+    model: str,
+    prompt: str = "",
+    lyrics: str = "",
+    instrumental: bool = False,
+    lyrics_optimizer: bool = False,
+) -> dict:
+    """Non-streaming music generation. New MiniMax accounts may be rejected upstream."""
+    style = (prompt or "").strip()
+    lines = (lyrics or "").strip()
+    if len(style) > MUSIC_PROMPT_LIMIT:
+        fail(1001, "音乐描述不能超过 2000 字", 400)
+    if len(lines) > MUSIC_LYRICS_LIMIT:
+        fail(1001, "歌词不能超过 3500 字", 400)
+    body: dict = {
+        "model": resolve_audio_model(model),
+        "stream": False,
+        "output_format": "url",
+        "audio_setting": {
+            "sample_rate": 44100,
+            "bitrate": 256000,
+            "format": "mp3",
+        },
+    }
+    if instrumental:
+        if not style:
+            fail(1001, "纯音乐需要风格描述", 400)
+        body["prompt"] = style
+        body["is_instrumental"] = True
+        return body
+    if lyrics_optimizer and not lines:
+        if not style:
+            fail(1001, "自动写词需要风格描述", 400)
+        body["prompt"] = style
+        body["lyrics_optimizer"] = True
+        return body
+    if not lines:
+        fail(1001, "音乐生成需要歌词，或打开纯音乐 / 歌词优化", 400)
+    body["lyrics"] = lines
+    if style:
+        body["prompt"] = style
+    if lyrics_optimizer:
+        body["lyrics_optimizer"] = True
+    return body
+
+
+def minimax_base_error(payload: dict) -> str | None:
+    if not isinstance(payload, dict):
+        return "响应不是 JSON"
+    base = payload.get("base_resp")
+    if not isinstance(base, dict):
+        return None
+    raw = base.get("status_code")
+    if raw is None:
+        return None
+    try:
+        code = int(raw)
+    except (TypeError, ValueError):
+        return str(base.get("status_msg") or "MiniMax 返回异常状态")
+    if code == 0:
+        return None
+    return str(base.get("status_msg") or f"MiniMax 错误 {code}")
+
+
+def minimax_audio_field(payload: dict) -> str:
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return ""
+    audio = data.get("audio")
+    if not isinstance(audio, str):
+        return ""
+    return audio.strip()
+
+
+def _is_http_url(value: str) -> bool:
+    return value.startswith("https://") or value.startswith("http://")
+
+
+async def store_generated_audio(value: str, *, suffix: str = ".mp3") -> str:
+    raw = (value or "").strip()
+    if not raw:
+        fail(3001, "生成成功但未返回音频", 502)
+    if raw.startswith("data:") or _is_http_url(raw):
+        return await persist_remote_url(raw)
+    compact = "".join(raw.split())
+    try:
+        data = bytes.fromhex(compact)
+    except ValueError:
+        fail(3001, "生成成功但音频数据无法解析", 502)
+        raise RuntimeError("unreachable")
+    if not data:
+        fail(3001, "生成成功但未返回音频", 502)
+    return persist_bytes(data, suffix)
+
+
+async def _minimax_audio_post(path: str, body: dict, model: str, *, read_timeout: float) -> dict:
+    if not settings.minimax_enabled:
+        fail(3001, "MiniMax 音频渠道已禁用", 503)
+    if not settings.minimax_api_key:
+        fail(3001, "未配置 MiniMax API Key", 503)
+    root = settings.minimax_root()
+    headers = {
+        "Authorization": f"Bearer {settings.minimax_api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "MangaCanvas/1.0",
+    }
+    timeout = httpx.Timeout(read_timeout, connect=10.0)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"{root}{path}", headers=headers, json=body)
+    except httpx.TimeoutException as exc:
+        from .model_probe import note_upstream_result
+
+        note_upstream_result(model, 0, str(exc))
+        fail(3001, "音频生成超时，请稍后重试", 504)
+        raise RuntimeError("unreachable")
+    except httpx.TransportError as exc:
+        from .model_probe import note_upstream_result
+
+        note_upstream_result(model, 0, str(exc))
+        fail(3001, f"音频任务提交失败: {exc}", 502)
+        raise RuntimeError("unreachable")
+    if resp.status_code >= 400:
+        from .model_probe import note_upstream_result
+
+        note_upstream_result(model, resp.status_code, resp.text)
+        fail(3001, f"音频任务提交失败: {_baidu_error_text(resp)}", 502)
+    try:
+        payload = resp.json()
+    except ValueError:
+        fail(3001, f"音频任务提交失败: {_baidu_error_text(resp)}", 502)
+        raise RuntimeError("unreachable")
+    message = minimax_base_error(payload)
+    if message:
+        fail(3001, f"音频生成失败: {message}", 502)
+    return payload
+
+
+async def submit_minimax_audio(model: str, body: dict) -> str:
+    if is_minimax_tts_model(model):
+        path, read_timeout = "/v1/t2a_v2", 120.0
+    elif is_minimax_music_model(model):
+        path, read_timeout = "/v1/music_generation", 240.0
+    else:
+        fail(1001, "未知音频模型", 400)
+        raise RuntimeError("unreachable")
+    payload = await _minimax_audio_post(path, body, model, read_timeout=read_timeout)
+    return await store_generated_audio(minimax_audio_field(payload))
 
 
 async def vidu_video_generate(

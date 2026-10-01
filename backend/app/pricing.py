@@ -12,6 +12,7 @@ from .ai_media import (
     minimax_resolution,
     billed_chat_model,
     openai_quality,
+    resolve_audio_model,
     resolve_video_model,
     seedance_duration,
     seedance_resolution,
@@ -135,7 +136,7 @@ def quote_request(
     if kind in {"script", "script_parse"}:
         kind = "text"
         unit = "script_parse"
-    if kind not in {"image", "video", "text"}:
+    if kind not in {"image", "video", "text", "audio"}:
         fail(1001, "未知 modality", 400)
 
     count = 1 if n is None else int(n)
@@ -182,6 +183,23 @@ def quote_request(
             credits=rule.credits_per_unit * seconds * count,
             quality="",
             resolution=billed_res,
+            rule_id=rule.id,
+        )
+
+    if kind == "audio":
+        if count != 1:
+            fail(1001, "音频暂不支持 n>1", 400)
+        model_id = resolve_audio_model(model)
+        rule = _lookup_rule(db, model_id, "audio", "", "")
+        return Quote(
+            model_id=model_id,
+            modality="audio",
+            unit="audio",
+            unit_count=1,
+            unit_price=rule.credits_per_unit,
+            credits=rule.credits_per_unit,
+            quality="",
+            resolution="",
             rule_id=rule.id,
         )
 

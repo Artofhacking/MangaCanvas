@@ -293,7 +293,7 @@ v1 按次（短上下文）：
 | 渠道 | 开关 | 官方价格（检索备查，非启用） |
 |------|------|------------------------------|
 | 百度智能云 AI 网关 · Seedance | `BAIDU_ENABLED` | 火山方舟 token 刊例折成秒：<https://www.volcengine.com/docs/82379/2191775> |
-| MiniMax Hailuo H3 | `MINIMAX_ENABLED` | <https://platform.minimax.cn/docs/guides/pricing-paygo> |
+| MiniMax Hailuo H3，以及同开关下的 `speech-2.8-hd` / `speech-2.8-turbo` / `music-3.0` | `MINIMAX_ENABLED` | 视频：<https://platform.minimax.cn/docs/guides/pricing-paygo>。音频按次暂定价（打开渠道才能扣费，不是官方刊例）：HD 8、Turbo 4、Music 3.0 20 |
 | Vidu Q3 | `VIDU_ENABLED` | <https://platform.vidu.cn/docs/pricing.md>（1 Vidu 积分 = ¥0.03125） |
 
 百度云 VOD（`BAIDU_VOD_AK` / `SK`）只做媒资预留，生成结果仍落本机 `uploads/`。

@@ -25,7 +25,7 @@ export interface CreditQuote {
 
 export interface QuoteRequest {
   model: string
-  modality: 'image' | 'video' | 'text'
+  modality: 'image' | 'video' | 'text' | 'audio'
   n?: number
   quality?: string
   size?: string

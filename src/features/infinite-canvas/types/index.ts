@@ -117,7 +117,10 @@ export interface Project {
 export interface ModelConfig {
   key: string;
   label: string;
-  type: 'image' | 'video' | 'chat';
+  type: 'image' | 'video' | 'chat' | 'audio';
+  /** Live audio catalog: tts = 配音, music = 音乐. SFX is not a MiniMax model. */
+  task?: 'tts' | 'music';
+  voices?: { label: string; key: string }[];
   enabled?: boolean;
   endpoint?: string;
   async?: boolean;
@@ -133,6 +136,7 @@ export interface ModelConfig {
     duration?: number;
     resolution?: string;
     n?: number;
+    voiceId?: string;
   };
   maxN?: number;
   supportsAspect?: boolean;

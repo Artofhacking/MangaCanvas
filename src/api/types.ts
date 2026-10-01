@@ -259,6 +259,9 @@ export interface ModelParameterSet {
   maxN?: number
   supports_aspect?: boolean
   supportsAspect?: boolean
+  /** Audio catalog only. MiniMax has no SFX task. */
+  task?: 'tts' | 'music'
+  voices?: { label: string; key: string }[]
 }
 
 export interface ModelDTO {

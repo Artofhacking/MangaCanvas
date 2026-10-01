@@ -3,7 +3,7 @@ import { displayModelName } from '@/lib/displayModelName'
 import { useModelsStore } from '@/store/modelsStore'
 import type { ModelConfig, SizeOption } from '../types'
 import { labeledSizes } from '../utils/aspectRatio'
-import { IMAGE_MODELS, VIDEO_MODELS, getImageModel, getVideoModel } from './models'
+import { IMAGE_MODELS, VIDEO_MODELS, getAudioModel, getImageModel, getVideoModel } from './models'
 
 export const SAFE_IMAGE_SIZE = '1024x1024'
 export const SAFE_VIDEO_SIZE = '1280*720'
@@ -48,6 +48,11 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   'seedance-2.0': 'doubao-seedance-2-0-260128',
   'seedance-2.0-fast': 'doubao-seedance-2-0-fast-260128',
   'seedance-2.5': 'doubao-seedance-2-5-260628',
+  'speech-2.8': 'speech-2.8-hd',
+  'speech-hd': 'speech-2.8-hd',
+  'speech-turbo': 'speech-2.8-turbo',
+  'music-3': 'music-3.0',
+  music: 'music-3.0',
 }
 
 function normalizeModelId(value: string): string {
@@ -57,7 +62,7 @@ function normalizeModelId(value: string): string {
 export function remapModelId(
   raw: string | undefined,
   liveIds: readonly string[] = [],
-  modality: 'image' | 'video' = 'image'
+  modality: 'image' | 'video' | 'audio' = 'image'
 ): string {
   const name = (raw || '').trim()
   const live = [...liveIds]
@@ -138,13 +143,17 @@ export function capabilitiesFromApi(model: ModelDTO): Partial<ModelConfig> {
   const resolutions = asLabeledKeys(params?.resolutions)
   const ratios = asLabeledKeys(params?.ratios)
   const durs = asDurationOptions(params?.durations)
+  const voices = asLabeledKeys(params?.voices)
   const maxN = Number(params?.maxN ?? params?.max_n)
   const defaultParams = model.defaultParams || {}
+  const task = params?.task === 'tts' || params?.task === 'music' ? params.task : undefined
 
   const next: Partial<ModelConfig> = {
     key: model.id,
     label: model.name,
   }
+  if (task) next.task = task
+  if (voices.length) next.voices = voices
   if (sizes.length) {
     next.sizes = sizes
     next.getSizesByQuality = (): SizeOption[] =>
@@ -166,6 +175,12 @@ export function capabilitiesFromApi(model: ModelDTO): Partial<ModelConfig> {
       duration: typeof defaultParams.duration === 'number' ? defaultParams.duration : undefined,
       resolution: typeof defaultParams.resolution === 'string' ? defaultParams.resolution : undefined,
       n: typeof defaultParams.n === 'number' ? defaultParams.n : undefined,
+      voiceId:
+        typeof defaultParams.voiceId === 'string'
+          ? defaultParams.voiceId
+          : typeof defaultParams.voice_id === 'string'
+            ? defaultParams.voice_id
+            : undefined,
     }
   }
   return next
@@ -179,7 +194,7 @@ function preferFilled<T>(live: readonly T[] | undefined, fallback: readonly T[] 
 }
 
 function mergeModelConfig(
-  type: 'image' | 'video',
+  type: 'image' | 'video' | 'audio',
   live: ModelDTO | undefined,
   mapped: ModelConfig | undefined
 ): ModelConfig {
@@ -213,6 +228,8 @@ function mergeModelConfig(
     resolutions: preferFilled(fromApi.resolutions, mapped?.resolutions),
     ratios,
     durs: preferFilled(fromApi.durs, mapped?.durs),
+    task: fromApi.task ?? mapped?.task,
+    voices: preferFilled(fromApi.voices, mapped?.voices),
     maxN: fromApi.maxN ?? mapped?.maxN ?? (type === 'image' ? 4 : undefined),
     supportsAspect,
     defaultParams: { ...mapped?.defaultParams, ...fromApi.defaultParams },
@@ -268,21 +285,24 @@ export function findVideoPickerModel(
   return picker.find((item) => displayModelName(item.label || item.key) === currentLabel)
 }
 
+function staticModelFor(
+  type: 'image' | 'video' | 'audio',
+  id: string
+): ModelConfig | undefined {
+  if (type === 'image') return getImageModel(id)
+  if (type === 'video') return getVideoModel(id)
+  return getAudioModel(id)
+}
+
 export function liveModelsToPicker(
   liveModels: readonly ModelDTO[],
-  type: 'image' | 'video',
+  type: 'image' | 'video' | 'audio',
   loading: boolean
 ): ModelConfig[] {
   if (loading) return []
   const mapped = liveModels
     .filter((item) => item.id && item.isEnabled !== false)
-    .map((item) =>
-      mergeModelConfig(
-        type,
-        item,
-        type === 'image' ? getImageModel(item.id) : getVideoModel(item.id)
-      )
-    )
+    .map((item) => mergeModelConfig(type, item, staticModelFor(type, item.id)))
   return type === 'video' ? collapseVideoPickerModels(mapped) : mapped
 }
 

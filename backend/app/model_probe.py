@@ -308,6 +308,54 @@ TEXT_CATALOG = [
     {"id": "grok-4.5", "name": "Grok 4.5", "owned_by": "xai", "modality": "text"},
 ]
 
+# Official T2A system voices (speech-t2a-http). Custom / cloned ids are accepted at generate time.
+TTS_VOICES = [
+    {"label": "抒情", "key": "Chinese (Mandarin)_Lyrical_Voice"},
+    {"label": "空乘", "key": "Chinese (Mandarin)_HK_Flight_Attendant"},
+    {"label": "英文", "key": "English_Graceful_Lady"},
+]
+
+
+def _audio_caps(*, task: str, voices: list[dict] | None = None) -> dict:
+    parameters: dict = {"task": task}
+    defaults: dict = {}
+    if voices:
+        parameters["voices"] = list(voices)
+        defaults["voice_id"] = voices[0]["key"]
+    return {"parameters": parameters, "defaultParams": defaults}
+
+
+# MiniMax has no dedicated SFX / 音效 catalog. Do not invent a model row.
+# TTS: non-streaming POST /v1/t2a_v2. Music: POST /v1/music_generation.
+# Same gate as Hailuo video: minimax_enabled + API key + GET /v1/models auth.
+# Music APIs are closed to new users as of 2026-08-20; entitled keys still see music-3.0.
+AUDIO_CATALOG = [
+    {
+        "id": "speech-2.8-hd",
+        "name": "Speech 2.8 HD 配音",
+        "description": "配音",
+        "owned_by": "minimax",
+        "modality": "audio",
+        **_audio_caps(task="tts", voices=TTS_VOICES),
+    },
+    {
+        "id": "speech-2.8-turbo",
+        "name": "Speech 2.8 Turbo 配音",
+        "description": "配音",
+        "owned_by": "minimax",
+        "modality": "audio",
+        **_audio_caps(task="tts", voices=TTS_VOICES),
+    },
+    {
+        "id": "music-3.0",
+        "name": "Music 3.0 音乐",
+        "description": "音乐",
+        "owned_by": "minimax",
+        "modality": "audio",
+        **_audio_caps(task="music"),
+    },
+]
+
 _cache: dict[str, tuple[float, list[dict]]] = {}
 _down_until: dict[str, float] = {}
 _lock = asyncio.Lock()
@@ -531,6 +579,9 @@ async def _live_ids(kind: str) -> set[str]:
     elif kind == "video":
         catalog = list(VIDEO_CATALOG)
         probe = _probe_video
+    elif kind == "audio":
+        catalog = list(AUDIO_CATALOG)
+        probe = None
     else:
         catalog = list(TEXT_CATALOG)
         probe = _probe_text
@@ -583,6 +634,14 @@ async def _live_ids(kind: str) -> set[str]:
             live.update(vidu_ids)
         return live - down
 
+    if kind == "audio":
+        # Auth check only, shared with Hailuo video. Never POST — TTS and music are billed.
+        live = set()
+        minimax_ids = [item["id"] for item in catalog if item["owned_by"] == "minimax"]
+        if settings.minimax_enabled and settings.minimax_api_key and minimax_ids and await _minimax_key_live():
+            live.update(minimax_ids)
+        return live - down
+
     nexcor_ids = [item["id"] for item in catalog if item["owned_by"] != "dashscope"]
     dashscope_ids = {item["id"] for item in catalog if item["owned_by"] == "dashscope"}
     live = set(dashscope_ids)
@@ -599,7 +658,7 @@ async def _live_ids(kind: str) -> set[str]:
 
 
 async def available_models(modality: str | None = None) -> list[dict]:
-    kinds = ["image", "video", "text"] if not modality else [modality]
+    kinds = ["image", "video", "text", "audio"] if not modality else [modality]
     now = time.monotonic()
     async with _lock:
         missing = [kind for kind in kinds if kind not in _cache or now - _cache[kind][0] > CACHE_TTL]
@@ -609,8 +668,12 @@ async def available_models(modality: str | None = None) -> list[dict]:
                 catalog = IMAGE_CATALOG
             elif kind == "video":
                 catalog = VIDEO_CATALOG
-            else:
+            elif kind == "audio":
+                catalog = AUDIO_CATALOG
+            elif kind == "text":
                 catalog = TEXT_CATALOG
+            else:
+                catalog = []
             rows = []
             for item in catalog:
                 if item["owned_by"] == "dashscope" and not settings.dashscope_api_key:
