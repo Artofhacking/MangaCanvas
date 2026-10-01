@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { AssetGenTask } from '@/store/assetGenerationStore'
 
-export type GenerationMediaType = 'image' | 'video'
+export type GenerationMediaType = 'image' | 'video' | 'audio'
 export type GenerationStatus = 'running' | 'succeeded' | 'failed'
 
 export type GenerationHistoryItem = {
@@ -23,6 +23,18 @@ const MAX_ITEMS = 80
 export const MEDIA_TYPE_LABEL: Record<GenerationMediaType, string> = {
   image: '图片',
   video: '视频',
+  audio: '音频',
+}
+
+export function fallbackGenerationTitle(mediaType: GenerationMediaType) {
+  if (mediaType === 'video') return '视频生成'
+  if (mediaType === 'audio') return '音频生成'
+  return '图像生成'
+}
+
+export function normalizeGenerationMediaType(value: unknown): GenerationMediaType {
+  if (value === 'video' || value === 'audio') return value
+  return 'image'
 }
 
 export const STATUS_LABEL: Record<GenerationStatus, string> = {
@@ -59,7 +71,7 @@ function normalizeItem(item: Partial<GenerationHistoryItem>): GenerationHistoryI
   const status = item.status === 'running' ? 'failed' : item.status === 'succeeded' ? 'succeeded' : 'failed'
   return {
     id: String(item.id),
-    mediaType: item.mediaType === 'video' ? 'video' : 'image',
+    mediaType: normalizeGenerationMediaType(item.mediaType),
     status,
     title: item.title || titleFromPrompt(item.prompt || '', status === 'failed' ? '生成任务' : '生成结果'),
     prompt: item.prompt || '',
@@ -151,7 +163,7 @@ export const useGenerationHistoryStore = create<GenerationHistoryState>((set, ge
       id,
       mediaType: input.mediaType,
       status: 'running',
-      title: input.title || titleFromPrompt(input.prompt, input.mediaType === 'video' ? '视频生成' : '图像生成'),
+      title: input.title || titleFromPrompt(input.prompt, fallbackGenerationTitle(input.mediaType)),
       prompt: input.prompt,
       source: input.source,
       createdAt: Date.now(),

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { Image as ImageIcon, Loader2, Sparkles, Video } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Image as ImageIcon, Loader2, Music, Sparkles, Video } from "lucide-react"
 
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { mediaUrl } from "@/lib/mediaUrl"
@@ -26,7 +26,7 @@ function sourceLabel(item: GenerationHistoryItem) {
   return MEDIA_TYPE_LABEL[item.mediaType]
 }
 
-export default function GenerationHistoryList() {
+export default function GenerationHistoryList({ focusId = null }: { focusId?: string | null }) {
   const { notify } = useFeedback()
   const historyItems = useGenerationHistoryStore((state) => state.items)
   const assetTasks = useAssetGenerationStore((state) => state.tasks)
@@ -35,6 +35,14 @@ export default function GenerationHistoryList() {
     [assetTasks, historyItems]
   )
   const [preview, setPreview] = useState<GenerationHistoryItem | null>(null)
+
+  useEffect(() => {
+    if (!focusId) return
+    setPreview(null)
+    const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(focusId) : focusId
+    const node = document.querySelector(`[data-history-id="${escaped}"]`)
+    if (node instanceof HTMLElement) node.scrollIntoView({ block: "nearest" })
+  }, [focusId])
 
   const handleOpen = (item: GenerationHistoryItem) => {
     if (item.resultUrl || item.thumbnailUrl) {
@@ -53,7 +61,7 @@ export default function GenerationHistoryList() {
         <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center text-[hsl(var(--secondary))]">
           <Sparkles className="mb-3 h-10 w-10 opacity-30" />
           <p className="text-sm">暂无生成记录</p>
-          <p className="mt-1 text-xs text-[hsl(var(--secondary))]">提交图片或视频生成后会显示在这里</p>
+          <p className="mt-1 text-xs text-[hsl(var(--secondary))]">提交图片、视频或音频生成后会显示在这里</p>
         </div>
       ) : (
         <div className="h-full space-y-2 overflow-y-auto">
@@ -63,8 +71,13 @@ export default function GenerationHistoryList() {
               <button
                 key={item.id}
                 type="button"
+                data-history-id={item.id}
                 onClick={() => handleOpen(item)}
-                className="w-full rounded-xl border border-transparent bg-[hsl(var(--surface-container-low))] p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-high))]"
+                className={`w-full rounded-xl border p-3 text-left transition-colors hover:bg-[hsl(var(--surface-container-high))] ${
+                  focusId === item.id
+                    ? "border-[hsl(var(--primary))]/40 bg-[hsl(var(--primary))]/8"
+                    : "border-transparent bg-[hsl(var(--surface-container-low))]"
+                }`}
               >
                 <div className="flex items-start gap-3">
                   <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[hsl(var(--surface-container-high))]">
@@ -78,6 +91,8 @@ export default function GenerationHistoryList() {
                           <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--primary))]" />
                         ) : item.mediaType === "video" ? (
                           <Video className="h-5 w-5" />
+                        ) : item.mediaType === "audio" ? (
+                          <Music className="h-5 w-5" />
                         ) : (
                           <ImageIcon className="h-5 w-5" />
                         )}
@@ -131,6 +146,15 @@ export default function GenerationHistoryList() {
                   controls
                   className="max-h-[360px] w-full bg-black object-contain"
                 />
+              ) : preview.mediaType === "audio" ? (
+                <div className="flex flex-col items-center gap-4 px-4 py-8">
+                  <Music className="h-10 w-10 text-[hsl(var(--primary))]" />
+                  <audio
+                    src={mediaUrl(preview.resultUrl || preview.thumbnailUrl)}
+                    controls
+                    className="w-full"
+                  />
+                </div>
               ) : (
                 <img
                   src={mediaUrl(preview.resultUrl || preview.thumbnailUrl)}

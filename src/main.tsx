@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import { FeedbackProvider } from "@/components/feedback/FeedbackProvider"
+import GenerationCompleteNotifier from "@/components/layout/GenerationCompleteNotifier"
 import { redirectLegacyHashLocation } from "@/lib/legacyHash"
 import { installScrollLockAnchor } from "@/lib/scrollLockAnchor"
 import './index.css'
@@ -14,6 +15,7 @@ if (!redirectLegacyHashLocation()) {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <FeedbackProvider>
+        <GenerationCompleteNotifier />
         <App />
       </FeedbackProvider>
     </React.StrictMode>,
