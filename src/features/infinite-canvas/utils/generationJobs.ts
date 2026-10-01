@@ -1,6 +1,18 @@
 import type { NodeData } from '../types'
 
 const jobs = new Map<string, AbortController>()
+const listeners = new Set<() => void>()
+
+function emitGenerationJobs() {
+  for (const listener of [...listeners]) listener()
+}
+
+export function subscribeGenerationJobs(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
 
 export function startGenerationJob(nodeId: string): AbortSignal {
   const existing = jobs.get(nodeId)
@@ -9,6 +21,7 @@ export function startGenerationJob(nodeId: string): AbortSignal {
   }
   const controller = new AbortController()
   jobs.set(nodeId, controller)
+  emitGenerationJobs()
   return controller.signal
 }
 
@@ -17,6 +30,7 @@ export function cancelGenerationJob(nodeId: string): boolean {
   if (!controller) return false
   controller.abort()
   jobs.delete(nodeId)
+  emitGenerationJobs()
   return true
 }
 
@@ -24,6 +38,7 @@ export function finishGenerationJob(nodeId: string, signal: AbortSignal): boolea
   const controller = jobs.get(nodeId)
   if (!controller || controller.signal !== signal) return false
   jobs.delete(nodeId)
+  emitGenerationJobs()
   return true
 }
 
