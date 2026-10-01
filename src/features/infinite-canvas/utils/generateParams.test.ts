@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   applyImageRatio,
   applyVideoRatio,
@@ -10,12 +10,15 @@ import {
   listVideoResolutions,
   normalizeVideoQuantity,
   resolveImageRequestModel,
+  resolveListedVideoModel,
   routedVideoModelKey,
   videoAspectSuppressedByReferences,
   videoRequestParams,
 } from './generateParams'
 import { collectGenerateInputs } from './generateSlots'
-import type { CustomEdge, CustomNode } from '../types'
+import { resolveVideoCapabilities } from '../config/modelCapabilities'
+import { useCanvasStore } from '../stores/canvasStore'
+import type { CustomEdge, CustomNode, ModelConfig } from '../types'
 
 function imageNode(data: Partial<CustomNode['data']>): CustomNode {
   return {
@@ -372,6 +375,98 @@ describe('video quantity', () => {
   it('keeps a valid count and rewrites an invalid one', () => {
     expect(coerceGenerateParams(videoNode({ n: 4 }))).toBeNull()
     expect(coerceGenerateParams(videoNode({ n: 3 }))).toEqual({ n: 1 })
+  })
+})
+
+describe('empty generate nodes keep a ratio control', () => {
+  beforeEach(() => {
+    useCanvasStore.getState().clearCanvas()
+  })
+
+  it('shows gpt-image-2 ratios on a palette image node, even if a live size list is empty', () => {
+    const id = useCanvasStore.getState().addNode('imageConfig', { x: 0, y: 0 })
+    const node = useCanvasStore.getState().nodes.find((item) => item.id === id)
+    expect(node?.type).toBe('imageConfig')
+    expect(node?.data.model).toBe('gpt-image-2')
+    expect(useCanvasStore.getState().edges.filter((edge) => edge.target === id)).toEqual([])
+
+    const wiped: ModelConfig = {
+      key: 'gpt-image-2',
+      label: 'GPT Image 2 文生图',
+      type: 'image',
+      sizes: [],
+      getSizesByQuality: () => [],
+    }
+    expect(listImageAspectRatios('gpt-image-2', 'medium', wiped)).toEqual([
+      '21:9',
+      '16:9',
+      '3:2',
+      '4:3',
+      '1:1',
+      '3:4',
+      '2:3',
+      '9:16',
+    ])
+    expect(listImageAspectRatios('wan2.7-image', 'standard', { ...wiped, key: 'wan2.7-image' })).toEqual([
+      '16:9',
+      '4:3',
+      '1:1',
+      '3:4',
+      '9:16',
+    ])
+    expect(listImageAspectRatios('qwen-image-2.0', 'standard', { ...wiped, key: 'qwen-image-2.0' })).toEqual([
+      '3:2',
+      '1:1',
+      '2:3',
+    ])
+  })
+
+  it('shows HappyHorse t2v ratios on a palette video node with zero image refs', () => {
+    const id = useCanvasStore.getState().addNode('videoConfig', { x: 0, y: 0 })
+    const { nodes, edges } = useCanvasStore.getState()
+    const node = nodes.find((item) => item.id === id)
+    expect(node?.data.model).toBe('happyhorse-1.1-t2v')
+    expect(node?.data.ratio).toBe('16:9')
+    expect(edges.filter((edge) => edge.target === id)).toEqual([])
+
+    const inputs = collectGenerateInputs(id, nodes, edges)
+    expect(countVideoRequestReferences(inputs.firstFrameImage, inputs.refImages)).toBe(0)
+    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', inputs)).toBe(false)
+    expect(
+      listVideoAspectRatios(
+        routedVideoModelKey('happyhorse-1.1-t2v', 0),
+        resolveListedVideoModel('happyhorse-1.1-t2v')
+      )
+    ).toEqual(HAPPYHORSE_RATIOS)
+  })
+
+  it('resolves ratios for the routed aspect key when the collapsed picker row is a different id', () => {
+    const picker = resolveVideoCapabilities('happyhorse-1.1-i2v')
+    expect(picker.key).not.toBe('happyhorse-1.1-t2v')
+    const aspectKey = routedVideoModelKey('happyhorse-1.1-t2v', 0)
+    expect(aspectKey).toBe('happyhorse-1.1-t2v')
+    expect(listVideoAspectRatios(aspectKey, resolveListedVideoModel(aspectKey, picker))).toEqual(
+      HAPPYHORSE_RATIOS
+    )
+    expect(listVideoAspectRatios(aspectKey, picker)).toEqual(HAPPYHORSE_RATIOS)
+
+    const wipedPicker: ModelConfig = {
+      key: 'happyhorse-1.1-t2v',
+      label: 'HappyHorse 文生视频',
+      type: 'video',
+      ratios: [],
+      sizes: [],
+      supportsAspect: false,
+    }
+    expect(listVideoAspectRatios(aspectKey, resolveListedVideoModel(aspectKey, wipedPicker))).toEqual(
+      HAPPYHORSE_RATIOS
+    )
+    expect(listVideoAspectRatios('happyhorse-1.1-r2v', wipedPicker)).toEqual(HAPPYHORSE_RATIOS)
+
+    const i2vKey = routedVideoModelKey('happyhorse-1.1-t2v', 1)
+    expect(listVideoAspectRatios(i2vKey, resolveListedVideoModel(i2vKey, resolveVideoCapabilities(aspectKey)))).toEqual(
+      []
+    )
   })
 })
 

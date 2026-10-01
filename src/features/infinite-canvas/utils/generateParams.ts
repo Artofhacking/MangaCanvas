@@ -4,7 +4,7 @@ import {
   resolveImageCapabilities,
   resolveVideoCapabilities,
 } from '../config/modelCapabilities'
-import { remapVideoModel } from '../config/models'
+import { getImageModel, getVideoModel, remapVideoModel } from '../config/models'
 import type { CustomNode, ModelConfig, NodeData, SizeOption } from '../types'
 import { getSizeRatio, labeledSizes, uniqueAspectRatios } from './aspectRatio'
 
@@ -81,12 +81,55 @@ export function listVideoResolutions(modelKey: string, model?: ModelConfig): str
   return ['720P']
 }
 
-export function listVideoAspectRatios(modelKey: string, model?: ModelConfig): string[] {
-  const caps = model || resolveVideoCapabilities(modelKey)
-  if (caps.ratios?.length) return caps.ratios.map((item) => item.key)
+function readVideoAspectRatios(caps: ModelConfig): string[] {
+  if (caps.ratios?.length) return caps.ratios.map((item) => item.key).filter(Boolean)
   if (caps.sizes?.length) return uniqueAspectRatios(caps.sizes)
   if (caps.supportsAspect === false) return []
   return [...ASPECT_RATIOS]
+}
+
+/**
+ * Caps used to draw the video ratio control.
+ * Always start from the routed id (live store merged with the static catalog).
+ * A collapsed picker row is applied only when it is that same id and actually
+ * has ratios or sizes — an empty live list must not hide the static catalog,
+ * and a HappyHorse i2v row must not be reused for t2v/r2v.
+ */
+export function resolveListedVideoModel(aspectKey: string, pickerModel?: ModelConfig): ModelConfig {
+  const resolved = resolveVideoCapabilities(aspectKey)
+  if (!pickerModel || pickerModel.key !== aspectKey) return resolved
+  const ratios = pickerModel.ratios?.length ? pickerModel.ratios : resolved.ratios
+  const sizes = pickerModel.sizes?.length ? pickerModel.sizes : resolved.sizes
+  if (!pickerModel.ratios?.length && !pickerModel.sizes?.length) return resolved
+  return {
+    ...resolved,
+    ratios,
+    sizes,
+    resolutions: pickerModel.resolutions?.length ? pickerModel.resolutions : resolved.resolutions,
+    durs: pickerModel.durs?.length ? pickerModel.durs : resolved.durs,
+    supportsAspect:
+      ratios?.length || sizes?.length
+        ? pickerModel.supportsAspect ?? resolved.supportsAspect ?? true
+        : resolved.supportsAspect,
+  }
+}
+
+export function listVideoAspectRatios(modelKey: string, model?: ModelConfig): string[] {
+  const applicable = model && model.key && model.key !== modelKey ? undefined : model
+  const caps = applicable || resolveVideoCapabilities(modelKey)
+  const hasOwnList = Boolean(caps.ratios?.length || caps.sizes?.length)
+  if (hasOwnList) return readVideoAspectRatios(caps)
+  if (!applicable) return readVideoAspectRatios(caps)
+
+  const resolvedCaps = resolveVideoCapabilities(modelKey)
+  if (resolvedCaps.ratios?.length || resolvedCaps.sizes?.length || resolvedCaps.supportsAspect === false) {
+    return readVideoAspectRatios(resolvedCaps)
+  }
+  const staticCaps = getVideoModel(modelKey)
+  if (staticCaps && (staticCaps.ratios?.length || staticCaps.sizes?.length || staticCaps.supportsAspect === false)) {
+    return readVideoAspectRatios(staticCaps)
+  }
+  return readVideoAspectRatios(caps)
 }
 
 /** Same cap as backend `collect_video_refs` for HappyHorse. */
@@ -188,12 +231,29 @@ export function videoAspectSuppressedByReferences(
   )
 }
 
-export function listImageSizes(modelKey: string, quality?: string, model?: ModelConfig): SizeOption[] {
-  const caps = model || resolveImageCapabilities(modelKey)
+function sizesFromCaps(caps: ModelConfig, quality?: string): SizeOption[] {
   if (caps.getSizesByQuality) {
-    return caps.getSizesByQuality(quality || caps.defaultParams?.quality || 'medium')
+    const listed = caps.getSizesByQuality(quality || caps.defaultParams?.quality || 'medium')
+    if (listed.length) return listed
   }
   if (caps.sizes?.length) return caps.sizes
+  return []
+}
+
+export function listImageSizes(modelKey: string, quality?: string, model?: ModelConfig): SizeOption[] {
+  const applicable = model && model.key && model.key !== modelKey ? undefined : model
+  const caps = applicable || resolveImageCapabilities(modelKey)
+  const primary = sizesFromCaps(caps, quality)
+  if (primary.length) return primary
+  if (applicable) {
+    const resolved = sizesFromCaps(resolveImageCapabilities(modelKey), quality)
+    if (resolved.length) return resolved
+    const staticCaps = getImageModel(modelKey)
+    if (staticCaps) {
+      const fromStatic = sizesFromCaps(staticCaps, quality)
+      if (fromStatic.length) return fromStatic
+    }
+  }
   return labeledSizes(['1024x1024'])
 }
 

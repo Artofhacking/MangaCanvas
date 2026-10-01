@@ -134,6 +134,48 @@ describe('capability lookup by id', () => {
     ])
   })
 
+  it('keeps the static ratio catalog when a live row sends empty lists', () => {
+    const picker = liveModelsToPicker(
+      [
+        live('happyhorse-1.1-t2v', 'HappyHorse 文生视频', 'video', {
+          parameters: {
+            ratios: [],
+            sizes: [],
+            resolutions: ['720P', '1080P'],
+            durations: [5, 10, 15],
+            supports_aspect: false,
+          },
+        }),
+      ],
+      'video',
+      false
+    )
+    const horse = picker.find((item) => item.key === 'happyhorse-1.1-t2v')
+    expect(horse?.ratios?.map((item) => item.key)).toEqual([
+      '16:9',
+      '9:16',
+      '1:1',
+      '4:3',
+      '3:4',
+      '4:5',
+      '5:4',
+      '9:21',
+      '21:9',
+    ])
+    expect(horse?.supportsAspect).toBe(true)
+
+    const imagePicker = liveModelsToPicker(
+      [
+        live('gpt-image-2', 'GPT Image 2 文生图', 'image', {
+          parameters: { sizes: [], qualities: [{ label: '中', key: 'medium' }] },
+        }),
+      ],
+      'image',
+      false
+    )
+    expect(imagePicker[0].getSizesByQuality?.('medium').map((item) => item.key)).toContain('1536x864')
+  })
+
   it('prefers structured parameters from the live API row', () => {
     const fromApi = capabilitiesFromApi(
       live('gpt-image-2', 'GPT Image 2 文生图', 'image', {
