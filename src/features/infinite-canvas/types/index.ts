@@ -92,6 +92,8 @@ export interface CustomEdge {
   sourceHandle?: string;
   targetHandle?: string;
   type?: string;
+  /** React Flow selection flag. Keyboard delete removes selected edges with selected nodes. */
+  selected?: boolean;
   data?: {
     promptOrder?: number;
     slotOrder?: number;
@@ -110,6 +112,9 @@ export interface Project {
   projectId?: string;
   sourceType?: string;
   sourceAssetId?: number;
+  /** From the list API. Undefined means unknown — do not read it as zero nodes. */
+  nodeCount?: number;
+  edgeCount?: number;
   canvasData: {
     nodes: CustomNode[];
     edges: CustomEdge[];
@@ -309,6 +314,8 @@ export interface CanvasStore {
   addNode: (type: string, position?: { x: number; y: number }, data?: Partial<NodeData>) => string;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   removeNode: (id: string) => void;
+  /** Selected nodes, edges that touch them, and any selected edges. One history step. */
+  removeSelectedNodes: () => boolean;
   duplicateNode: (id: string) => string | null;
   selectNode: (id: string) => void;
   addEdgeManually: (params: Partial<CustomEdge>) => void;

@@ -103,6 +103,8 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
                 sourceType,
                 sourceAssetId,
                 canvasData: toCanvasData(canvasData || project.canvasData),
+                nodeCount: canvasData ? canvasData.nodes.length : project.nodeCount,
+                edgeCount: canvasData ? canvasData.edges.length : project.edgeCount,
                 updatedAt: new Date(),
               }
             : project
@@ -122,6 +124,8 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
       sourceType,
       sourceAssetId,
       canvasData: canvasData ? toCanvasData(canvasData) : emptyCanvasData(),
+      nodeCount: canvasData ? canvasData.nodes.length : 0,
+      edgeCount: canvasData ? canvasData.edges.length : 0,
     };
 
     const newProjects = [workflowProject, ...get().projects];
@@ -158,6 +162,8 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
         projectId: String(workflow.projectId),
         sourceType: workflow.sourceType,
         sourceAssetId: workflow.sourceAssetId,
+        nodeCount: typeof workflow.nodeCount === 'number' ? workflow.nodeCount : previous?.nodeCount,
+        edgeCount: typeof workflow.edgeCount === 'number' ? workflow.edgeCount : previous?.edgeCount,
         canvasData: toCanvasData(workflow.canvasData || previous?.canvasData),
       };
     });
@@ -201,6 +207,8 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
               edges: canvasData.edges || [],
               viewport: canvasData.viewport || { x: 100, y: 50, zoom: 0.8 },
             },
+            nodeCount: (canvasData.nodes || []).length,
+            edgeCount: (canvasData.edges || []).length,
           },
           ...get().projects,
         ],
@@ -212,9 +220,11 @@ export const useCanvasDocumentsStore = create<ProjectsStore>((set, get) => ({
     set({
       projects: get().projects.map((p) =>
         p.id === id
-          ? {
+            ? {
               ...p,
               canvasData: { ...p.canvasData, ...canvasData },
+              nodeCount: canvasData.nodes ? canvasData.nodes.length : p.nodeCount,
+              edgeCount: canvasData.edges ? canvasData.edges.length : p.edgeCount,
               updatedAt: new Date(),
             }
           : p

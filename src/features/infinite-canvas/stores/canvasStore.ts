@@ -7,6 +7,44 @@ import { stripNodeGenerationTransients } from '../utils/videoJobBinding';
 let nodeId = 0;
 const getNodeId = () => `node_${nodeId++}`;
 
+type CanvasRemovalApi = {
+  nodes: CustomNode[];
+  edges: CustomEdge[];
+  referencePickTargetId: string | null;
+  saveHistory: () => void;
+};
+
+/** Shared by context-menu delete and keyboard delete. One history entry per call. */
+function commitCanvasRemoval(
+  get: () => CanvasRemovalApi,
+  set: (partial: Pick<CanvasRemovalApi, 'nodes' | 'edges' | 'referencePickTargetId'>) => void,
+  nodeIds: Iterable<string>,
+  edgeIds: Iterable<string> = [],
+): boolean {
+  const idSet = new Set(nodeIds);
+  const edgeSet = new Set(edgeIds);
+  if (idSet.size === 0 && edgeSet.size === 0) return false;
+
+  const current = get();
+  const pick = current.referencePickTargetId;
+  const nodes = current.nodes.filter((node) => !idSet.has(node.id));
+  const edges = current.edges.filter(
+    (edge) => !idSet.has(edge.source) && !idSet.has(edge.target) && !edgeSet.has(edge.id),
+  );
+  const referencePickTargetId = pick && idSet.has(pick) ? null : pick;
+  if (
+    nodes.length === current.nodes.length &&
+    edges.length === current.edges.length &&
+    referencePickTargetId === pick
+  ) {
+    return false;
+  }
+
+  set({ nodes, edges, referencePickTargetId });
+  get().saveHistory();
+  return true;
+}
+
 const getDefaultNodeData = (type: string): NodeData => {
   switch (type) {
     case 'text':
@@ -228,15 +266,19 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     });
   },
 
-  // Remove node
+  // Remove node (context menu / toolbar). Same graph update as keyboard delete.
   removeNode: (id: string) => {
-    const pick = get().referencePickTargetId;
-    set({
-      nodes: get().nodes.filter((node) => node.id !== id),
-      edges: get().edges.filter((edge) => edge.source !== id && edge.target !== id),
-      referencePickTargetId: pick === id ? null : pick,
-    });
-    get().saveHistory();
+    commitCanvasRemoval(get, set, [id]);
+  },
+
+  removeSelectedNodes: () => {
+    const { nodes, edges } = get();
+    return commitCanvasRemoval(
+      get,
+      set,
+      nodes.filter((node) => node.selected).map((node) => node.id),
+      edges.filter((edge) => edge.selected).map((edge) => edge.id),
+    );
   },
 
   // Duplicate node

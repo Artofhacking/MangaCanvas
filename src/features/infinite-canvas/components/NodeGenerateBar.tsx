@@ -689,11 +689,8 @@ const NodeGenerateBar: React.FC = () => {
     setDraftPrompt(typeof node?.data.prompt === 'string' ? node.data.prompt : '')
   }, [node?.data.prompt, selectedId])
 
-  useEffect(() => {
-    if (!selectedId) return
-    const timer = window.setTimeout(() => mentionRef.current?.focus(), 40)
-    return () => window.clearTimeout(timer)
-  }, [selectedId])
+  // Selection must not focus the prompt. Delete/Backspace then remove the node;
+  // clicking the field is what starts typing.
 
   useEffect(() => {
     if (!picking) return
