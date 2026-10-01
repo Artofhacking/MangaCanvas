@@ -27,6 +27,7 @@ import {
   BgColorsOutlined,
   VideoCameraOutlined,
   PlayCircleOutlined,
+  AudioOutlined,
   ThunderboltOutlined,
   HighlightOutlined,
   LockOutlined,
@@ -80,6 +81,7 @@ import VideoNode from './components/nodes/VideoNode';
 import VideoConfigNode from './components/nodes/VideoConfigNode';
 import EffectConfigNode from './components/nodes/EffectConfigNode';
 import TemplateEffectNode from './components/nodes/TemplateEffectNode';
+import AudioNode from './components/nodes/AudioNode';
 import CanvasFlowEdge from './components/edges/CanvasFlowEdge';
 import PromptOrderEdge from './components/edges/PromptOrderEdge';
 import ImageRoleEdge from './components/edges/ImageRoleEdge';
@@ -117,6 +119,7 @@ const nodeTypes = {
   videoConfig: VideoConfigNode,
   effectConfig: EffectConfigNode,
   templateEffect: TemplateEffectNode,
+  audio: AudioNode,
 };
 
 const edgeTypes = {
@@ -1070,6 +1073,7 @@ const CanvasInner: React.FC = () => {
     { type: 'videoConfig', name: '视频', icon: <VideoCameraOutlined />, color: '#9a3412' },
     { type: 'image', name: '图片', icon: <PictureOutlined />, color: '#ea580c' },
     { type: 'video', name: '成片', icon: <PlayCircleOutlined />, color: '#b45309' },
+    { type: 'audio', name: '音频', icon: <AudioOutlined />, color: '#9a3412' },
   ];
   const extraNodeTypes = [
     { type: 'effectConfig', name: '效果', icon: <ThunderboltOutlined />, color: '#d97706' },

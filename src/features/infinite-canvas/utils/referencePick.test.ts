@@ -10,8 +10,11 @@ import {
   noteReferencePickClick,
   REFERENCE_EMPTY_HINT,
   REFERENCE_PICK_BUTTON_LABEL,
+  REFERENCE_PICK_AUDIO_EMPTY_MESSAGE,
+  REFERENCE_PICK_AUDIO_TYPE_MESSAGE,
   REFERENCE_PICK_EMPTY_MESSAGE,
   REFERENCE_PICK_SELF_MESSAGE,
+  REFERENCE_PICK_TEXT_EMPTY_MESSAGE,
   REFERENCE_PICK_TOOLTIP,
   REFERENCE_PICK_TYPE_MESSAGE,
   REFERENCE_PICK_VIDEO_LIMIT_MESSAGE,
@@ -277,6 +280,43 @@ describe('applyReferencePickClick', () => {
     useCanvasStore.getState().setReferencePickTarget(nextId)
     useCanvasStore.getState().clearCanvas()
     expect(useCanvasStore.getState().referencePickTargetId).toBeNull()
+  })
+})
+
+describe('audio reference pick', () => {
+  it('lets an audio node take text and audio, and refuses pictures', () => {
+    const target = node({ id: 'voice', type: 'audio', data: { label: '音频', audioMode: 'tts' } })
+    const text = node({ id: 'line', type: 'text', data: { label: '台词', content: '你好' } })
+    const emptyText = node({ id: 'blank', type: 'text', data: { label: '空', content: '  ' } })
+    const clip = node({ id: 'clip', type: 'audio', data: { label: '参考', url: 'https://cdn/a.mp3' } })
+    const emptyClip = node({ id: 'silent', type: 'audio', data: { label: '空音频', url: '' } })
+    const picture = node({ id: 'shot', type: 'image', data: { label: '图', url: 'https://img/a.png' } })
+    const nodes = [target, text, emptyText, clip, emptyClip, picture]
+
+    expect(assessReferencePick({ source: text, target, nodes, edges: [] }).visual).toBe('pickable')
+    expect(assessReferencePick({ source: clip, target, nodes, edges: [] }).visual).toBe('pickable')
+    expect(assessReferencePick({ source: emptyText, target, nodes, edges: [] })).toMatchObject({
+      visual: 'blocked',
+      message: REFERENCE_PICK_TEXT_EMPTY_MESSAGE,
+    })
+    expect(assessReferencePick({ source: emptyClip, target, nodes, edges: [] })).toMatchObject({
+      visual: 'blocked',
+      message: REFERENCE_PICK_AUDIO_EMPTY_MESSAGE,
+    })
+    expect(assessReferencePick({ source: picture, target, nodes, edges: [] })).toMatchObject({
+      visual: 'blocked',
+      message: REFERENCE_PICK_AUDIO_TYPE_MESSAGE,
+    })
+  })
+
+  it('still blocks an audio source on a 画面 node', () => {
+    const target = node({ id: 'gen', type: 'imageConfig', data: { label: '画面', model: 'gpt-image-2' } })
+    const clip = node({ id: 'clip', type: 'audio', data: { label: '音频', url: 'https://cdn/a.mp3' } })
+    expect(assessReferencePick({ source: clip, target, nodes: [target, clip], edges: [] })).toMatchObject({
+      visual: 'blocked',
+      block: 'type',
+      message: REFERENCE_PICK_TYPE_MESSAGE,
+    })
   })
 })
 

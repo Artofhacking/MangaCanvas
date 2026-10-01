@@ -41,6 +41,10 @@ export interface NodeData {
   duration?: number;
   n?: number;
   prompt?: string;
+  /** 配音 tts / 音效 sfx / 音乐 music. One audio card owns config and playback. */
+  audioMode?: 'tts' | 'sfx' | 'music';
+  /** MiniMax TTS voice id from the live audio catalog. */
+  voiceId?: string;
   executed?: boolean;
   outputNodeId?: string;
   autoExecute?: boolean;

@@ -14,7 +14,15 @@ function extensionFor(mime: string): string {
     'video/mp4': 'mp4',
     'video/webm': 'webm',
     'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
     'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/wave': 'wav',
+    'audio/mp4': 'm4a',
+    'audio/aac': 'aac',
+    'audio/ogg': 'ogg',
+    'audio/flac': 'flac',
+    'audio/webm': 'webm',
   }
   if (known[mime]) return known[mime]
   const subtype = (mime.split('/')[1] || 'bin').split('+')[0]

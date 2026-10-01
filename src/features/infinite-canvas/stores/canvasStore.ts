@@ -36,6 +36,14 @@ const getDefaultNodeData = (type: string): NodeData => {
       };
     case 'video':
       return { url: '', label: '视频节点' };
+    case 'audio':
+      return {
+        prompt: '',
+        url: '',
+        model: '',
+        audioMode: 'tts',
+        label: '音频',
+      };
     case 'effectConfig':
       return {
         style: '',

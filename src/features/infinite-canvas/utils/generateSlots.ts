@@ -1,6 +1,6 @@
 import type { CustomEdge, CustomNode } from '../types'
 
-export const GENERATE_NODE_TYPES = ['imageConfig', 'videoConfig'] as const
+export const GENERATE_NODE_TYPES = ['imageConfig', 'videoConfig', 'audio'] as const
 export type GenerateNodeType = (typeof GENERATE_NODE_TYPES)[number]
 
 export type ReferenceSlotKind = 'image' | 'video' | 'text' | 'audio' | 'effect' | 'unknown'
@@ -21,13 +21,14 @@ export interface GenerateConnectedInputs {
   prompt: string
   textSnippets: string[]
   refImages: string[]
+  refAudios: string[]
   firstFrameImage: string
   lastFrameImage: string
   slots: ReferenceSlot[]
 }
 
 export function isGenerateNodeType(type?: string | null): type is GenerateNodeType {
-  return type === 'imageConfig' || type === 'videoConfig'
+  return type === 'imageConfig' || type === 'videoConfig' || type === 'audio'
 }
 
 export function getEdgeSlotOrder(edge: CustomEdge, fallback = 0): number {
@@ -165,6 +166,7 @@ export function collectGenerateInputs(
   const slots = getIncomingReferenceSlots(nodeId, nodes, edges)
   const textSnippets: string[] = []
   const refImages: string[] = []
+  const refAudios: string[] = []
   let firstFrameImage = ''
   let lastFrameImage = ''
   const effectParams: { style?: string; lighting?: string; camera?: string; effect?: string } = {}
@@ -176,6 +178,12 @@ export function collectGenerateInputs(
 
     if (slot.kind === 'text' && slot.snippet) {
       textSnippets.push(slot.snippet)
+      return
+    }
+
+    if (slot.kind === 'audio') {
+      const mediaUrl = readNodeMediaUrl(sourceNode)
+      if (mediaUrl) refAudios.push(mediaUrl)
       return
     }
 
@@ -227,6 +235,7 @@ export function collectGenerateInputs(
     prompt,
     textSnippets,
     refImages,
+    refAudios,
     firstFrameImage,
     lastFrameImage,
     slots,

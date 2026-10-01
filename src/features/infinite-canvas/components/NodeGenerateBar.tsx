@@ -18,6 +18,8 @@ import { message, Tooltip } from 'antd'
 import { useCanvasStore } from '../stores/canvasStore'
 import { findVideoPickerModel, liveModelsToPicker, remapModelId } from '../config/modelCapabilities'
 import { useImageModels, useVideoModels } from '../hooks/useModels'
+import { AudioGenerateControls, type AudioGenerateAvailability } from './AudioGenerateControls'
+import { audioPromptPlaceholder, buildCanvasAudioRequest, readAudioMode } from '../utils/audioMode'
 import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
 import { useNodeGenerateAction } from '../hooks/useNodeGenerateAction'
 import {
@@ -661,6 +663,7 @@ const NodeGenerateBar: React.FC = () => {
   const [draftPrompt, setDraftPrompt] = useState('')
   const [quote, setQuote] = useState<CreditQuote | null>(null)
   const [quoteError, setQuoteError] = useState('')
+  const [audioGate, setAudioGate] = useState<AudioGenerateAvailability>({ blocked: false, hint: '' })
   const mentionRef = useRef<MentionPromptInputHandle>(null)
   const prevSlotsRef = useRef<{ nodeId: string | null; slots: SlotRef[] }>({ nodeId: null, slots: [] })
 
@@ -730,10 +733,48 @@ const NodeGenerateBar: React.FC = () => {
     updateNode(selectedId, data)
   }, [selectedId, updateNode])
 
+  const handleAudioAvailability = useCallback((state: AudioGenerateAvailability) => {
+    setAudioGate((prev) => (prev.blocked === state.blocked && prev.hint === state.hint ? prev : state))
+  }, [])
+
+  useEffect(() => {
+    if (node?.type === 'audio') return
+    setAudioGate((prev) => (prev.blocked || prev.hint ? { blocked: false, hint: '' } : prev))
+  }, [node?.type])
+
   useEffect(() => {
     if (!node) {
       setQuote(null)
+      setQuoteError('')
       return
+    }
+    if (node.type === 'audio') {
+      const mode = readAudioMode(node.data.audioMode)
+      const model = typeof node.data.model === 'string' ? node.data.model : ''
+      if (mode === 'sfx' || !model) {
+        setQuote(null)
+        setQuoteError('')
+        return
+      }
+      const projectId = resolveProjectId()
+      const timer = window.setTimeout(() => {
+        creditsApi
+          .quote({
+            model,
+            modality: 'audio',
+            n: 1,
+            projectId,
+          })
+          .then((result) => {
+            setQuote(result)
+            setQuoteError('')
+          })
+          .catch((error: unknown) => {
+            setQuote(null)
+            setQuoteError(error instanceof Error ? error.message : '估价失败')
+          })
+      }, 280)
+      return () => window.clearTimeout(timer)
     }
     const projectId = resolveProjectId()
     const timer = window.setTimeout(() => {
@@ -777,6 +818,7 @@ const NodeGenerateBar: React.FC = () => {
     node?.data.resolution,
     node?.data.duration,
     node?.data.n,
+    node?.data.audioMode,
     node?.type,
     slots,
     videoReferenceCount,
@@ -798,6 +840,20 @@ const NodeGenerateBar: React.FC = () => {
 
   const insufficient = Boolean(quote && (!quote.sufficient || !quote.quotaOk))
   const blockedReason = quote && !quote.sufficient ? '积分不足' : quote && !quote.quotaOk ? (quote.message || '额度不足') : quoteError
+  const audioCopy = node?.type === 'audio' && readAudioMode(node.data.audioMode) !== 'sfx'
+    ? buildCanvasAudioRequest({
+        mode: readAudioMode(node.data.audioMode),
+        model: typeof node.data.model === 'string' && node.data.model ? node.data.model : 'pending',
+        prompt: draftPrompt,
+        lyrics: connectedInputs?.textSnippets.join('\n\n') || '',
+        voiceId: typeof node.data.voiceId === 'string' ? node.data.voiceId : undefined,
+      })
+    : null
+  const audioCopyMessage = audioCopy && !audioCopy.ok && audioCopy.message !== '当前没有可用的音频模型'
+    ? audioCopy.message
+    : ''
+  const audioBlocked = node?.type === 'audio' && (audioGate.blocked || Boolean(audioCopyMessage))
+  const audioReason = audioGate.blocked ? audioGate.hint : audioCopyMessage
 
   const handleToggleReferencePick = (event: React.MouseEvent) => {
     event.stopPropagation()
@@ -809,6 +865,10 @@ const NodeGenerateBar: React.FC = () => {
     event.stopPropagation()
     if (picking) {
       message.info(REFERENCE_PICK_SEND_BLOCKED)
+      return
+    }
+    if (audioBlocked) {
+      if (audioReason) message.info(audioReason)
       return
     }
     if (insufficient) {
@@ -894,11 +954,17 @@ const NodeGenerateBar: React.FC = () => {
             slots={slots}
             onChange={handlePromptChange}
             placeholder={
-              node.type === 'videoConfig'
-                ? '描述视频，输入 @ 引用已连入的参考…'
-                : '描述画面，输入 @ 引用已连入的参考…'
+              node.type === 'audio'
+                ? audioPromptPlaceholder(readAudioMode(node.data.audioMode))
+                : node.type === 'videoConfig'
+                  ? '描述视频，输入 @ 引用已连入的参考…'
+                  : '描述画面，输入 @ 引用已连入的参考…'
             }
           />
+
+          {node.type === 'audio' && audioGate.hint ? (
+            <p className="mt-2 text-[11px] leading-4 text-[hsl(var(--secondary))]">{audioGate.hint}</p>
+          ) : null}
 
           {suppressVideoAspect ? (
             <p className="mt-2 text-[11px] leading-4 text-[hsl(var(--secondary))]">
@@ -908,24 +974,34 @@ const NodeGenerateBar: React.FC = () => {
 
           <div className="mt-2 flex min-w-0 items-center gap-1.5">
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleCastClick}
-                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
-                >
-                  <Users className="h-3 w-3" />
-                  角色库
-                </button>
-              </div>
-              <DockDivider />
-              <GenerateBarModelPicker
-                node={node}
-                onChange={handleModelChange}
-                suppressVideoAspect={suppressVideoAspect}
-                videoReferenceCount={videoReferenceCount}
-                imageReferenceCount={imageReferenceCount}
-              />
+              {node.type === 'audio' ? (
+                <AudioGenerateControls
+                  node={node}
+                  onChange={handleModelChange}
+                  onAvailability={handleAudioAvailability}
+                />
+              ) : (
+                <>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleCastClick}
+                      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--on-surface-variant))] transition-colors hover:bg-[hsl(var(--surface-container-highest))]"
+                    >
+                      <Users className="h-3 w-3" />
+                      角色库
+                    </button>
+                  </div>
+                  <DockDivider />
+                  <GenerateBarModelPicker
+                    node={node}
+                    onChange={handleModelChange}
+                    suppressVideoAspect={suppressVideoAspect}
+                    videoReferenceCount={videoReferenceCount}
+                    imageReferenceCount={imageReferenceCount}
+                  />
+                </>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <span
@@ -940,9 +1016,17 @@ const NodeGenerateBar: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={sending || insufficient || picking}
+                disabled={sending || insufficient || picking || audioBlocked}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50"
-                title={picking ? REFERENCE_PICK_SEND_BLOCKED : insufficient ? blockedReason || '积分不足' : '发送生成'}
+                title={
+                  picking
+                    ? REFERENCE_PICK_SEND_BLOCKED
+                    : audioBlocked
+                      ? audioReason || '暂不能生成'
+                      : insufficient
+                        ? blockedReason || '积分不足'
+                        : '发送生成'
+                }
               >
                 <ArrowUp className={cn('h-4 w-4', sending && 'animate-pulse')} />
               </button>
