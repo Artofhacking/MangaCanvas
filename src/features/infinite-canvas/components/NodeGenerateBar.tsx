@@ -62,6 +62,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { displayModelName } from '@/lib/displayModelName'
+import { videoModelTip } from '../config/videoModelTip'
 import { cn } from '@/lib/utils'
 
 /**
@@ -290,6 +291,19 @@ function GenerateBarModelPicker({
     onChange(applyModelDefaults(node.type, model.key, node, liveIds, model))
   }
 
+  const triggerName =
+    loading && !selected
+      ? '加载模型…'
+      : selected
+        ? displayModelName(selected.label)
+        : pickerModels.length === 0
+          ? '暂无可用模型'
+          : displayModelName(currentKey) || '选择模型'
+  const selectedTip = isVideo && selected ? videoModelTip(selected.key, selected.label) : ''
+  const triggerTitle = selectedTip
+    ? `${displayModelName(selected?.label) || triggerName} — ${selectedTip}`
+    : selected?.label || currentKey || '选择模型'
+
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-0.5">
       <DropdownMenu>
@@ -298,19 +312,15 @@ function GenerateBarModelPicker({
             wide
             loading={loading && pickerModels.length === 0}
             disabled={loading && pickerModels.length === 0}
-            title={selected?.label || currentKey || '选择模型'}
-            label={
-              loading && !selected
-                ? '加载模型…'
-                : selected
-                  ? displayModelName(selected.label)
-                  : pickerModels.length === 0
-                    ? '暂无可用模型'
-                    : displayModelName(currentKey) || '选择模型'
-            }
+            title={triggerTitle}
+            label={triggerName}
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={8} className={cn(DOCK_MENU, 'max-h-[420px] w-72')}>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={8}
+          className={cn(DOCK_MENU, isVideo ? 'max-h-[520px] w-[22rem]' : 'max-h-[420px] w-72')}
+        >
           <p className="px-2 pb-1.5 pt-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
             模型
           </p>
@@ -319,16 +329,38 @@ function GenerateBarModelPicker({
               {loading ? '正在拉取可用模型…' : error ? '模型列表加载失败' : '接口未返回可用模型'}
             </p>
           ) : (
-            pickerModels.map((model) => (
-              <DropdownMenuItem
-                key={model.key}
-                onClick={() => handleSelect(model)}
-                className={menuItemClass(selected?.key === model.key)}
-              >
-                <Check className={cn('mr-2 h-3.5 w-3.5', selected?.key === model.key ? 'opacity-100' : 'opacity-0')} />
-                <span className="truncate">{displayModelName(model.label)}</span>
-              </DropdownMenuItem>
-            ))
+            pickerModels.map((model) => {
+              const active = selected?.key === model.key
+              const tip = isVideo ? videoModelTip(model.key, model.label) : ''
+              return (
+                <DropdownMenuItem
+                  key={model.key}
+                  onClick={() => handleSelect(model)}
+                  className={cn(menuItemClass(active), tip && 'items-start')}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-3.5 w-3.5 shrink-0',
+                      tip && 'mt-0.5',
+                      active ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block truncate">{displayModelName(model.label)}</span>
+                    {tip ? (
+                      <span
+                        className={cn(
+                          'mt-0.5 block whitespace-normal break-words text-[11px] font-normal leading-4',
+                          active ? 'text-white/80' : 'text-[hsl(var(--secondary))]'
+                        )}
+                      >
+                        {tip}
+                      </span>
+                    ) : null}
+                  </span>
+                </DropdownMenuItem>
+              )
+            })
           )}
         </DropdownMenuContent>
       </DropdownMenu>
