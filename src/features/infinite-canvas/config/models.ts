@@ -6,6 +6,7 @@ import { labeledSizes } from '../utils/aspectRatio';
  * Not a picker source — empty/error live lists must not dump this catalog.
  * Live `parameters.sizes` always wins; this list is last-resort only.
  * Video picker subtitles are family tips in `videoModelTip.ts`, not per-id copy here.
+ * Image picker subtitles are per-model tips in `imageModelTip.ts`, not per-id copy here.
  */
 
 /** Mirrors backend `GPT_IMAGE_2_SIZES` — one pixel size per common ratio. */
