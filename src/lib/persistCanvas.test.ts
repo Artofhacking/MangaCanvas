@@ -11,14 +11,18 @@ vi.mock('@/features/project/api/workflows', () => ({
   workflowsApi: {
     getAll: vi.fn(),
     update: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
   },
 }))
 
 import { uploadApi } from '@/api/uploadApi'
 import { workflowsApi } from '@/features/project/api/workflows'
 import { useCanvasStore } from '@/features/infinite-canvas/stores/canvasStore'
+import { useCanvasDocumentsStore } from '@/features/infinite-canvas/stores/projectsStore'
 import {
   CANVAS_AUTOSAVE_DEBOUNCE_MS,
+  noteWorkflowLoaded,
   persistOpenCanvas,
   resetCanvasAutosaveForTests,
 } from './persistCanvas'
@@ -42,6 +46,7 @@ describe('persistOpenCanvas', () => {
 
   beforeEach(() => {
     resetCanvasAutosaveForTests()
+    useCanvasDocumentsStore.setState({ projects: [], currentProjectId: null })
     useCanvasStore.setState({
       nodes: [],
       edges: [],
@@ -51,7 +56,10 @@ describe('persistOpenCanvas', () => {
       historyIndex: -1,
     })
     vi.mocked(workflowsApi.update).mockReset()
-    vi.mocked(workflowsApi.update).mockResolvedValue({ success: true, data: {} as never })
+    vi.mocked(workflowsApi.update).mockResolvedValue({ success: true, data: { id: 'workflow_1', name: '工作流', projectId: '8', sourceType: 'blank', status: 'draft', modified: '2026-01-01T00:00:00.000Z' } })
+    vi.mocked(workflowsApi.create).mockReset()
+    vi.mocked(workflowsApi.delete).mockReset()
+    vi.mocked(workflowsApi.delete).mockResolvedValue({ success: true, data: true })
     vi.spyOn(uploadApi, 'uploadSingleFile').mockResolvedValue(STORED)
   })
 
@@ -186,5 +194,76 @@ describe('persistOpenCanvas', () => {
     })
     await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
     expect(workflowsApi.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not create or update a blank draft, and deletes a loaded workflow once it has no nodes', async () => {
+    useCanvasStore.setState({ currentProjectId: 'draft_1', nodes: [] })
+    await persistOpenCanvas({ projectId: 8, workflowId: 'draft_1', immediate: true })
+    expect(workflowsApi.create).not.toHaveBeenCalled()
+    expect(workflowsApi.update).not.toHaveBeenCalled()
+    expect(workflowsApi.delete).not.toHaveBeenCalled()
+
+    useCanvasStore.setState({ currentProjectId: 'workflow_1', nodes: [] })
+    await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
+    expect(workflowsApi.delete).not.toHaveBeenCalled()
+
+    noteWorkflowLoaded('workflow_1')
+    await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
+    expect(workflowsApi.delete).toHaveBeenCalledWith(8, 'workflow_1')
+    expect(workflowsApi.update).not.toHaveBeenCalled()
+    expect(workflowsApi.create).not.toHaveBeenCalled()
+  })
+
+  it('creates the server row on the first non-empty save of a draft and keeps later edits on that id', async () => {
+    vi.mocked(workflowsApi.create).mockResolvedValue({
+      success: true,
+      data: {
+        id: 'workflow_server',
+        projectId: '8',
+        name: '空白工作流',
+        sourceType: 'blank',
+        status: 'draft',
+        modified: '2026-09-01T00:00:00.000Z',
+        canvasData: {
+          nodes: [textNode('第一笔')],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+        },
+      },
+    })
+    useCanvasDocumentsStore.setState({
+      projects: [
+        {
+          id: 'draft_1',
+          name: '空白工作流',
+          thumbnail: '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          projectId: '8',
+          sourceType: 'blank',
+          nodeCount: 0,
+          edgeCount: 0,
+          canvasData: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+        },
+      ],
+      currentProjectId: null,
+    })
+    useCanvasStore.setState({ currentProjectId: 'draft_1', nodes: [textNode('第一笔')] })
+
+    await persistOpenCanvas({ projectId: 8, workflowId: 'draft_1', immediate: true })
+
+    expect(workflowsApi.create).toHaveBeenCalledTimes(1)
+    expect(workflowsApi.update).not.toHaveBeenCalled()
+    expect(vi.mocked(workflowsApi.create).mock.calls[0][1]).toMatchObject({
+      name: '空白工作流',
+      sourceType: 'blank',
+    })
+    expect(useCanvasStore.getState().currentProjectId).toBe('workflow_server')
+
+    useCanvasStore.setState({ nodes: [textNode('第二笔')] })
+    await persistOpenCanvas({ projectId: 8, workflowId: 'draft_1', immediate: true })
+    expect(workflowsApi.create).toHaveBeenCalledTimes(1)
+    expect(workflowsApi.update).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(workflowsApi.update).mock.calls[0][1]).toBe('workflow_server')
   })
 })

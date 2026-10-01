@@ -57,10 +57,10 @@ import { getAllProjects } from './utils/indexedDB';
 import { workflowsApi } from '@/features/project/api/workflows';
 import { projectApi } from '@/api/projectApi';
 import { dominantAssetNode } from '@/lib/assetSeed';
-import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
+import { buildSeedCanvas, isDraftWorkflowId, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
 import { canvasSidebarWorkflows, workflowNodeCountLabel } from './workflowSidebar';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
-import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { isAdoptedWorkflow, noteWorkflowLoaded, persistOpenCanvas, setPersistedWorkflowListener } from '@/lib/persistCanvas';
 import { stopLocalGenerationJobs } from './utils/generationJobs';
 import { beginCanvasVideoJobResume } from './utils/resumeVideoJobs';
 import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
@@ -725,10 +725,21 @@ const CanvasInner: React.FC = () => {
   }, [initProjects]);
 
   useEffect(() => {
+    setPersistedWorkflowListener((nextWorkflowId) => {
+      if (!projectId || nextWorkflowId === workflowId) return;
+      navigate(`/project/${projectId}/workflows/${nextWorkflowId}`, {
+        replace: true,
+        state: location.state,
+      });
+    });
+    return () => setPersistedWorkflowListener(null);
+  }, [location.state, navigate, projectId, workflowId]);
+
+  useEffect(() => {
     if (!projectId) return;
     const numericProjectId = Number(projectId);
     setWorkflowsLoaded(false);
-    void syncProjectWorkflows(projectId).finally(() => setWorkflowsLoaded(true));
+    void syncProjectWorkflows(projectId, workflowId).finally(() => setWorkflowsLoaded(true));
     if (Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
     setEpisodesLoaded(false);
     void projectApi.episodes.getAll(numericProjectId).then((response) => {
@@ -736,7 +747,7 @@ const CanvasInner: React.FC = () => {
         setEpisodes(response.data || []);
       }
     }).finally(() => setEpisodesLoaded(true));
-  }, [projectId, syncProjectWorkflows]);
+  }, [projectId, syncProjectWorkflows, workflowId]);
 
   useEffect(() => {
     if (!projectId || workflowId || !episodeId) return;
@@ -769,15 +780,42 @@ const CanvasInner: React.FC = () => {
     if (!projectId || !canvasDocumentId) return;
 
     let cancelled = false;
+    const canvasNow = useCanvasStore.getState();
+    // The first real save of a blank canvas replaces the draft id. The nodes
+    // are already on screen; refetching would wipe edits made while creating.
+    if (
+      isAdoptedWorkflow(canvasDocumentId) &&
+      canvasNow.currentProjectId === canvasDocumentId &&
+      canvasNow.nodes.length > 0
+    ) {
+      beginCanvasVideoJobResume();
+      setHydratedWorkflowId(canvasDocumentId);
+      return () => {
+        cancelled = true;
+        stopLocalGenerationJobs();
+      };
+    }
+
     setHydratedWorkflowId(null);
     deferCanvasFitView(reactFlowStore);
 
     const hydrate = async () => {
       const numericProjectId = Number(projectId);
-      if (!Number.isNaN(numericProjectId) && workflowId) {
+      if (isDraftWorkflowId(workflowId)) {
+        const existing = useCanvasDocumentsStore.getState().getProjectById(canvasDocumentId);
+        if (!existing) {
+          createWorkflowDocument({
+            id: canvasDocumentId,
+            name: '空白工作流',
+            projectId: String(projectId),
+            sourceType: 'blank',
+          });
+        }
+      } else if (!Number.isNaN(numericProjectId) && workflowId) {
         const response = await workflowsApi.getById(numericProjectId, workflowId);
         if (cancelled) return;
         if (response.success && response.data) {
+          noteWorkflowLoaded(response.data.id);
           let canvasData = response.data.canvasData
           if (
             response.data.sourceType === 'episode' &&

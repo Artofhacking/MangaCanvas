@@ -18,6 +18,15 @@ export function canvasSidebarWorkflows<T extends CanvasSidebarWorkflow>(
   )
 }
 
+/**
+ * Workflow space, the assets tab, and the recent list.
+ * Empty canvases are not saved work, so they stay off these lists.
+ * A missing count is unknown and stays visible.
+ */
+export function listedWorkflows<T extends CanvasSidebarWorkflow>(workflows: T[]): T[] {
+  return workflows.filter((item) => item.nodeCount !== 0)
+}
+
 /** Label for 「N 节点」. Missing counts stay blank instead of rendering a fake zero. */
 export function workflowNodeCountLabel(nodeCount: number | undefined): string | null {
   if (typeof nodeCount !== 'number' || !Number.isFinite(nodeCount)) return null
