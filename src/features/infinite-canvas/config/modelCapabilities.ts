@@ -25,10 +25,10 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   happyhorse: 'happyhorse-1.1-t2v',
   'happyhorse-t2v': 'happyhorse-1.1-t2v',
   'happyhorse-i2v': 'happyhorse-1.1-i2v',
-  'happyhorse-r2v': 'happyhorse-1.1-r2v',
+  'happyhorse-r2v': 'happyhorse-1.1-i2v',
   'happy-horse-1.1-t2v': 'happyhorse-1.1-t2v',
   'happy-horse-1.1-i2v': 'happyhorse-1.1-i2v',
-  'happy-horse-1.1-r2v': 'happyhorse-1.1-r2v',
+  'happy-horse-1.1-r2v': 'happyhorse-1.1-i2v',
   hailuo: 'MiniMax-H3',
   'hailuo-i2v': 'MiniMax-H3',
   'minimax-hailuo': 'MiniMax-H3',
@@ -54,6 +54,21 @@ function normalizeModelId(value: string): string {
   return value.trim().toLowerCase().replace(/_/g, '-')
 }
 
+/** HappyHorse r2v has no gateway channel. Keep a live i2v/t2v id instead. */
+function redirectHappyHorseR2v(modelId: string, liveIds: readonly string[]): string {
+  const name = modelId.toLowerCase()
+  if (!(name.includes('happyhorse') || name.includes('happy-horse')) || !name.includes('r2v')) {
+    return modelId
+  }
+  const i2v = liveIds.find((id) => id.toLowerCase().includes('i2v'))
+  if (i2v) return i2v
+  const t2v = liveIds.find((id) => id.toLowerCase().includes('t2v'))
+  if (t2v) return t2v
+  const other = liveIds.find((id) => !id.toLowerCase().includes('r2v'))
+  if (other) return other
+  return 'happyhorse-1.1-i2v'
+}
+
 export function remapModelId(
   raw: string | undefined,
   liveIds: readonly string[] = [],
@@ -61,32 +76,31 @@ export function remapModelId(
 ): string {
   const name = (raw || '').trim()
   const live = [...liveIds]
-  if (name && live.includes(name)) return name
+  const finish = (id: string) => redirectHappyHorseR2v(id, live)
+  if (name && live.includes(name)) return finish(name)
 
   const aliased =
     (name && (LEGACY_MODEL_ALIASES[name] || LEGACY_MODEL_ALIASES[normalizeModelId(name)])) || ''
-  if (aliased && (live.length === 0 || live.includes(aliased))) return aliased
+  if (aliased && (live.length === 0 || live.includes(aliased))) return finish(aliased)
 
   if (name && live.length) {
     const normalized = normalizeModelId(name)
     const exact = live.find((id) => normalizeModelId(id) === normalized)
-    if (exact) return exact
+    if (exact) return finish(exact)
   }
 
   if (modality === 'video' && live.length) {
     if (name.includes('i2v') || name.includes('kf2v') || name.includes('r2v')) {
-      const preferred = name.includes('r2v')
-        ? live.find((id) => id.includes('r2v'))
-        : live.find((id) => id.includes('i2v'))
-      if (preferred) return preferred
+      const preferred = live.find((id) => id.includes('i2v')) || live.find((id) => id.includes('t2v'))
+      if (preferred) return finish(preferred)
     }
     const t2v = live.find((id) => id.includes('t2v'))
-    if (t2v) return t2v
-    return live[0]
+    if (t2v) return finish(t2v)
+    return finish(live[0])
   }
 
-  if (live.length) return live[0]
-  return aliased || name
+  if (live.length) return finish(live[0])
+  return finish(aliased || name)
 }
 
 function asLabeledKeys(value: unknown): { label: string; key: string }[] {
@@ -218,9 +232,9 @@ function videoPickerScore(model: ModelConfig): number {
 }
 
 /**
- * One picker row per display name. HappyHorse t2v/i2v/r2v all strip to
- * 「HappyHorse」; keep the richest variant (usually t2v) and let generate
- * routing pick t2v/i2v/r2v from refs.
+ * One picker row per display name. HappyHorse variants strip to 「HappyHorse」;
+ * keep the richest row (usually t2v). Generate routing uses t2v with no refs
+ * and i2v for any ref. r2v is not called.
  */
 export function collapseVideoPickerModels(models: ModelConfig[]): ModelConfig[] {
   const kept = new Map<string, ModelConfig>()

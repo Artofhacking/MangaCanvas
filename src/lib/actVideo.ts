@@ -8,7 +8,7 @@ import { persistOpenCanvas } from '@/lib/persistCanvas'
 import { nextMediaPixelFields } from '@/features/infinite-canvas/utils/mediaFrame'
 import { usablePosterUrl } from '@/features/infinite-canvas/utils/videoPoster'
 
-export const ACT_VIDEO_MODEL = 'happyhorse-1.1-r2v'
+export const ACT_VIDEO_MODEL = 'happyhorse-1.1-i2v'
 export const ACT_VIDEO_SIZE = '1280*720'
 export const ACT_VIDEO_RESOLUTION = '720P'
 export const ACT_VIDEO_DURATION = 5
@@ -98,11 +98,11 @@ export async function generateActVideo(actId: string) {
     return
   }
 
-  const urls = refs.map((item) => item.url)
-  const imageNames = refs.map((item, index) => item.name || `参考图${index + 1}`)
+  const frame = refs[0]
+  const imageNames = [frame.name || '参考图1']
   const heading = String(act.data.label || '')
   const videoPrompt = buildActVideoPrompt(heading, prompt, imageNames, ACT_VIDEO_DURATION)
-  message.info(`使用 ${refs.length} 张参考图生成本幕视频`)
+  message.info(refs.length > 1 ? '多张参考图时，本幕只使用第一张作为首帧' : '使用参考图生成本幕视频')
   const outgoing = store.edges.filter((edge) => edge.source === actId)
   const existingVideo = outgoing
     .map((edge) => store.nodes.find((node) => node.id === edge.target && node.type === 'video'))
@@ -146,8 +146,8 @@ export async function generateActVideo(actId: string) {
     const videoUrl = await videoService.generate({
       model: ACT_VIDEO_MODEL,
       prompt: videoPrompt,
-      firstFrameImage: urls[0],
-      images: urls,
+      firstFrameImage: frame.url,
+      images: [frame.url],
       imageNames,
       size: ACT_VIDEO_SIZE,
       resolution: ACT_VIDEO_RESOLUTION,
@@ -163,7 +163,7 @@ export async function generateActVideo(actId: string) {
     if (signal.aborted || !finishGenerationJob(videoId, signal)) return
     useCanvasStore.getState().updateNode(videoId, {
       url: videoUrl,
-      thumbnail: usablePosterUrl(urls[0]),
+      thumbnail: usablePosterUrl(frame.url),
       ...nextMediaPixelFields(null),
       loading: false,
       statusLabel: undefined,

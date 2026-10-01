@@ -11,6 +11,7 @@ from .ai_media import (
     is_vidu_model,
     minimax_resolution,
     billed_chat_model,
+    happyhorse_variant,
     openai_quality,
     resolve_video_model,
     seedance_duration,
@@ -73,11 +74,8 @@ def resolve_billed_video_model(
     raw = (model or "").strip()
     if is_seedance_model(raw) or is_minimax_model(raw) or is_vidu_model(raw):
         return resolve_video_model(raw, has_image)
-    if image_count >= 2:
-        return "happyhorse-1.1-r2v"
-    if has_image or image_count >= 1:
-        return "happyhorse-1.1-i2v"
-    return "happyhorse-1.1-t2v"
+    count = image_count if image_count > 0 else (1 if has_image else 0)
+    return happyhorse_variant(count)
 
 
 def happyhorse_billing_resolution(size: str | None, resolution: str | None) -> str:

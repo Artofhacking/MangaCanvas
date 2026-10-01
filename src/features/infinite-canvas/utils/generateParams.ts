@@ -127,7 +127,8 @@ export interface VideoRequestFields {
 
 /**
  * Fields the video request should carry.
- * HappyHorse t2v / r2v include `ratio`. i2v omits it so the frame can follow the first image.
+ * HappyHorse t2v includes `ratio`. Any reference image uses i2v and omits ratio
+ * so the frame follows the first image. r2v is never selected.
  */
 export function videoRequestParams(input: {
   model: string
@@ -161,19 +162,26 @@ function keepsOwnVideoAspect(modelKey: string): boolean {
 
 /**
  * HappyHorse mode follows image URLs, not the stored id:
- * 0 → t2v (ratio), 1 → i2v (no ratio; aspect follows the first frame), 2+ → r2v (ratio).
- * Seedance / MiniMax / Vidu keep their own ratio even when references are attached.
+ * 0 → t2v (ratio), ≥1 → i2v (no ratio; aspect follows the first frame).
+ * Extra references are ignored. r2v is never returned.
+ * Seedance / MiniMax / Vidu keep their own model even when references are attached.
  */
 export function routedVideoModelKey(modelKey: string, referenceCount: number): string {
   if (keepsOwnVideoAspect(modelKey)) return modelKey
-  if (referenceCount >= 2) return 'happyhorse-1.1-r2v'
-  if (referenceCount === 1) return 'happyhorse-1.1-i2v'
+  if (referenceCount >= 1) return 'happyhorse-1.1-i2v'
   return 'happyhorse-1.1-t2v'
 }
 
-/** Hide the ratio control only for HappyHorse i2v (exactly one image URL). */
+/** Image URLs the HappyHorse request should carry. i2v keeps only the first frame. */
+export function happyHorseRequestImages(modelKey: string, images: readonly string[]): string[] {
+  const routed = routedVideoModelKey(modelKey, images.length)
+  if (!routed.startsWith('happyhorse-')) return [...images]
+  return routed.endsWith('i2v') ? images.slice(0, 1) : []
+}
+
+/** Hide the ratio control for HappyHorse whenever an image URL will be sent. */
 export function videoReferenceModeDropsAspect(modelKey: string, referenceCount: number): boolean {
-  if (referenceCount !== 1) return false
+  if (referenceCount < 1) return false
   if (keepsOwnVideoAspect(modelKey)) return false
   return true
 }

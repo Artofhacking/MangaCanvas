@@ -659,7 +659,10 @@ const NodeGenerateBar: React.FC = () => {
       const payload =
         node.type === 'videoConfig'
           ? {
-              model: String(node.data.model || 'happyhorse-1.1-t2v'),
+              model: routedVideoModelKey(
+                String(node.data.model || 'happyhorse-1.1-t2v'),
+                videoReferenceCount
+              ),
               modality: 'video' as const,
               size: node.data.size,
               resolution: node.data.resolution,
