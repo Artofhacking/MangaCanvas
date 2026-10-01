@@ -17,7 +17,6 @@ from ..ai_media import (
     is_seedance_model,
     is_vidu_model,
     happyhorse_dashscope_body,
-    happyhorse_variant,
     minimax_video_generate,
     IMAGE_GENERATION_TIMEOUT_MESSAGE,
     openai_image_generate,
@@ -437,14 +436,6 @@ async def videos(request: Request, user: models.User = Depends(current_user_deta
 
     if not (is_seedance_model(model) or is_minimax_model(model) or is_vidu_model(model)):
         duration = require_happyhorse_duration(duration)
-        if _is_happyhorse_model(str(model)) or "r2v" in str(model).lower():
-            model = happyhorse_variant(len(images))
-            if str(model).endswith("i2v"):
-                if images:
-                    images = images[:1]
-                    first_frame = images[0]
-                    image_names = image_names[:1]
-                ratio = None
 
     _assert_video_channel(str(model))
 

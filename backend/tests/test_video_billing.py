@@ -217,8 +217,7 @@ def test_r2v_and_persist_failure_releases(user, db, monkeypatch):
     assert db.query(models.User).filter_by(email="emp@x.com").one().credits == 2000
     row = db.query(models.BillingReservation).filter_by(idempotency_key="vid-fail").one()
     assert row.status == "refunded"
-    assert row.model_id == "happyhorse-1.1-i2v"
-    assert "r2v" not in row.model_id
+    assert row.model_id == "happyhorse-1.1-r2v"
 
 
 def test_seedance_rejected_when_baidu_off_even_with_nexcor(user, db, monkeypatch):

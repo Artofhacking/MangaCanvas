@@ -21,7 +21,7 @@ export const GPT_IMAGE_PRESET_SIZES = [
 
 const gptImagePresetSizeOptions = (): SizeOption[] => labeledSizes([...GPT_IMAGE_PRESET_SIZES])
 
-/** Official HappyHorse 1.1 t2v ratios. i2v does not accept `ratio`, and r2v is not called. */
+/** Official HappyHorse 1.1 t2v / r2v ratios. i2v does not accept `ratio`. */
 export const HAPPYHORSE_ASPECT_RATIOS = [
   '16:9',
   '9:16',
@@ -445,34 +445,20 @@ export function resolvePickerModels<T extends { key: string; enabled?: boolean }
   return filterLiveModels(all, liveIds)
 }
 
-function avoidHappyHorseR2v(modelId: string, liveIds: readonly string[]): string {
-  const name = modelId.toLowerCase()
-  if (!(name.includes('happyhorse') || name.includes('happy-horse')) || !name.includes('r2v')) {
-    return modelId
-  }
-  return liveIds.find((id) => id.includes('i2v')) || 'happyhorse-1.1-i2v'
-}
-
 export function remapVideoModel(key: string | undefined, liveIds: readonly string[] = []): string {
   const name = (key || '').trim()
-  const finish = (id: string) => avoidHappyHorseR2v(id, liveIds)
   if (liveIds.length) {
-    if (name && liveIds.includes(name)) return finish(name)
+    if (name && liveIds.includes(name)) return name
     if (name.includes('i2v') || name.includes('kf2v') || name.includes('r2v')) {
-      return finish(
-        liveIds.find((id) => id.includes('i2v'))
-          || liveIds.find((id) => id.includes('t2v'))
-          || liveIds.find((id) => !id.toLowerCase().includes('r2v'))
-          || liveIds[0]
-      )
+      return liveIds.find((id) => id.includes('r2v') && name.includes('r2v'))
+        || liveIds.find((id) => id.includes('i2v'))
+        || liveIds[0]
     }
     return liveIds.find((id) => id.includes('t2v')) || liveIds[0]
   }
   if (!name) return 'happyhorse-1.1-t2v'
-  if (name.includes('r2v') && (name.includes('happyhorse') || name.includes('happy-horse'))) {
-    return 'happyhorse-1.1-i2v'
-  }
   if (VIDEO_MODELS.some((item) => item.key === name)) return name
+  if (name.includes('r2v')) return 'happyhorse-1.1-r2v'
   if (name.includes('i2v') || name.includes('kf2v')) return 'happyhorse-1.1-i2v'
   return 'happyhorse-1.1-t2v'
 }

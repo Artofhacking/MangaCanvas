@@ -38,7 +38,7 @@ def test_gpt_25_high_n2(db):
     assert quoted.credits == 304
 
 
-def test_happyhorse_multi_ref_bills_i2v_not_r2v(db):
+def test_happyhorse_r2v_720p(db):
     quoted = quote_request(
         db,
         model="happyhorse-1.1-r2v",
@@ -48,28 +48,9 @@ def test_happyhorse_multi_ref_bills_i2v_not_r2v(db):
         resolution="720P",
         image_count=2,
     )
-    assert quoted.model_id == "happyhorse-1.1-i2v"
-    assert "r2v" not in quoted.model_id
+    assert quoted.model_id == "happyhorse-1.1-r2v"
     assert quoted.resolution == "720p"
     assert quoted.credits == 600
-    one = quote_request(
-        db,
-        model="happyhorse-1.1-t2v",
-        modality="video",
-        duration=5,
-        resolution="720P",
-        image_count=1,
-    )
-    assert one.model_id == "happyhorse-1.1-i2v"
-    none = quote_request(
-        db,
-        model="happyhorse-1.1-r2v",
-        modality="video",
-        duration=5,
-        resolution="720P",
-        image_count=0,
-    )
-    assert none.model_id == "happyhorse-1.1-t2v"
 
 
 def test_body_1080p_hits_seed_1080p(db):

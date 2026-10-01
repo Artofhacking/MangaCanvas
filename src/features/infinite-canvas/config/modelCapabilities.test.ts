@@ -160,12 +160,6 @@ describe('legacy node.model remapping', () => {
     expect(remapModelId('happyhorse-i2v', ['happyhorse-1.1-t2v', 'happyhorse-1.1-i2v'], 'video')).toBe(
       'happyhorse-1.1-i2v'
     )
-    expect(
-      remapModelId('happyhorse-1.1-r2v', ['happyhorse-1.1-t2v', 'happyhorse-1.1-i2v', 'happyhorse-1.1-r2v'], 'video')
-    ).toBe('happyhorse-1.1-i2v')
-    expect(remapModelId('happyhorse-r2v', ['happyhorse-1.1-t2v', 'happyhorse-1.1-i2v'], 'video')).toBe(
-      'happyhorse-1.1-i2v'
-    )
     expect(remapModelId('hailuo-i2v', ['MiniMax-H3', 'happyhorse-1.1-t2v'], 'video')).toBe('MiniMax-H3')
   })
 
