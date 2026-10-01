@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Bell, Check, Trash2, X } from "lucide-react"
 
 import GenerationHistoryList from "@/components/layout/GenerationHistoryList"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { subscribeNotificationDrawer, type NotificationDrawerTab } from "@/lib/notificationDrawerBridge"
 
-type DrawerTab = "messages" | "history"
+type DrawerTab = NotificationDrawerTab
 
 const DRAWER_TABS: { id: DrawerTab; label: string }[] = [
   { id: "messages", label: "消息列表" },
@@ -28,6 +29,8 @@ interface NotificationDrawerProps {
   onMarkAllAsRead: () => void
   onMarkAsRead: (id: number) => void
   onClearAll: () => void
+  /** Tab selected when this drawer opens from its own trigger. Completion popups override it. */
+  preferredTab?: DrawerTab
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -73,14 +76,37 @@ export default function NotificationDrawer({
   onMarkAllAsRead,
   onMarkAsRead,
   onClearAll,
+  preferredTab = "messages",
 }: NotificationDrawerProps) {
   const unreadCount = notifications.filter((item) => !item.read).length
-  const [activeTab, setActiveTab] = useState<DrawerTab>("messages")
+  const [activeTab, setActiveTab] = useState<DrawerTab>(preferredTab)
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const [wasOpen, setWasOpen] = useState(open)
+  const [openedFromNotice, setOpenedFromNotice] = useState(false)
+  const openRef = useRef(open)
+  openRef.current = open
   const isMessagesTab = activeTab === "messages"
 
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (!open) {
+      if (openedFromNotice) setOpenedFromNotice(false)
+    } else if (openedFromNotice) {
+      setOpenedFromNotice(false)
+    } else {
+      setActiveTab(preferredTab)
+      setFocusId(null)
+    }
+  }
+
   useEffect(() => {
-    if (open) setActiveTab("messages")
-  }, [open])
+    return subscribeNotificationDrawer((request) => {
+      if (!openRef.current) setOpenedFromNotice(true)
+      setActiveTab(request.tab)
+      setFocusId(request.focusId ?? null)
+      onOpenChange(true)
+    })
+  }, [onOpenChange])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -191,7 +217,7 @@ export default function NotificationDrawer({
                 </div>
               )
             ) : (
-              <GenerationHistoryList />
+              <GenerationHistoryList focusId={focusId} />
             )}
           </div>
 
