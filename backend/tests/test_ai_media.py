@@ -49,7 +49,7 @@ def test_mention_image_roles_prefixes_plot():
     assert mention_image_roles(prompt, ["老林"]) == prompt
 
 
-def test_happyhorse_multi_ref_degrades_to_i2v_first_frame():
+def test_happyhorse_r2v_keeps_all_refs_and_audio():
     body = build_happyhorse_video_body(
         model="happyhorse-1.1-r2v",
         prompt="老张取笑老林。",
@@ -57,19 +57,16 @@ def test_happyhorse_multi_ref_degrades_to_i2v_first_frame():
         duration=5,
         image_urls=["https://img/a.png", "https://img/b.png", "https://img/c.png"],
         names=["老林", "塑料菜袋", "老张"],
-        ratio="4:5",
     )
-    assert body["model"] == "happyhorse-1.1-i2v"
-    assert "r2v" not in body["model"]
-    assert "ratio" not in body
-    assert "size" not in body
+    assert body["model"] == "happyhorse-1.1-r2v"
+    assert body["ratio"] == "16:9"
     assert body["resolution"] == "720P"
+    assert body["size"] == "1280*720"
     assert body["audio"] is True
-    assert body["images"] == ["https://img/a.png"]
-    assert "reference_images" not in body
-    assert body["metadata"]["input"]["media"] == [{"type": "first_frame", "url": "https://img/a.png"}]
+    assert body["images"] == ["https://img/a.png", "https://img/b.png", "https://img/c.png"]
+    assert body["reference_images"] == body["images"]
+    assert [item["type"] for item in body["metadata"]["input"]["media"]] == ["reference_image"] * 3
     assert "第1张参考图是老林" in body["prompt"]
-    assert "塑料菜袋" not in body["prompt"]
 
 
 def test_seedance_nexcor_body_keeps_id_and_does_not_become_happyhorse():
@@ -140,7 +137,7 @@ def test_happyhorse_ratio_follows_reference_count():
     assert i2v["model"] == "happyhorse-1.1-i2v"
     assert "ratio" not in i2v
 
-    multi = build_happyhorse_video_body(
+    r2v = build_happyhorse_video_body(
         model="happyhorse-1.1-t2v",
         prompt="双人",
         size="1280*720",
@@ -149,11 +146,9 @@ def test_happyhorse_ratio_follows_reference_count():
         ratio="4:5",
         resolution="720P",
     )
-    assert multi["model"] == "happyhorse-1.1-i2v"
-    assert "r2v" not in multi["model"]
-    assert "ratio" not in multi
-    assert "size" not in multi
-    assert multi["images"] == ["https://img/a.png"]
+    assert r2v["model"] == "happyhorse-1.1-r2v"
+    assert r2v["ratio"] == "4:5"
+    assert r2v["size"] == "576*720"
     dash = happyhorse_dashscope_body(
         model="happyhorse-1.1-t2v",
         prompt="双人",
@@ -163,10 +158,9 @@ def test_happyhorse_ratio_follows_reference_count():
         ratio="4:5",
         resolution="720P",
     )
-    assert dash["model"] == "happyhorse-1.1-i2v"
-    assert "r2v" not in dash["model"]
-    assert "ratio" not in dash["parameters"]
-    assert dash["input"]["media"] == [{"type": "first_frame", "url": "https://img/a.png"}]
+    assert dash["model"] == "happyhorse-1.1-r2v"
+    assert dash["parameters"]["ratio"] == "4:5"
+    assert dash["input"]["media"][0]["type"] == "reference_image"
     i2v_dash = happyhorse_dashscope_body(
         model="happyhorse-1.1-t2v",
         prompt="开门",
@@ -180,18 +174,13 @@ def test_happyhorse_ratio_follows_reference_count():
     assert i2v_dash["input"]["media"][0]["type"] == "first_frame"
 
 
-def test_happyhorse_variant_never_selects_r2v():
+def test_happyhorse_variant_follows_reference_count():
     assert happyhorse_variant(0) == "happyhorse-1.1-t2v"
     assert happyhorse_variant(1) == "happyhorse-1.1-i2v"
-    assert happyhorse_variant(2) == "happyhorse-1.1-i2v"
-    assert happyhorse_variant(3) == "happyhorse-1.1-i2v"
-    for count in (0, 1, 2, 3):
-        assert "r2v" not in happyhorse_variant(count)
-    assert resolve_video_model("happyhorse-1.1-r2v", False) == "happyhorse-1.1-t2v"
-    assert resolve_video_model("happyhorse-1.1-r2v", True) == "happyhorse-1.1-i2v"
-    assert resolve_video_model("happyhorse-1.1-t2v", True) == "happyhorse-1.1-i2v"
-    assert resolve_video_model("happy-horse-1.1-r2v", True) == "happyhorse-1.1-i2v"
-    assert "r2v" not in resolve_video_model("happyhorse-1.1-r2v", True)
+    assert happyhorse_variant(2) == "happyhorse-1.1-r2v"
+    assert happyhorse_variant(3) == "happyhorse-1.1-r2v"
+    assert resolve_video_model("happyhorse-1.1-r2v", True) == "happyhorse-1.1-r2v"
+    assert resolve_video_model("happy-horse-1.1-r2v", False) == "happyhorse-1.1-r2v"
 
 
 def test_multi_ref_no_longer_hijacks_disabled_vidu():

@@ -57,8 +57,7 @@ def _image_caps(*, sizes: list[str], qualities: list[dict], default_size: str, d
     }
 
 
-# Official HappyHorse 1.1 t2v ratios. i2v has no ratio parameter.
-# Generation never selects the r2v catalog row.
+# Official HappyHorse 1.1 t2v / r2v. i2v has no ratio parameter.
 HAPPYHORSE_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "4:5", "5:4", "9:21", "21:9"]
 
 

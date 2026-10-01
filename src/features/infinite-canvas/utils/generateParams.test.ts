@@ -10,7 +10,6 @@ import {
   listVideoResolutions,
   normalizeVideoQuantity,
   resolveImageRequestModel,
-  happyHorseRequestImages,
   routedVideoModelKey,
   videoAspectSuppressedByReferences,
   videoRequestParams,
@@ -250,7 +249,7 @@ function visibleHappyHorseRatios(
 }
 
 describe('video aspect with reference images', () => {
-  it('shows HappyHorse ratios only for pure t2v, and hides them whenever a frame is attached', () => {
+  it('shows HappyHorse ratios for t2v and r2v, and hides them for a single first frame', () => {
     const empty = collectGenerateInputs('v1', [videoNode()], [])
     expect(countVideoRequestReferences(empty.firstFrameImage, empty.refImages)).toBe(0)
     expect(visibleHappyHorseRatios('happyhorse-1.1-t2v', empty)).toEqual(HAPPYHORSE_RATIOS)
@@ -286,40 +285,26 @@ describe('video aspect with reference images', () => {
       [edgeToVideo('e1', 'a', 1), edgeToVideo('e2', 'b', 2), edgeToVideo('e3', 'c', 3)]
     )
     expect(countVideoRequestReferences(three.firstFrameImage, three.refImages)).toBe(3)
-    expect(visibleHappyHorseRatios('happyhorse-1.1-t2v', three)).toEqual([])
-    expect(visibleHappyHorseRatios('happyhorse-1.1-r2v', three)).toEqual([])
+    expect(visibleHappyHorseRatios('happyhorse-1.1-t2v', three)).toEqual(HAPPYHORSE_RATIOS)
+    expect(visibleHappyHorseRatios('happyhorse-1.1-r2v', three)).toEqual(HAPPYHORSE_RATIOS)
     expect(videoRequestParams({
       model: 'happyhorse-1.1-t2v',
       referenceCount: 3,
       ratio: '4:5',
       resolution: '720P',
-      size: '1280*720',
-    })).toEqual({ resolution: '720P', size: '1280*720' })
-    expect(videoAspectSuppressedByReferences('happyhorse-1.1-t2v', three)).toBe(true)
+    })).toEqual({ ratio: '4:5', resolution: '720P', size: '576*720' })
   })
 
-  it('routes 0 refs to t2v and any refs to i2v, never r2v', () => {
-    expect(routedVideoModelKey('happyhorse-1.1-t2v', 0)).toBe('happyhorse-1.1-t2v')
+  it('selects t2v, i2v, or r2v from the HappyHorse reference count', () => {
     expect(routedVideoModelKey('happyhorse-1.1-r2v', 0)).toBe('happyhorse-1.1-t2v')
+    expect(routedVideoModelKey('happyhorse-1.1-t2v', 0)).toBe('happyhorse-1.1-t2v')
     expect(routedVideoModelKey('happyhorse-1.1-t2v', 1)).toBe('happyhorse-1.1-i2v')
     expect(routedVideoModelKey('happyhorse-1.1-i2v', 1)).toBe('happyhorse-1.1-i2v')
-    expect(routedVideoModelKey('happyhorse-1.1-r2v', 2)).toBe('happyhorse-1.1-i2v')
-    expect(routedVideoModelKey('happyhorse-1.1-t2v', 3)).toBe('happyhorse-1.1-i2v')
-    for (const count of [0, 1, 2, 3]) {
-      expect(routedVideoModelKey('happyhorse-1.1-r2v', count)).not.toContain('r2v')
-    }
-    expect(happyHorseRequestImages('happyhorse-1.1-t2v', [])).toEqual([])
-    expect(happyHorseRequestImages('happyhorse-1.1-r2v', ['https://img/a.png'])).toEqual(['https://img/a.png'])
-    expect(
-      happyHorseRequestImages('happyhorse-1.1-t2v', ['https://img/a.png', 'https://img/b.png', 'https://img/c.png'])
-    ).toEqual(['https://img/a.png'])
+    expect(routedVideoModelKey('happyhorse-1.1-t2v', 2)).toBe('happyhorse-1.1-r2v')
+    expect(routedVideoModelKey('happyhorse-1.1-i2v', 3)).toBe('happyhorse-1.1-r2v')
     expect(routedVideoModelKey('doubao-seedance-2-0-260128', 2)).toBe('doubao-seedance-2-0-260128')
     expect(routedVideoModelKey('MiniMax-H3', 3)).toBe('MiniMax-H3')
     expect(routedVideoModelKey('viduq3-pro', 2)).toBe('viduq3-pro')
-    expect(happyHorseRequestImages('doubao-seedance-2-0-260128', ['https://img/a.png', 'https://img/b.png'])).toEqual([
-      'https://img/a.png',
-      'https://img/b.png',
-    ])
   })
 
   it('keeps the t2v aspect control when nothing image-like would be sent', () => {
