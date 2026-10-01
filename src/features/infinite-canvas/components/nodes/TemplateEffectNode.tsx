@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
+import { ReferencePickChrome } from '../ReferencePickChrome';
 import { Input, Button, message } from 'antd';
 import { DeleteOutlined, CopyOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -385,6 +386,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
           </Button>
         </div>
       </div>
+      <ReferencePickChrome roundedClass="rounded-lg" />
     </div>
   );
 };

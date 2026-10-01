@@ -38,6 +38,15 @@ code {
   overflow: visible;
 }
 
+.react-flow__node.reference-pick-pickable,
+.react-flow__node.reference-pick-connected {
+  cursor: pointer;
+}
+
+.react-flow__node.reference-pick-blocked {
+  cursor: not-allowed;
+}
+
 /* Native media drag steals the pointer from React Flow node/group drag. */
 .react-flow__node img,
 .react-flow__node video {

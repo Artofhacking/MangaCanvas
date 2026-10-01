@@ -54,7 +54,8 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-function nodeMediaUrl(node: CustomNode): string {
+/** URL `collectGenerateInputs` will actually forward for an image or video source. */
+export function readNodeMediaUrl(node: CustomNode): string {
   return asText(node.data.url) || asText(node.data.base64) || asText(node.data.thumbnail)
 }
 
@@ -106,7 +107,7 @@ function sourceSnippet(node: CustomNode | undefined, kind: ReferenceSlotKind): s
 function sourceThumb(node: CustomNode | undefined, kind: ReferenceSlotKind): string | undefined {
   if (!node) return undefined
   if (kind === 'image' || kind === 'video') {
-    return nodeMediaUrl(node) || undefined
+    return readNodeMediaUrl(node) || undefined
   }
   return undefined
 }

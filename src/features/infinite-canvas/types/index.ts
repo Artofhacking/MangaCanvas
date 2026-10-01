@@ -77,6 +77,8 @@ export interface CustomNode {
   position: { x: number; y: number };
   data: NodeData;
   zIndex?: number;
+  /** React Flow selection flag. Kept on the node so the generate bar can stay mounted. */
+  selected?: boolean;
 }
 
 export interface CustomEdge {
@@ -293,6 +295,9 @@ export interface CanvasStore {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
+  /** Generate node currently accepting canvas clicks as reference edges. Null leaves drag-connect unchanged. */
+  referencePickTargetId: string | null;
+  setReferencePickTarget: (id: string | null) => void;
   addNode: (type: string, position?: { x: number; y: number }, data?: Partial<NodeData>) => string;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   removeNode: (id: string) => void;

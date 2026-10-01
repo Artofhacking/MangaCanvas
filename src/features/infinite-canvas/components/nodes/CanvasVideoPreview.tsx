@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } fro
 import { Play } from 'lucide-react'
 import { mediaUrl } from '@/lib/mediaUrl'
 import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction'
+import { isReferencePickActive } from '../../utils/referencePick'
 import { useCanvasNodeInViewport } from '../../hooks/useCanvasNodeInViewport'
 import {
   CANVAS_VIDEO_HOVER_PLAY_MS,
@@ -138,6 +139,7 @@ export function CanvasVideoPreview({
       <div
         className="absolute inset-0 z-0"
         onClick={(event) => {
+          if (isReferencePickActive()) return
           const now = Date.now()
           if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
             lastPreviewClickAt.current = now
@@ -154,8 +156,12 @@ export function CanvasVideoPreview({
           type="button"
           className="nodrag nopan absolute left-1/2 top-1/2 z-10 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white shadow-sm"
           title="播放"
-          onPointerDown={(event) => event.stopPropagation()}
+          onPointerDown={(event) => {
+            if (isReferencePickActive()) return
+            event.stopPropagation()
+          }}
           onClick={(event) => {
+            if (isReferencePickActive()) return
             event.stopPropagation()
             event.preventDefault()
             const now = Date.now()

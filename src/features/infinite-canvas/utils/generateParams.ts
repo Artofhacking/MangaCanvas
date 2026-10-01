@@ -133,7 +133,7 @@ export function listVideoAspectRatios(modelKey: string, model?: ModelConfig): st
 }
 
 /** Same cap as backend `collect_video_refs` for HappyHorse. */
-const VIDEO_REFERENCE_LIMIT = 3
+export const VIDEO_REFERENCE_LIMIT = 3
 
 /**
  * Image URLs `collectGenerateInputs` gathers for a video node: the first frame,

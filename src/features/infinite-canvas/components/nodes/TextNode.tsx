@@ -10,6 +10,7 @@ import type { CustomNode } from '../../types';
 import { PlusHandle } from './PlusHandle';
 import { MediaPreviewCard, TEXT_NOTE_WIDTH } from './MediaPreviewCard';
 import { isMediaPreviewDoubleClick, pointerTravelExceeds } from '../../utils/canvasInteraction';
+import { isReferencePickActive } from '../../utils/referencePick';
 import { requestTextEditFocus } from '../../utils/textEditFocus';
 
 const DEFAULT_TEXT_LABEL = '文本';
@@ -23,6 +24,7 @@ function useOpenOnSecondClick(onOpen: () => void) {
   }
 
   const onClick = (event: React.MouseEvent) => {
+    if (isReferencePickActive()) return
     if (pointerTravelExceeds(pointerOrigin.current, event)) return
     const now = Date.now()
     if (!isMediaPreviewDoubleClick(now, lastClickAt.current)) {

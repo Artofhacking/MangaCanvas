@@ -54,6 +54,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   edges: [],
   viewport: { x: 100, y: 50, zoom: 0.8 },
   currentProjectId: null,
+  referencePickTargetId: null,
   history: [],
   historyIndex: -1,
 
@@ -90,11 +91,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
     const newIndex = historyIndex - 1;
     const state = history[newIndex];
+    const nodes = JSON.parse(JSON.stringify(state.nodes)) as CustomNode[];
+    const pick = get().referencePickTargetId;
 
     set({
-      nodes: JSON.parse(JSON.stringify(state.nodes)),
+      nodes,
       edges: JSON.parse(JSON.stringify(state.edges)),
       historyIndex: newIndex,
+      referencePickTargetId: pick && nodes.some((node) => node.id === pick && isGenerateNodeType(node.type)) ? pick : null,
     });
   },
 
@@ -105,11 +109,14 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
     const newIndex = historyIndex + 1;
     const state = history[newIndex];
+    const nodes = JSON.parse(JSON.stringify(state.nodes)) as CustomNode[];
+    const pick = get().referencePickTargetId;
 
     set({
-      nodes: JSON.parse(JSON.stringify(state.nodes)),
+      nodes,
       edges: JSON.parse(JSON.stringify(state.edges)),
       historyIndex: newIndex,
+      referencePickTargetId: pick && nodes.some((node) => node.id === pick && isGenerateNodeType(node.type)) ? pick : null,
     });
   },
 
@@ -215,9 +222,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   // Remove node
   removeNode: (id: string) => {
+    const pick = get().referencePickTargetId;
     set({
       nodes: get().nodes.filter((node) => node.id !== id),
       edges: get().edges.filter((edge) => edge.source !== id && edge.target !== id),
+      referencePickTargetId: pick === id ? null : pick,
     });
     get().saveHistory();
   },
@@ -260,6 +269,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         selected: node.id === id,
       })),
     });
+  },
+
+  setReferencePickTarget: (id: string | null) => {
+    if (!id) {
+      if (get().referencePickTargetId !== null) set({ referencePickTargetId: null });
+      return;
+    }
+    const node = get().nodes.find((item) => item.id === id);
+    if (!node || !isGenerateNodeType(node.type)) {
+      if (get().referencePickTargetId !== null) set({ referencePickTargetId: null });
+      return;
+    }
+    if (!node.selected) get().selectNode(id);
+    if (get().referencePickTargetId !== id) set({ referencePickTargetId: id });
   },
 
   // Add edge
@@ -312,7 +335,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   // Clear canvas
   clearCanvas: () => {
-    set({ nodes: [], edges: [], viewport: { x: 100, y: 50, zoom: 0.8 } });
+    set({ nodes: [], edges: [], viewport: { x: 100, y: 50, zoom: 0.8 }, referencePickTargetId: null });
     nodeId = 0;
   },
 
@@ -327,6 +350,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         nodes,
         edges: canvasData.edges || [],
         viewport: canvasData.viewport || { x: 100, y: 50, zoom: 0.8 },
+        referencePickTargetId: null,
       });
 
       // Update node ID counter
