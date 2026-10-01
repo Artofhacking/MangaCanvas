@@ -12,6 +12,7 @@ import ReactFlow, {
   Edge,
   Connection,
   OnConnectStart,
+  type NodeChange,
 } from 'reactflow';
 import {
   ArrowLeftOutlined,
@@ -47,6 +48,7 @@ import CreditsBadge from '@/components/layout/CreditsBadge';
 import 'reactflow/dist/style.css';
 
 import { useCanvasStore } from './stores/canvasStore';
+import { useModelsStore } from '@/store/modelsStore';
 import { useCanvasDocumentsStore } from './stores/projectsStore';
 import { useThemeStore } from './stores/themeStore';
 import { getAllProjects } from './utils/indexedDB';
@@ -90,6 +92,11 @@ import { CanvasZoomControls } from './components/CanvasZoomControls';
 import TextEditBar from './components/TextEditBar';
 import ConnectDropMenu, { type ConnectDropChoice, type ConnectDropMenuState } from './components/ConnectDropMenu';
 import { isGenerateNodeType } from './utils/generateSlots';
+import {
+  applyReferencePickClick,
+  noteReferencePickClick,
+  withReferencePickClasses,
+} from './utils/referencePick';
 import { spawnGenerateFromSource, spawnTextNoteFromSource } from './utils/spawnGenerateFromSource';
 import { getClientPoint, getHandlePointFromEvent, getHandleScreenPoint } from './utils/connectPreview';
 import {
@@ -151,6 +158,8 @@ const CanvasInner: React.FC = () => {
     onConnect,
     addNode,
     selectNode,
+    referencePickTargetId,
+    setReferencePickTarget,
     loadProject,
     updateViewport,
     undo,
@@ -170,7 +179,15 @@ const CanvasInner: React.FC = () => {
   } = useCanvasDocumentsStore();
   const [hydratedWorkflowId, setHydratedWorkflowId] = useState<string | null>(null);
   const canvasReady = Boolean(canvasDocumentId) && hydratedWorkflowId === canvasDocumentId;
-  const flowNodes = canvasReady ? nodes : HIDDEN_FLOW_NODES;
+  const imageModels = useModelsStore((state) => state.image.models);
+  const liveImageModelIds = useMemo(
+    () => imageModels.filter((model) => model.isEnabled !== false).map((model) => model.id),
+    [imageModels]
+  );
+  const flowNodes = useMemo(() => {
+    if (!canvasReady) return HIDDEN_FLOW_NODES;
+    return withReferencePickClasses(nodes, edges, referencePickTargetId, liveImageModelIds);
+  }, [canvasReady, edges, liveImageModelIds, nodes, referencePickTargetId]);
   const flowEdges = canvasReady ? edges : HIDDEN_FLOW_EDGES;
   const fitViewSettled = useStore((state) => (state as { fitViewOnInitDone?: boolean }).fitViewOnInitDone === true);
   useEffect(() => {
@@ -869,10 +886,64 @@ const CanvasInner: React.FC = () => {
     [addNode, viewport]
   );
 
-  // 点击画布空白区域时关闭节点菜单
+  // 点击画布空白区域时关闭节点菜单。点选参考时不改选中，生成栏才能留在目标节点上。
   const handlePaneClick = useCallback(() => {
     setShowNodeMenu(false);
+    const targetId = useCanvasStore.getState().referencePickTargetId;
+    if (!targetId) return;
+    const target = useCanvasStore.getState().nodes.find((node) => node.id === targetId);
+    if (target && !target.selected) useCanvasStore.getState().selectNode(targetId);
   }, []);
+
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    if (useCanvasStore.getState().referencePickTargetId) {
+      const next = changes.filter((change) => change.type !== 'select');
+      if (next.length === 0) return;
+      onNodesChange(next);
+      return;
+    }
+    onNodesChange(changes);
+  }, [onNodesChange]);
+
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: RFNode) => {
+    if (!useCanvasStore.getState().referencePickTargetId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (noteReferencePickClick(node.id)) return;
+    const targetId = useCanvasStore.getState().referencePickTargetId;
+    const result = applyReferencePickClick(node.id);
+    if (result.action === 'blocked') message.warning(result.message);
+    if (targetId) {
+      const current = useCanvasStore.getState().nodes.find((item) => item.id === targetId);
+      if (current && !current.selected) useCanvasStore.getState().selectNode(targetId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!referencePickTargetId) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setReferencePickTarget(null);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [referencePickTargetId, setReferencePickTarget]);
+
+  useEffect(() => {
+    if (referencePickTargetId) setConnectDropMenu(null);
+  }, [referencePickTargetId]);
+
+  useEffect(() => {
+    if (!referencePickTargetId) return;
+    const target = nodes.find((node) => node.id === referencePickTargetId);
+    if (!target || !isGenerateNodeType(target.type)) {
+      setReferencePickTarget(null);
+      return;
+    }
+    if (!target.selected) selectNode(referencePickTargetId);
+  }, [nodes, referencePickTargetId, selectNode, setReferencePickTarget]);
 
   const clearConnectPreview = useCallback(() => {
     previewFromRef.current = null
@@ -1261,11 +1332,12 @@ const CanvasInner: React.FC = () => {
         <ReactFlow
           nodes={flowNodes}
           edges={flowEdges}
-          onNodesChange={isLocked ? undefined : onNodesChange}
+          onNodesChange={isLocked ? undefined : handleNodesChange}
           onEdgesChange={isLocked ? undefined : onEdgesChange}
           onConnect={isLocked ? undefined : handleConnect}
           onConnectStart={isLocked ? undefined : handleConnectStart}
           onConnectEnd={isLocked ? undefined : handleConnectEnd}
+          onNodeClick={handleNodeClick}
           connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -1279,13 +1351,13 @@ const CanvasInner: React.FC = () => {
           snapGrid={[20, 20]}
           minZoom={0.1}
           maxZoom={2}
-          className={isDark ? 'dark' : ''}
+          className={[isDark ? 'dark' : '', referencePickTargetId ? 'reference-pick-active' : ''].filter(Boolean).join(' ')}
           onlyRenderVisibleElements={CANVAS_ONLY_RENDER_VISIBLE_ELEMENTS}
           nodesDraggable={!isLocked}
           nodesConnectable={!isLocked}
-          elementsSelectable={!isLocked}
+          elementsSelectable={!isLocked && !referencePickTargetId}
           selectionMode={SelectionMode.Partial}
-          selectionOnDrag={!isLocked}
+          selectionOnDrag={!isLocked && !referencePickTargetId}
           selectionKeyCode="Shift"
           multiSelectionKeyCode={[...CANVAS_MULTI_SELECTION_KEYS]}
           panOnDrag={getCanvasPanOnDrag(isLocked)}

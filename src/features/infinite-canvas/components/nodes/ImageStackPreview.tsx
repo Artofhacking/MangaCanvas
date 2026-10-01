@@ -1,4 +1,5 @@
 import { mediaUrl } from '@/lib/mediaUrl'
+import { isReferencePickActive } from '../../utils/referencePick'
 import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
 import {
   IMAGE_STACK_CARD,
@@ -132,8 +133,12 @@ function StackCandidate({
       }}
       title="点击置顶"
       aria-label={`第${index + 1}张，点击置顶`}
-      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        if (isReferencePickActive()) return
+        event.stopPropagation()
+      }}
       onClick={(event) => {
+        if (isReferencePickActive()) return
         event.stopPropagation()
         event.preventDefault()
         onActivate()

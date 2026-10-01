@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { formatGeneratingLabel } from '../../utils/generationJobs'
+import { ReferencePickChrome } from '../ReferencePickChrome'
 
 export const IMAGE_PREVIEW_WIDTH = 448
 export const VIDEO_PREVIEW_WIDTH = 448
@@ -269,6 +270,7 @@ export const MediaPreviewCard: React.FC<MediaPreviewCardProps> = ({
           style={{ backgroundColor: 'hsl(var(--media-stage))' }}
         >
           {isFlow ? children : <div className="absolute inset-0">{children}</div>}
+          <ReferencePickChrome />
         </div>
       </div>
     </div>

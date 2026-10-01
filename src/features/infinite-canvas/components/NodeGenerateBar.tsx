@@ -14,7 +14,7 @@ import {
   Users,
   Video,
 } from 'lucide-react'
-import { message } from 'antd'
+import { message, Tooltip } from 'antd'
 import { useCanvasStore } from '../stores/canvasStore'
 import { findVideoPickerModel, liveModelsToPicker, remapModelId } from '../config/modelCapabilities'
 import { useImageModels, useVideoModels } from '../hooks/useModels'
@@ -66,6 +66,13 @@ import { displayModelName } from '@/lib/displayModelName'
 import { imageModelTip } from '../config/imageModelTip'
 import { videoModelTip } from '../config/videoModelTip'
 import { cn } from '@/lib/utils'
+import {
+  REFERENCE_EMPTY_HINT,
+  REFERENCE_PICK_BUTTON_LABEL,
+  REFERENCE_PICK_EXIT_TOOLTIP,
+  REFERENCE_PICK_SEND_BLOCKED,
+  REFERENCE_PICK_TOOLTIP,
+} from '../utils/referencePick'
 
 /**
  * Reserved dock width. Triggers are fixed-width pills and the frame is this
@@ -79,7 +86,7 @@ import { cn } from '@/lib/utils'
  * push the ratio pill out of sight.
  */
 const BAR_WIDTH = 760
-const BAR_ESTIMATED_HEIGHT = 168
+const BAR_ESTIMATED_HEIGHT = 208
 /** HappyHorse i2v has no ratio; output follows the first frame. */
 const VIDEO_REFERENCE_ASPECT_HINT = '输出跟首帧'
 const DOCK_MENU =
@@ -647,6 +654,9 @@ const NodeGenerateBar: React.FC = () => {
   const edges = useCanvasStore((state) => state.edges)
   const nodes = useCanvasStore((state) => state.nodes)
   const updateNode = useCanvasStore((state) => state.updateNode)
+  const referencePickTargetId = useCanvasStore((state) => state.referencePickTargetId)
+  const setReferencePickTarget = useCanvasStore((state) => state.setReferencePickTarget)
+  const picking = Boolean(selectedId && referencePickTargetId === selectedId)
   const { send, sending } = useNodeGenerateAction(selectedId)
   const [draftPrompt, setDraftPrompt] = useState('')
   const [quote, setQuote] = useState<CreditQuote | null>(null)
@@ -683,6 +693,18 @@ const NodeGenerateBar: React.FC = () => {
     const timer = window.setTimeout(() => mentionRef.current?.focus(), 40)
     return () => window.clearTimeout(timer)
   }, [selectedId])
+
+  useEffect(() => {
+    if (!picking) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      setReferencePickTarget(null)
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [picking, setReferencePickTarget])
 
   useEffect(() => {
     if (!selectedId) {
@@ -777,8 +799,18 @@ const NodeGenerateBar: React.FC = () => {
   const insufficient = Boolean(quote && (!quote.sufficient || !quote.quotaOk))
   const blockedReason = quote && !quote.sufficient ? '积分不足' : quote && !quote.quotaOk ? (quote.message || '额度不足') : quoteError
 
+  const handleToggleReferencePick = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (!selectedId) return
+    setReferencePickTarget(picking ? null : selectedId)
+  }
+
   const handleSend = (event: React.MouseEvent) => {
     event.stopPropagation()
+    if (picking) {
+      message.info(REFERENCE_PICK_SEND_BLOCKED)
+      return
+    }
     if (insufficient) {
       message.warning(blockedReason || '积分不足')
       return
@@ -813,7 +845,30 @@ const NodeGenerateBar: React.FC = () => {
               : 'rounded-[22px] shadow-[0_10px_28px_rgba(42,28,24,0.10)]'
           )}
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="mb-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <Tooltip title={picking ? REFERENCE_PICK_EXIT_TOOLTIP : REFERENCE_PICK_TOOLTIP} placement="top">
+                <button
+                  type="button"
+                  onClick={handleToggleReferencePick}
+                  aria-pressed={picking}
+                  data-reference-pick-toggle={picking ? 'on' : 'off'}
+                  className={cn(
+                    'inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-3 text-[12px] font-semibold transition-colors',
+                    picking
+                      ? 'signature-gradient text-white shadow-sm'
+                      : 'bg-[hsl(var(--surface-container-high))] text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-highest))]'
+                  )}
+                >
+                  {REFERENCE_PICK_BUTTON_LABEL}
+                </button>
+              </Tooltip>
+              {slots.length > 0 ? (
+                <span className="shrink-0 rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
+                  {`${slots.length} 个参考`}
+                </span>
+              ) : null}
+            </div>
             <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
               {slots.length === 0 ? (
                 <div className="flex h-14 items-center gap-3 rounded-2xl border-2 border-dashed border-[hsl(var(--outline-variant))]/45 bg-[hsl(var(--surface-container-low))] px-3">
@@ -822,7 +877,7 @@ const NodeGenerateBar: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-[hsl(var(--on-surface))]">参考资源</p>
-                    <p className="text-[11px] text-[hsl(var(--secondary))]">连入后编号，输入 @ 可引用</p>
+                    <p className="text-[11px] text-[hsl(var(--secondary))]">{REFERENCE_EMPTY_HINT}</p>
                   </div>
                 </div>
               ) : (
@@ -831,11 +886,6 @@ const NodeGenerateBar: React.FC = () => {
                 ))
               )}
             </div>
-            {slots.length > 0 ? (
-              <span className="shrink-0 rounded-full bg-[hsl(var(--surface-container-high))] px-2.5 py-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
-                {`${slots.length} 个参考`}
-              </span>
-            ) : null}
           </div>
 
           <MentionPromptInput
@@ -890,9 +940,9 @@ const NodeGenerateBar: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={sending || insufficient}
+                disabled={sending || insufficient || picking}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50"
-                title={insufficient ? blockedReason || '积分不足' : '发送生成'}
+                title={picking ? REFERENCE_PICK_SEND_BLOCKED : insufficient ? blockedReason || '积分不足' : '发送生成'}
               >
                 <ArrowUp className={cn('h-4 w-4', sending && 'animate-pulse')} />
               </button>

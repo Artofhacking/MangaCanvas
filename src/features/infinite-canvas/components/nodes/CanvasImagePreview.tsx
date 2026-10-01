@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
 import { mediaUrl } from '@/lib/mediaUrl'
 import { isMediaPreviewDoubleClick } from '../../utils/canvasInteraction'
+import { isReferencePickActive } from '../../utils/referencePick'
 import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
 import { readCanvasSourceSize } from '../../utils/canvasDisplayBitmap'
 import { measurePreviewImage, type MediaMeasurement } from '../../utils/mediaFrame'
@@ -62,6 +63,7 @@ export function CanvasImagePreview({
       <div
         className="absolute inset-0"
         onClick={(event) => {
+          if (isReferencePickActive()) return
           const now = Date.now()
           if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
             lastPreviewClickAt.current = now
