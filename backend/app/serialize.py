@@ -291,7 +291,17 @@ def normalize_canvas(canvas: dict | None) -> dict:
     }
 
 
-def workflow(row: models.CanvasWorkflow, include_canvas: bool = True) -> dict:
+def _sequence_len(value) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def workflow(
+    row: models.CanvasWorkflow,
+    include_canvas: bool = True,
+    *,
+    node_count: int | None = None,
+    edge_count: int | None = None,
+) -> dict:
     data = {
         "id": row.id,
         "organizationId": row.organization_id,
@@ -306,7 +316,19 @@ def workflow(row: models.CanvasWorkflow, include_canvas: bool = True) -> dict:
         "updatedAt": iso(row.updated_at),
     }
     if include_canvas:
-        data["canvasData"] = normalize_canvas(row.canvas_data)
+        raw = row.canvas_data if isinstance(row.canvas_data, dict) else {}
+        # Count the stored arrays. Do not read a caller-supplied override, and
+        # do not treat a missing or non-array field as a loaded empty canvas.
+        data["nodeCount"] = _sequence_len(raw.get("nodes"))
+        data["edgeCount"] = _sequence_len(raw.get("edges"))
+        data["canvasData"] = normalize_canvas(raw)
+    else:
+        # List rows defer canvas_data. Never touch that column here.
+        # A missing count stays omitted so clients do not render it as zero.
+        if node_count is not None:
+            data["nodeCount"] = int(node_count)
+        if edge_count is not None:
+            data["edgeCount"] = int(edge_count)
     return data
 
 

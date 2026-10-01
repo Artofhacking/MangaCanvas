@@ -112,6 +112,9 @@ export interface Project {
   projectId?: string;
   sourceType?: string;
   sourceAssetId?: number;
+  /** From the list API. Undefined means unknown — do not read it as zero nodes. */
+  nodeCount?: number;
+  edgeCount?: number;
   canvasData: {
     nodes: CustomNode[];
     edges: CustomEdge[];

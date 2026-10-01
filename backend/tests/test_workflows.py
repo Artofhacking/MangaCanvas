@@ -153,24 +153,38 @@ def test_list_omits_canvas_and_does_not_sort_canvas_data(client, project_id):
     assert [item["id"] for item in data["list"]] == ["workflow_new"]
     assert "canvasData" not in data["list"][0]
     assert data["list"][0]["name"] == "新工作流"
+    assert data["list"][0]["nodeCount"] == 1
+    assert data["list"][0]["edgeCount"] == 0
 
     workflow_sql = [sql for sql in client.statements if "canvas_workflows" in sql]
     assert workflow_sql, client.statements
-    ordered = [sql for sql in workflow_sql if "ORDER BY" in sql]
+    ordered = [sql for sql in workflow_sql if "ORDER BY" in sql.upper()]
     assert ordered, workflow_sql
-    assert all("canvas_data" not in sql for sql in ordered), ordered
-    assert all("LIMIT" in sql for sql in ordered), ordered
-    assert all("canvas_data" not in sql for sql in workflow_sql), workflow_sql
+    # Filesort must not see the JSON document. Counts are a separate lookup.
+    assert all("canvas_data" not in sql.lower() for sql in ordered), ordered
+    assert all("LIMIT" in sql.upper() for sql in ordered), ordered
+    length_sql = [
+        sql
+        for sql in workflow_sql
+        if "json_array_length" in sql.lower() or "json_length" in sql.lower()
+    ]
+    assert length_sql, workflow_sql
+    assert all("ORDER BY" not in sql.upper() for sql in length_sql), length_sql
+    assert all("canvas_data" in sql.lower() for sql in length_sql), length_sql
 
     page2 = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows", params={"page": 2, "size": 1}))
     assert [item["id"] for item in page2["list"]] == ["workflow_old"]
     assert "canvasData" not in page2["list"][0]
+    assert page2["list"][0]["nodeCount"] == 1
+    assert page2["list"][0]["edgeCount"] == 1
 
 
 def test_detail_create_and_update_still_return_canvas(client, project_id):
     detail = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old"))
     assert detail["canvasData"]["nodes"][0]["id"] == "n-heavy"
     assert detail["canvasData"]["edges"][0]["id"] == "e-heavy"
+    assert detail["nodeCount"] == 1
+    assert detail["edgeCount"] == 1
 
     created = _data(
         client.post(
@@ -184,6 +198,8 @@ def test_detail_create_and_update_still_return_canvas(client, project_id):
     )
     assert created["canvasData"]["nodes"][0]["id"] == "created"
     assert created["canvasData"]["edges"][0]["id"] == "e-created"
+    assert created["nodeCount"] == 1
+    assert created["edgeCount"] == 1
 
     updated = _data(
         client.put(
@@ -194,6 +210,67 @@ def test_detail_create_and_update_still_return_canvas(client, project_id):
     assert updated["name"] == "已改"
     assert updated["canvasData"]["nodes"][0]["id"] == "edited"
     assert updated["canvasData"]["edges"] == []
+    assert updated["nodeCount"] == 1
+    assert updated["edgeCount"] == 0
+
+
+def test_list_node_count_counts_arrays_only(client, db, project_id):
+    project = db.get(models.Project, project_id)
+    db.add(
+        models.CanvasWorkflow(
+            id="workflow_empty",
+            organization_id=project.organization_id,
+            project_id=project.id,
+            name="空白工作流",
+            source_type="blank",
+            canvas_data={"nodes": [], "edges": [], "viewport": {"x": 0, "y": 0, "zoom": 1}},
+            updated_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        )
+    )
+    db.add(
+        models.CanvasWorkflow(
+            id="workflow_three",
+            organization_id=project.organization_id,
+            project_id=project.id,
+            name="三节点",
+            source_type="scene",
+            canvas_data={
+                "nodes": [{"id": "a"}, {"id": "b"}, {"id": "c"}],
+                "edges": [{"id": "e1"}, {"id": "e2"}],
+                "viewport": {"x": 0, "y": 0, "zoom": 1},
+            },
+            updated_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        )
+    )
+    broken = db.query(models.CanvasWorkflow).filter_by(id="workflow_old").one()
+    broken.canvas_data = {"viewport": {"x": 0, "y": 0, "zoom": 1}, "nodes": {"not": "a list"}, "edges": None}
+    db.commit()
+
+    data = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows", params={"page": 1, "size": 20}))
+    by_id = {item["id"]: item for item in data["list"]}
+    assert set(by_id) >= {"workflow_empty", "workflow_three", "workflow_old", "workflow_new"}
+    assert all("canvasData" not in item for item in data["list"])
+    assert by_id["workflow_empty"]["nodeCount"] == 0
+    assert by_id["workflow_empty"]["edgeCount"] == 0
+    assert by_id["workflow_three"]["nodeCount"] == 3
+    assert by_id["workflow_three"]["edgeCount"] == 2
+    assert by_id["workflow_old"]["nodeCount"] == 0
+    assert by_id["workflow_old"]["edgeCount"] == 0
+    assert by_id["workflow_new"]["nodeCount"] == 1
+
+
+def test_mysql_count_expression_uses_json_length_without_order_by():
+    from sqlalchemy.dialects import mysql
+
+    from app.canvas_counts import canvas_collection_count
+
+    expression = canvas_collection_count(models.CanvasWorkflow.canvas_data, "$.nodes", "mysql")
+    sql = str(expression.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
+    lowered = sql.lower()
+    assert "json_length" in lowered
+    assert "json_extract" in lowered
+    assert "array" in lowered
+    assert "order by" not in lowered
 
 
 def test_invalid_json_is_a_non_empty_json_400(client, project_id):

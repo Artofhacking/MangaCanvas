@@ -293,6 +293,9 @@ export interface WorkflowDTO {
   sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object'
   sourceAssetId?: number | null
   status?: 'draft' | 'active' | 'archived'
+  /** Present on list and detail. List omits canvasData, so this is the node total. */
+  nodeCount?: number
+  edgeCount?: number
   canvasData?: {
     nodes: unknown[]
     edges: unknown[]

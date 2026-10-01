@@ -211,6 +211,9 @@ export interface Workflow {
   status: WorkflowStatus
   modified: string
   thumbnail?: string
+  /** Server-side node total. Missing means the count was not loaded, not zero. */
+  nodeCount?: number
+  edgeCount?: number
   canvasData?: {
     nodes: unknown[]
     edges: unknown[]

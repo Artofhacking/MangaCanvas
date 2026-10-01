@@ -58,6 +58,7 @@ import { workflowsApi } from '@/features/project/api/workflows';
 import { projectApi } from '@/api/projectApi';
 import { dominantAssetNode } from '@/lib/assetSeed';
 import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
+import { canvasSidebarWorkflows, workflowNodeCountLabel } from './workflowSidebar';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
 import { stopLocalGenerationJobs } from './utils/generationJobs';
@@ -238,6 +239,10 @@ const CanvasInner: React.FC = () => {
         .filter((item) => String(item.projectId) === String(projectId))
         .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()),
     [projectId, projects]
+  );
+  const sidebarWorkflows = useMemo(
+    () => canvasSidebarWorkflows(projectWorkflows, canvasDocumentId),
+    [canvasDocumentId, projectWorkflows],
   );
 
   const currentWorkflow = canvasDocumentId ? getProjectById(canvasDocumentId) : null;
@@ -1262,11 +1267,12 @@ const CanvasInner: React.FC = () => {
                   </div>
                   {!workflowsLoaded ? (
                     <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载工作流中...</div>
-                  ) : projectWorkflows.length === 0 ? (
+                  ) : sidebarWorkflows.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有工作流</div>
                   ) : (
-                    projectWorkflows.map((item) => {
+                    sidebarWorkflows.map((item) => {
                       const active = item.id === canvasDocumentId;
+                      const nodeCountLabel = workflowNodeCountLabel(item.nodeCount);
                       return (
                         <button
                           key={item.id}
@@ -1279,9 +1285,11 @@ const CanvasInner: React.FC = () => {
                           }`}
                         >
                           <span className="truncate font-medium">{item.name}</span>
-                          <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">
-                            {item.canvasData?.nodes?.length ?? 0} 节点
-                          </span>
+                          {nodeCountLabel ? (
+                            <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">
+                              {nodeCountLabel}
+                            </span>
+                          ) : null}
                         </button>
                       );
                     })
