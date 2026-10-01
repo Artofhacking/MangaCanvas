@@ -25,7 +25,7 @@ describe('normalizeCanvasData stale generation', () => {
           id: 'gen',
           type: 'imageConfig',
           position: { x: 0, y: 0 },
-          data: { label: '画面节点', loading: true, progress: 40, prompt: '@2 穿上 @1' },
+          data: { label: '画面节点', loading: true, progress: 40, statusLabel: '生成中', prompt: '@2 穿上 @1' },
         },
         {
           id: 'again',
@@ -44,11 +44,41 @@ describe('normalizeCanvasData stale generation', () => {
       prompt: '@2 穿上 @1',
     })
     expect(canvas.nodes[0].data.progress).toBeUndefined()
+    expect(canvas.nodes[0].data.statusLabel).toBeUndefined()
     expect(canvas.nodes[1].data).toMatchObject({
       loading: false,
       url: 'https://cdn.example/prev.png',
       error: '',
     })
+  })
+
+  it('keeps a persisted video job resumable and still drops the generating overlay', () => {
+    const canvas = normalizeCanvasData({
+      nodes: [
+        {
+          id: 'clip',
+          type: 'video',
+          position: { x: 0, y: 0 },
+          data: {
+            label: '视频节点',
+            loading: true,
+            progress: 12,
+            statusLabel: '生成中',
+            videoJobIds: ['job_1'],
+          },
+        },
+      ],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    })
+
+    expect(canvas.nodes[0].data).toMatchObject({
+      loading: false,
+      videoJobIds: ['job_1'],
+    })
+    expect(canvas.nodes[0].data.progress).toBeUndefined()
+    expect(canvas.nodes[0].data.statusLabel).toBeUndefined()
+    expect(canvas.nodes[0].data.error).toBeUndefined()
   })
 })
 

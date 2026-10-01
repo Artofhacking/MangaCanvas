@@ -164,7 +164,13 @@ export function buildGeneratedVideoNodePatch(input: {
   if (rows.length === 0) {
     return {
       ok: false,
-      patch: { loading: false, error: '生成失败', progress: undefined, statusLabel: undefined },
+      patch: {
+        loading: false,
+        error: '生成失败',
+        progress: undefined,
+        statusLabel: undefined,
+        videoJobIds: undefined,
+      },
       notice: { level: 'error', text: '生成失败' },
     }
   }
@@ -187,6 +193,7 @@ export function buildGeneratedVideoNodePatch(input: {
       error: '',
       progress: undefined,
       statusLabel: undefined,
+      videoJobIds: undefined,
       updatedAt: input.now ?? Date.now(),
       executed: true,
       outputNodeId: input.nodeId,

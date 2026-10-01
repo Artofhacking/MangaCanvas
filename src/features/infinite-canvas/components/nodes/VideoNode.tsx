@@ -9,7 +9,8 @@ import type { CustomNode } from '../../types';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
 import { PlusHandle } from './PlusHandle';
-import { bindNodeGenerationCancel, readNodeProgress } from '../../utils/generationJobs';
+import { readNodeProgress } from '../../utils/generationJobs';
+import { bindNodeVideoResumeCancel } from '../../utils/resumeVideoJobs';
 import {
   MediaEmptyGlyph,
   MediaPreviewCard,
@@ -241,7 +242,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             kind="video"
             progress={readNodeProgress(data)}
             label={typeof data.statusLabel === 'string' ? data.statusLabel : undefined}
-            onCancel={bindNodeGenerationCancel(id, updateNode)}
+            onCancel={bindNodeVideoResumeCancel(id, updateNode)}
           />
         ) : hasMedia ? (
           <VideoResultStage

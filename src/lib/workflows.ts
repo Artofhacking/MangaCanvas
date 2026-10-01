@@ -136,14 +136,27 @@ export const emptyCanvasData = (): CanvasGraph => ({
 
 export const INTERRUPTED_GENERATION_ERROR = '生成中断，请重新生成'
 
-/** Drop in-flight generation flags. Jobs live in memory, so a reloaded graph cannot still be running. */
+function hasPersistedVideoJob(data: Record<string, unknown>): boolean {
+  return Array.isArray(data.videoJobIds)
+    && data.videoJobIds.some((item) => typeof item === 'string' && item.trim().length > 0)
+}
+
+/** Drop in-flight generation flags. A reload is not generating unless a video job id is resumed separately. */
 export function clearStaleGenerationLoading<T extends { data?: Record<string, unknown> }>(node: T): T {
   const data = node.data
-  if (!data?.loading) return node
-  const next: Record<string, unknown> = { ...data, loading: false }
+  if (!data) return node
+  const loading = Boolean(data.loading)
+  const hasProgress = typeof data.progress === 'number'
+  const hasStatus = typeof data.statusLabel === 'string' && data.statusLabel.length > 0
+  if (!loading && !hasProgress && !hasStatus) return node
+  const next: Record<string, unknown> = { ...data }
+  if (loading) next.loading = false
   delete next.progress
+  delete next.statusLabel
   const url = typeof next.url === 'string' ? next.url.trim() : ''
-  if (!url && !next.error) next.error = INTERRUPTED_GENERATION_ERROR
+  if (loading && !url && !next.error && !hasPersistedVideoJob(next)) {
+    next.error = INTERRUPTED_GENERATION_ERROR
+  }
   return { ...node, data: next }
 }
 

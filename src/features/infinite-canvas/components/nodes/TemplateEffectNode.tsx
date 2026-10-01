@@ -10,7 +10,9 @@ import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia';
 import { nextMediaPixelFields } from '../../utils/mediaFrame';
 import { usablePosterUrl } from '../../utils/videoPoster';
 import { isCanceledError } from '@/api/core';
+import { isUserCancelAbort } from '@/lib/generationAbort';
 import { finishGenerationJob, startGenerationJob } from '../../utils/generationJobs';
+import { rememberNodeVideoJob } from '../../utils/resumeVideoJobs';
 import { creditsApi } from '@/api/creditsApi';
 import { HttpError } from '@/api/core/error';
 import { resolveProjectId } from '@/lib/session';
@@ -190,12 +192,14 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         template: localTemplate,
         templateLabel: getTemplateLabel(localTemplate),
         resolution: localResolution,
+        videoJobIds: [],
       }
     );
 
     addEdgeManually({ source: id, target: videoNodeId });
 
     const signal = startGenerationJob(videoNodeId);
+    const workflowId = useCanvasStore.getState().currentProjectId;
 
     try {
       const videoUrl = await generate({
@@ -206,6 +210,10 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         template: localTemplate as string,
         nodeId: videoNodeId,
         signal,
+        onSubmitted: (jobId: string) => {
+          if (isUserCancelAbort(signal)) return
+          rememberNodeVideoJob(videoNodeId, jobId, workflowId)
+        },
       }, (status, percent) => {
         if (signal.aborted) return
         updateNode(videoNodeId, {
@@ -230,10 +238,17 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
           loading: false,
           progress: undefined,
           statusLabel: undefined,
+          videoJobIds: undefined,
           updatedAt: Date.now(),
         });
       } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined, statusLabel: undefined });
+        updateNode(videoNodeId, {
+          loading: false,
+          error: '生成失败',
+          progress: undefined,
+          statusLabel: undefined,
+          videoJobIds: undefined,
+        });
       }
       persistOpenCanvas();
     } catch (err: unknown) {
@@ -247,7 +262,14 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         removeNode(videoNodeId);
         message.warning('积分不足');
       } else {
-        updateNode(videoNodeId, { loading: false, error: '生成失败', progress: undefined, statusLabel: undefined });
+        const timedOut = err instanceof Error && err.message.includes('视频生成超时')
+        updateNode(videoNodeId, {
+          loading: false,
+          error: '生成失败',
+          progress: undefined,
+          statusLabel: undefined,
+          ...(timedOut ? {} : { videoJobIds: undefined }),
+        });
       }
       persistOpenCanvas();
     } finally {

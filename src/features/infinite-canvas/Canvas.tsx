@@ -56,6 +56,8 @@ import { dominantAssetNode } from '@/lib/assetSeed';
 import { buildSeedCanvas, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { stopLocalGenerationJobs } from './utils/generationJobs';
+import { beginCanvasVideoJobResume } from './utils/resumeVideoJobs';
 import { uploadCanvasBlob } from '@/lib/uploadCanvasMedia';
 import { nextMediaPixelFields, readBlobPixelSize } from './utils/mediaFrame';
 import {
@@ -778,6 +780,7 @@ const CanvasInner: React.FC = () => {
 
       if (cancelled) return;
       loadProject(canvasDocumentId, getProjectCanvas);
+      beginCanvasVideoJobResume();
       setHydratedWorkflowId(canvasDocumentId);
     };
 
@@ -786,6 +789,7 @@ const CanvasInner: React.FC = () => {
     });
     return () => {
       cancelled = true;
+      stopLocalGenerationJobs();
     };
   }, [
     canvasDocumentId,

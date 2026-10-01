@@ -5,7 +5,9 @@ import { isCanceledError } from '@/api/core'
 import { remapModelId, resolveImageCapabilities, resolveVideoCapabilities } from '../config/modelCapabilities'
 import { useModelsStore } from '@/store/modelsStore'
 import { useCanvasStore } from '../stores/canvasStore'
+import { isUserCancelAbort } from '@/lib/generationAbort'
 import { finishGenerationJob, hasGenerationJob, startGenerationJob, subscribeGenerationJobs } from '../utils/generationJobs'
+import { rememberNodeVideoJob } from '../utils/resumeVideoJobs'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from '../utils/generateSlots'
 import { resolveMentionsForSend } from '../utils/promptMentions'
 import { useImageGeneration } from './useImageGeneration'
@@ -107,6 +109,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
       : (liveName || resolveVideoCapabilities(model).label || model)
 
     const signal = startGenerationJob(nodeId)
+    const workflowId = useCanvasStore.getState().currentProjectId
     const applyProgress = (_status: string, percent?: number) => {
       if (signal.aborted) return
       if (typeof percent === 'number' && Number.isFinite(percent)) {
@@ -119,6 +122,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
       error: '',
       progress: undefined,
       statusLabel: isImage ? undefined : '排队中',
+      ...(isImage ? {} : { videoJobIds: [] }),
       model,
       modelLabel,
     })
@@ -183,6 +187,10 @@ export function useNodeGenerateAction(nodeId: string | null) {
         ratio: videoFields.ratio,
         nodeId,
         signal,
+        onSubmitted: (jobId: string) => {
+          if (isUserCancelAbort(signal)) return
+          rememberNodeVideoJob(nodeId, jobId, workflowId)
+        },
       }
       const reportClip = (status: string, percent?: number) => {
         if (signal.aborted) return
@@ -257,12 +265,18 @@ export function useNodeGenerateAction(nodeId: string | null) {
       else message.error(typeof outcome.patch.error === 'string' && outcome.patch.error ? outcome.patch.error : outcome.notice.text)
     } catch (err: unknown) {
       if (signal.aborted) return
+      // Refresh aborts the fetch without aborting our signal. Keep the job id so the next open can resume.
+      const keepVideoJob = !isImage && (
+        isCanceledError(err) ||
+        (err instanceof Error && err.message.includes('视频生成超时'))
+      )
+      const clearJobs = isImage || keepVideoJob ? {} : { videoJobIds: undefined }
       if (isCanceledError(err)) {
         updateNode(nodeId, { loading: false, error: '', progress: undefined, statusLabel: undefined })
         return
       }
       if (err instanceof Error && err.message === 'API_RATE_LIMIT') {
-        updateNode(nodeId, { loading: false, progress: undefined, statusLabel: undefined })
+        updateNode(nodeId, { loading: false, progress: undefined, statusLabel: undefined, ...clearJobs })
         message.warning('请求过于频繁，请稍后重试')
       } else {
         updateNode(nodeId, {
@@ -270,11 +284,12 @@ export function useNodeGenerateAction(nodeId: string | null) {
           error: toErrorMessage(err, '生成失败'),
           progress: undefined,
           statusLabel: undefined,
+          ...clearJobs,
         })
       }
     } finally {
       const ownsJob = finishGenerationJob(nodeId, signal)
-      if (ownsJob) {
+      if (ownsJob && !signal.aborted) {
         const current = useCanvasStore.getState().nodes.find((item) => item.id === nodeId)
         if (current?.data.loading) {
           const existing = typeof current.data.error === 'string' ? current.data.error : ''

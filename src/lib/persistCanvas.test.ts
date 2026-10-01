@@ -131,4 +131,60 @@ describe('persistOpenCanvas', () => {
       vi.useRealTimers()
     }
   })
+
+  it('persists video job ids and drops in-flight generating fields', async () => {
+    useCanvasStore.setState({
+      nodes: [
+        {
+          id: 'clip',
+          type: 'video',
+          position: { x: 0, y: 0 },
+          data: {
+            label: '视频节点',
+            loading: true,
+            progress: 35,
+            statusLabel: '生成中',
+            videoJobIds: ['job_1', 'job_2'],
+            prompt: '雨夜',
+          },
+        },
+      ],
+    })
+
+    await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
+
+    const saved = vi.mocked(workflowsApi.update).mock.calls[0][2]?.canvasData?.nodes?.[0] as {
+      data?: Record<string, unknown>
+    }
+    expect(saved?.data).toMatchObject({
+      label: '视频节点',
+      prompt: '雨夜',
+      videoJobIds: ['job_1', 'job_2'],
+    })
+    expect(saved?.data).not.toHaveProperty('loading')
+    expect(saved?.data).not.toHaveProperty('progress')
+    expect(saved?.data).not.toHaveProperty('statusLabel')
+    expect(useCanvasStore.getState().nodes[0].data.loading).toBe(true)
+    expect(useCanvasStore.getState().nodes[0].data.statusLabel).toBe('生成中')
+
+    useCanvasStore.setState({
+      nodes: [
+        {
+          id: 'clip',
+          type: 'video',
+          position: { x: 0, y: 0 },
+          data: {
+            label: '视频节点',
+            loading: true,
+            progress: 80,
+            statusLabel: '生成中',
+            videoJobIds: ['job_1', 'job_2'],
+            prompt: '雨夜',
+          },
+        },
+      ],
+    })
+    await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
+    expect(workflowsApi.update).toHaveBeenCalledTimes(1)
+  })
 })

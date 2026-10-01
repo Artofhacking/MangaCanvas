@@ -1,3 +1,4 @@
+import { DETACH_ABORT_REASON, USER_CANCEL_ABORT_REASON } from '@/lib/generationAbort'
 import type { NodeData } from '../types'
 
 const jobs = new Map<string, AbortController>()
@@ -17,7 +18,7 @@ export function subscribeGenerationJobs(listener: () => void) {
 export function startGenerationJob(nodeId: string): AbortSignal {
   const existing = jobs.get(nodeId)
   if (existing) {
-    existing.abort()
+    existing.abort(DETACH_ABORT_REASON)
   }
   const controller = new AbortController()
   jobs.set(nodeId, controller)
@@ -28,10 +29,20 @@ export function startGenerationJob(nodeId: string): AbortSignal {
 export function cancelGenerationJob(nodeId: string): boolean {
   const controller = jobs.get(nodeId)
   if (!controller) return false
-  controller.abort()
+  controller.abort(USER_CANCEL_ABORT_REASON)
   jobs.delete(nodeId)
   emitGenerationJobs()
   return true
+}
+
+/** Stop in-memory pollers when the canvas closes. Does not cancel backend video jobs. */
+export function stopLocalGenerationJobs() {
+  if (jobs.size === 0) return
+  for (const controller of jobs.values()) {
+    if (!controller.signal.aborted) controller.abort(DETACH_ABORT_REASON)
+  }
+  jobs.clear()
+  emitGenerationJobs()
 }
 
 export function finishGenerationJob(nodeId: string, signal: AbortSignal): boolean {
