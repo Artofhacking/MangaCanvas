@@ -27,6 +27,9 @@ const mapWorkflow = (dto: WorkflowDTO): Workflow => ({
   thumbnail: dto.thumbnail ?? undefined,
   // List responses omit canvasData. Do not invent an empty graph here, or
   // callers cannot tell "not loaded" from "this canvas really has no nodes".
+  // nodeCount is the same idea: only copy a number the server actually sent.
+  ...(typeof dto.nodeCount === 'number' ? { nodeCount: dto.nodeCount } : {}),
+  ...(typeof dto.edgeCount === 'number' ? { edgeCount: dto.edgeCount } : {}),
   ...(dto.canvasData ? { canvasData: normalizeCanvasData(dto.canvasData) } : {}),
 })
 

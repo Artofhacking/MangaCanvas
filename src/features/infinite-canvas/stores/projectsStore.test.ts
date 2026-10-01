@@ -67,6 +67,63 @@ describe('syncProjectWorkflows', () => {
     expect(saved.canvasData.nodes).toHaveLength(1)
     expect(saved.canvasData.nodes[0].id).toBe('n1')
     expect(saved.canvasData.edges).toHaveLength(1)
+    expect(saved.nodeCount).toBeUndefined()
+  })
+
+  it('stores the server nodeCount instead of the empty placeholder canvas', async () => {
+    useCanvasDocumentsStore.setState({
+      projects: [
+        {
+          id: 'workflow_a',
+          name: '旧名',
+          thumbnail: '',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+          projectId: '4',
+          sourceType: 'scene',
+          nodeCount: 1,
+          canvasData: storedCanvas,
+        },
+      ],
+    })
+    vi.mocked(workflowsApi.getAll).mockResolvedValue({
+      success: true,
+      data: {
+        list: [
+          {
+            id: 'workflow_a',
+            projectId: '4',
+            name: '场景工作流',
+            sourceType: 'scene',
+            status: 'draft',
+            modified: '2026-09-01T00:00:00.000Z',
+            nodeCount: 3,
+            edgeCount: 2,
+          },
+          {
+            id: 'workflow_empty',
+            projectId: '4',
+            name: '空白工作流',
+            sourceType: 'blank',
+            status: 'draft',
+            modified: '2026-08-01T00:00:00.000Z',
+            nodeCount: 0,
+            edgeCount: 0,
+          },
+        ],
+        pagination: { page: 1, size: 100, total: 2 },
+      },
+    })
+
+    await useCanvasDocumentsStore.getState().syncProjectWorkflows('4')
+
+    const saved = useCanvasDocumentsStore.getState().projects.find((item) => item.id === 'workflow_a')
+    const empty = useCanvasDocumentsStore.getState().projects.find((item) => item.id === 'workflow_empty')
+    expect(saved?.nodeCount).toBe(3)
+    expect(saved?.edgeCount).toBe(2)
+    expect(saved?.canvasData.nodes).toHaveLength(1)
+    expect(empty?.nodeCount).toBe(0)
+    expect(empty?.canvasData.nodes).toEqual([])
   })
 
   it('clears a stale loading flag kept from a previous canvas', async () => {
@@ -140,5 +197,39 @@ describe('syncProjectWorkflows', () => {
     const saved = useCanvasDocumentsStore.getState().projects[0]
     expect(saved.canvasData.nodes).toEqual([])
     expect(saved.canvasData.edges).toEqual([])
+    expect(saved.nodeCount).toBeUndefined()
+  })
+
+  it('tracks nodeCount from the canvas once it is actually loaded or edited', () => {
+    useCanvasDocumentsStore.getState().createWorkflowDocument({
+      id: 'workflow_blank',
+      name: '空白工作流',
+      projectId: '4',
+      sourceType: 'blank',
+    })
+    expect(useCanvasDocumentsStore.getState().projects[0].nodeCount).toBe(0)
+
+    useCanvasDocumentsStore.getState().updateProjectCanvas('workflow_blank', {
+      nodes: [{ id: 'n1', type: 'text', position: { x: 0, y: 0 }, data: { content: '草稿' } }],
+    })
+    expect(useCanvasDocumentsStore.getState().projects[0].nodeCount).toBe(1)
+
+    useCanvasDocumentsStore.getState().createWorkflowDocument({
+      id: 'workflow_blank',
+      name: '空白工作流',
+      projectId: '4',
+      sourceType: 'blank',
+      canvasData: {
+        nodes: [
+          { id: 'n1', type: 'text', position: { x: 0, y: 0 }, data: {} },
+          { id: 'n2', type: 'text', position: { x: 10, y: 10 }, data: {} },
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+        viewport: { x: 0, y: 0, zoom: 1 },
+      },
+    })
+    const saved = useCanvasDocumentsStore.getState().projects[0]
+    expect(saved.nodeCount).toBe(2)
+    expect(saved.edgeCount).toBe(1)
   })
 })

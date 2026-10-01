@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, defer
 
 from .. import models, serialize
+from ..canvas_counts import canvas_collection_count
 from ..canvas_media import persist_inline_canvas_logged
 from ..serialize import normalize_canvas
 from ..db import get_db
@@ -39,6 +40,21 @@ def _default_canvas() -> dict:
     return {"nodes": [], "edges": [], "viewport": {"x": 0, "y": 0, "zoom": 1}}
 
 
+def _collection_counts(db: Session, workflow_ids: list[str]) -> dict[str, tuple[int, int]]:
+    """Return ``(node_count, edge_count)`` without sorting the JSON column."""
+    if not workflow_ids:
+        return {}
+    dialect = db.get_bind().dialect.name
+    node_count = canvas_collection_count(models.CanvasWorkflow.canvas_data, "$.nodes", dialect)
+    edge_count = canvas_collection_count(models.CanvasWorkflow.canvas_data, "$.edges", dialect)
+    rows = (
+        db.query(models.CanvasWorkflow.id, node_count, edge_count)
+        .filter(models.CanvasWorkflow.id.in_(workflow_ids))
+        .all()
+    )
+    return {workflow_id: (int(nodes or 0), int(edges or 0)) for workflow_id, nodes, edges in rows}
+
+
 @router.get("")
 def list_workflows(
     project_id: int,
@@ -66,7 +82,15 @@ def list_workflows(
         .limit(size)
         .all()
     )
-    items = [serialize.workflow(r, include_canvas=False) for r in rows]
+    counts = _collection_counts(db, [row.id for row in rows])
+    items = []
+    for row in rows:
+        counted = counts.get(row.id)
+        if counted is None:
+            items.append(serialize.workflow(row, include_canvas=False))
+            continue
+        nodes, edges = counted
+        items.append(serialize.workflow(row, include_canvas=False, node_count=nodes, edge_count=edges))
     return ok({"list": items, "pagination": {"page": page, "size": size, "total": int(total or 0)}})
 
 

@@ -242,13 +242,13 @@ export default function WorkflowsTab() {
                   <div className="mt-3 flex items-center justify-between text-xs">
                     <span className="text-[hsl(var(--secondary))]">节点数量</span>
                     <span className="font-semibold text-[hsl(var(--on-surface))]">
-                      {workflow.canvasData?.nodes?.length ?? 0} 个
+                      {typeof workflow.nodeCount === "number" ? `${workflow.nodeCount} 个` : "—"}
                     </span>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs">
                     <span className="text-[hsl(var(--secondary))]">连线数量</span>
                     <span className="font-semibold text-[hsl(var(--on-surface))]">
-                      {workflow.canvasData?.edges?.length ?? 0} 条
+                      {typeof workflow.edgeCount === "number" ? `${workflow.edgeCount} 条` : "—"}
                     </span>
                   </div>
                 </div>
