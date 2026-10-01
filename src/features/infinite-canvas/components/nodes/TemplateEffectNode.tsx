@@ -6,6 +6,7 @@ import { DeleteOutlined, CopyOutlined, PlayCircleOutlined } from '@ant-design/ic
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useVideoGeneration } from '../../hooks';
 import { persistOpenCanvas } from '@/lib/persistCanvas';
+import { formatAiError } from '@/lib/formatAiError';
 import { isInlineCanvasMedia } from '@/lib/canvasPayload';
 import { uploadCanvasMediaUrl } from '@/lib/uploadCanvasMedia';
 import { nextMediaPixelFields } from '../../utils/mediaFrame';
@@ -266,7 +267,7 @@ const TemplateEffectNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data,
         const timedOut = err instanceof Error && err.message.includes('视频生成超时')
         updateNode(videoNodeId, {
           loading: false,
-          error: '生成失败',
+          error: formatAiError(err, '生成失败'),
           progress: undefined,
           statusLabel: undefined,
           ...(timedOut ? {} : { videoJobIds: undefined }),

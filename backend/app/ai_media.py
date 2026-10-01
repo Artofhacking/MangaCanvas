@@ -686,6 +686,13 @@ def seedance_ratio(size: str | None) -> str:
     return SEEDANCE_RATIO_BY_SIZE.get(raw, "16:9")
 
 
+def seedance_task_ratio(size: str | None, *, has_frame: bool) -> str:
+    """Text-to-video needs a concrete ratio. First/last frame must follow the image."""
+    if has_frame:
+        return "adaptive"
+    return seedance_ratio(size)
+
+
 def seedance_resolution(model: str, size: str | None, resolution: str | None) -> str:
     raw = str(size or "").lower()
     res = (resolution or "").lower().replace(" ", "")
@@ -1033,7 +1040,8 @@ async def baidu_video_generate(
         "content": content,
         "duration": seedance_duration(resolved, duration),
         "resolution": seedance_resolution(resolved, size, resolution),
-        "ratio": seedance_ratio(size),
+        # A fixed ratio is rejected for first-frame / first-last-frame tasks.
+        "ratio": seedance_task_ratio(size, has_frame=bool(first_frame or last_frame)),
         "watermark": False,
         "generate_audio": True,
     }

@@ -3,6 +3,7 @@ import { message } from 'antd';
 import { imageService, resolveImageReferences } from '@/api/aigc';
 import type { TaskStatus } from '@/api/aigc';
 import { isCanceledError } from '@/api/core';
+import { formatAiError } from '@/lib/formatAiError';
 import type { ImageGenerationParams } from '../types';
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -75,7 +76,7 @@ export function useImageGeneration(): UseImageGenerationReturn {
         err.message.includes('429') ||
         (err as { response?: { status?: number } }).response?.status === 429
       );
-      const errorMessage = is429 ? 'API_RATE_LIMIT' : (err instanceof Error ? err.message : '图片生成失败');
+      const errorMessage = is429 ? 'API_RATE_LIMIT' : formatAiError(err, '图片生成失败');
       setError(errorMessage);
       if (!is429) {
         message.error(errorMessage);

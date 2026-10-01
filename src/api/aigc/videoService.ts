@@ -4,6 +4,7 @@ import { requestData } from '@/api/core/response'
 import { applyBillingPayload, withIdempotentGenerate, type BillingPayload } from '@/lib/billing'
 import { isUserCancelAbort } from '@/lib/generationAbort'
 import { resolveProjectId } from '@/lib/session'
+import { formatAiError } from '@/lib/formatAiError'
 import { titleFromPrompt, useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import type { VideoGenerateOptions } from './types'
 
@@ -169,11 +170,11 @@ async function watchJob(jobId: string, options: VideoWatchOptions = {}): Promise
 async function pollJob(jobId: string, options: VideoGenerateOptions) {
   const job = await watchJob(jobId, options)
   if (job.status === 'succeeded') {
-    if (!job.url) throw new Error(job.message || '生成成功但未找到视频 URL')
+    if (!job.url) throw new Error(formatAiError(job.message || '', '生成成功但未找到视频 URL'))
     return job.url
   }
   if (job.status === 'cancelled') throw abortedError()
-  throw new Error(job.message || '视频生成失败')
+  throw new Error(formatAiError(job.message || '', '视频生成失败'))
 }
 
 export const videoService = {
@@ -209,7 +210,7 @@ export const videoService = {
         return submitted.url
       }
       if (submitted.status === 'failed') {
-        throw new Error(submitted.message || '视频生成失败')
+        throw new Error(formatAiError(submitted.message || '', '视频生成失败'))
       }
       if (submitted.status === 'cancelled') throw abortedError()
       const url = await pollJob(jobId, options)
@@ -217,7 +218,7 @@ export const videoService = {
       return url
     } catch (error) {
       const canceled = isCanceledError(error) || (error instanceof Error && error.name === 'AbortError')
-      const message = canceled ? '已取消' : error instanceof Error ? error.message : '生成失败'
+      const message = canceled ? '已取消' : formatAiError(error, '生成失败')
       useGenerationHistoryStore.getState().fail(historyId, message)
       throw error
     } finally {

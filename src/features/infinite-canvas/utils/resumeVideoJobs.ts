@@ -1,4 +1,5 @@
 import { isCanceledError } from '@/api/core'
+import { formatAiError } from '@/lib/formatAiError'
 import { videoService } from '@/api/aigc/videoService'
 import type { TaskProgress } from '@/api/aigc/types'
 import { persistOpenCanvas } from '@/lib/persistCanvas'
@@ -76,7 +77,7 @@ async function watchOne(
     return {
       jobId,
       status: 'failed',
-      message: error instanceof Error ? error.message : '视频生成失败',
+      message: formatAiError(error, '视频生成失败'),
     }
   }
 }

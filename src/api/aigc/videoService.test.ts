@@ -10,6 +10,8 @@ vi.mock('@/api/core/response', () => ({
 
 import { requestData } from '@/api/core/response'
 import { DETACH_ABORT_REASON, USER_CANCEL_ABORT_REASON } from '@/lib/generationAbort'
+import { FIRST_FRAME_RATIO_HINT } from '@/lib/formatAiError'
+import { useGenerationHistoryStore } from '@/store/generationHistoryStore'
 import { videoService } from './videoService'
 
 const request = vi.mocked(requestData)
@@ -94,5 +96,33 @@ describe('videoService refresh does not cancel the backend job', () => {
     })).rejects.toMatchObject({ name: 'AbortError' })
 
     expect(request.mock.calls.filter((call) => isCancel(String(call[1]?.url || ''))).length).toBeGreaterThan(0)
+  })
+})
+
+describe('videoService failure copy', () => {
+  beforeEach(() => {
+    request.mockReset()
+  })
+
+  it('rejects with a Chinese hint instead of the upstream JSON body', async () => {
+    const upstream = '视频任务提交失败: {"error":{"code":"InvalidParameter.TaskTypeConstraint","message":"The parameter ratio specified in the request is not valid. For first-frame or first-last-frame generation, the output ratio follows the first-frame image.","type":"BadRequest"},"content":[{"text":"输入图片说明：雾峡"}]}'
+    request.mockImplementation(async (_client, config) => {
+      const url = String(config?.url || '')
+      if (config?.method === 'POST' && url === '/ai/videos/generations') {
+        return { job_id: 'job_fail', status: 'failed', message: upstream }
+      }
+      throw new Error(`unexpected ${config?.method} ${url}`)
+    })
+
+    await expect(videoService.generate({
+      model: 'doubao-seedance-2-0-260128',
+      prompt: '雾峡失败样本',
+    })).rejects.toThrow(FIRST_FRAME_RATIO_HINT)
+
+    const item = useGenerationHistoryStore.getState().items.find((entry) => entry.prompt === '雾峡失败样本')
+    expect(item?.status).toBe('failed')
+    expect(item?.error).toContain(FIRST_FRAME_RATIO_HINT)
+    expect(item?.error).not.toContain('{')
+    expect(item?.error).not.toContain('雾峡')
   })
 })

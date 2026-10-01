@@ -3,6 +3,7 @@ import { message } from 'antd';
 import { videoService } from '@/api/aigc';
 import type { TaskStatus } from '@/api/aigc';
 import { isCanceledError } from '@/api/core';
+import { formatAiError } from '@/lib/formatAiError';
 import type { VideoGenerationParams } from '../types';
 import type { GenerationProgressHandler } from './useImageGeneration';
 
@@ -72,7 +73,7 @@ export function useVideoGeneration(): UseVideoGenerationReturn {
         err.message.includes('429') ||
         (err as { response?: { status?: number } }).response?.status === 429
       );
-      const errorMessage = is429 ? 'API_RATE_LIMIT' : (err instanceof Error ? err.message : '视频生成失败');
+      const errorMessage = is429 ? 'API_RATE_LIMIT' : formatAiError(err, '视频生成失败');
       setError(errorMessage);
       if (!params.quiet && !is429) {
         message.error(errorMessage);
