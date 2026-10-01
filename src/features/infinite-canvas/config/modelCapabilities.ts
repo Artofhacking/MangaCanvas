@@ -171,6 +171,13 @@ export function capabilitiesFromApi(model: ModelDTO): Partial<ModelConfig> {
   return next
 }
 
+/** Empty live arrays are "not provided", so they must not replace the static catalog. */
+function preferFilled<T>(live: readonly T[] | undefined, fallback: readonly T[] | undefined): T[] | undefined {
+  if (live && live.length > 0) return [...live]
+  if (fallback && fallback.length > 0) return [...fallback]
+  return undefined
+}
+
 function mergeModelConfig(
   type: 'image' | 'video',
   live: ModelDTO | undefined,
@@ -179,32 +186,42 @@ function mergeModelConfig(
   const fromApi = live ? capabilitiesFromApi(live) : {}
   const id = live?.id || mapped?.key || ''
   const hasApiCaps = Boolean(
-    fromApi.sizes || fromApi.qualities || fromApi.resolutions || fromApi.durs
+    fromApi.sizes?.length || fromApi.qualities?.length || fromApi.resolutions?.length || fromApi.durs?.length
   )
   if (!hasApiCaps && !mapped && id) {
     warnMissingCapabilities(id)
   }
-  const sizes = fromApi.sizes || mapped?.sizes
+  const sizes = preferFilled(fromApi.sizes, mapped?.sizes)
+  const ratios = preferFilled(fromApi.ratios, mapped?.ratios)
+  const liveDeclaredAspect = Boolean(fromApi.ratios?.length || fromApi.sizes?.length)
+  const mappedDeclaresAspect = Boolean(mapped?.ratios?.length || mapped?.sizes?.length)
+  // A sparse live row can send supports_aspect:false with no ratio/size list.
+  // That flag must not erase a static catalog that still has aspect options.
+  const supportsAspect =
+    fromApi.supportsAspect === false && !liveDeclaredAspect && mappedDeclaresAspect && mapped?.supportsAspect !== false
+      ? mapped?.supportsAspect ?? true
+      : fromApi.supportsAspect ??
+        mapped?.supportsAspect ??
+        (type === 'video' ? Boolean(sizes?.length || ratios?.length) : undefined)
   return {
     key: id,
     label: live?.name || mapped?.label || id,
     type,
     async: mapped?.async ?? true,
-    qualities: fromApi.qualities || mapped?.qualities,
+    qualities: preferFilled(fromApi.qualities, mapped?.qualities),
     sizes,
-    resolutions: fromApi.resolutions || mapped?.resolutions,
-    ratios: fromApi.ratios || mapped?.ratios,
-    durs: fromApi.durs || mapped?.durs,
+    resolutions: preferFilled(fromApi.resolutions, mapped?.resolutions),
+    ratios,
+    durs: preferFilled(fromApi.durs, mapped?.durs),
     maxN: fromApi.maxN ?? mapped?.maxN ?? (type === 'image' ? 4 : undefined),
-    supportsAspect:
-      fromApi.supportsAspect ??
-      mapped?.supportsAspect ??
-      (type === 'video' ? Boolean(fromApi.sizes || mapped?.sizes) : undefined),
+    supportsAspect,
     defaultParams: { ...mapped?.defaultParams, ...fromApi.defaultParams },
     getSizesByQuality:
-      fromApi.getSizesByQuality ||
+      (fromApi.sizes?.length ? fromApi.getSizesByQuality : undefined) ||
       mapped?.getSizesByQuality ||
-      (sizes ? () => (sizes[0].label.includes('(') ? sizes : labeledSizes(sizes.map((item) => item.key))) : undefined),
+      (sizes?.length
+        ? () => (sizes[0].label.includes('(') ? sizes : labeledSizes(sizes.map((item) => item.key)))
+        : undefined),
   }
 }
 

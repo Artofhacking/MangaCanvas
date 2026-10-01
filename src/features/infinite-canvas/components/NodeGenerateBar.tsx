@@ -43,6 +43,7 @@ import {
   listVideoResolutions,
   parseVideoSize,
   resolveImageRequestModel,
+  resolveListedVideoModel,
   routedVideoModelKey,
   videoAspectSuppressedByReferences,
 } from '../utils/generateParams'
@@ -73,6 +74,8 @@ import { cn } from '@/lib/utils'
  * Video is the wide row: 角色库 + model + ratio + resolution + duration + count.
  * 688px hid the count pill under the row's horizontal overflow (only the copy
  * icon stayed in view). 760px keeps 「1张 / 2张 / 4张」 fully visible.
+ * Model and 比例 stay outside that scroller so a hidden scrollbar cannot
+ * push the ratio pill out of sight.
  */
 const BAR_WIDTH = 760
 const BAR_ESTIMATED_HEIGHT = 168
@@ -235,7 +238,7 @@ function GenerateBarModelPicker({
     (typeof node.data.resolution === 'string' && node.data.resolution) || videoParsed.resolution
   const videoRatio = (typeof node.data.ratio === 'string' && node.data.ratio) || videoParsed.ratio
   const aspectKey = isVideo ? routedVideoModelKey(currentKey, videoReferenceCount) : currentKey
-  const aspectModel = aspectKey === currentModel?.key ? currentModel : undefined
+  const aspectModel = isVideo ? resolveListedVideoModel(aspectKey, currentModel) : undefined
   const availableResolutions = listVideoResolutions(aspectKey, aspectModel)
   const videoRatios = listVideoAspectRatios(aspectKey, aspectModel)
   const showVideoAspect = !suppressVideoAspect && videoRatios.length > 0
@@ -303,9 +306,14 @@ function GenerateBarModelPicker({
   const triggerTitle = selectedTip
     ? `${displayModelName(selected?.label) || triggerName} — ${selectedTip}`
     : selected?.label || currentKey || '选择模型'
+  const ratioTriggerProps = {
+    'data-generate-ratio': 'true',
+    'aria-label': '比例',
+  } as const
 
   return (
-    <div className="flex min-w-0 shrink-0 items-center gap-0.5">
+    <div className="flex min-w-0 flex-1 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-0.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <DockSelectTrigger
@@ -368,27 +376,68 @@ function GenerateBarModelPicker({
       <DockDivider />
 
       {isVideo ? (
+        showVideoAspect ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <DockSelectTrigger
+                {...ratioTriggerProps}
+                aria-label={`比例 ${videoRatio}`}
+                icon={<RatioGlyph ratio={videoRatio} />}
+                label={videoRatio}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
+              {videoRatios.map((ratio) => (
+                <DropdownMenuItem
+                  key={ratio}
+                  onClick={() => onChange(applyVideoRatio(videoResolution, ratio))}
+                  className={menuItemClass(videoRatio === ratio)}
+                >
+                  <Check className={cn('mr-2 h-3.5 w-3.5', videoRatio === ratio ? 'opacity-100' : 'opacity-0')} />
+                  <RatioGlyph ratio={ratio} />
+                  <span className="ml-2">{ratio}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <DockSelectTrigger
+              {...ratioTriggerProps}
+              aria-label={`比例 ${imageRatio}`}
+              icon={<RatioGlyph ratio={imageRatio} />}
+              label={imageRatio}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
+            {imageRatios.map((ratio) => (
+              <DropdownMenuItem
+                key={ratio}
+                onClick={() => {
+                  const next = applyImageRatio(
+                    imageRequestKey,
+                    typeof node.data.quality === 'string' ? node.data.quality : undefined,
+                    ratio,
+                    imageRequestModel
+                  )
+                  if (next) onChange(next)
+                }}
+                className={menuItemClass(imageRatio === ratio)}
+              >
+                <Check className={cn('mr-2 h-3.5 w-3.5', imageRatio === ratio ? 'opacity-100' : 'opacity-0')} />
+                <RatioGlyph ratio={ratio} />
+                <span className="ml-2">{ratio}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+      </div>
+      <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {isVideo ? (
         <>
-          {showVideoAspect ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <DockSelectTrigger icon={<RatioGlyph ratio={videoRatio} />} label={videoRatio} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
-                {videoRatios.map((ratio) => (
-                  <DropdownMenuItem
-                    key={ratio}
-                    onClick={() => onChange(applyVideoRatio(videoResolution, ratio))}
-                    className={menuItemClass(videoRatio === ratio)}
-                  >
-                    <Check className={cn('mr-2 h-3.5 w-3.5', videoRatio === ratio ? 'opacity-100' : 'opacity-0')} />
-                    <RatioGlyph ratio={ratio} />
-                    <span className="ml-2">{ratio}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <DockSelectTrigger className="w-[5.5rem]" icon={<Monitor className="h-3 w-3" />} label={videoResolution} />
@@ -454,32 +503,6 @@ function GenerateBarModelPicker({
         </>
       ) : (
         <>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <DockSelectTrigger icon={<RatioGlyph ratio={imageRatio} />} label={imageRatio} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
-              {imageRatios.map((ratio) => (
-                <DropdownMenuItem
-                  key={ratio}
-                  onClick={() => {
-                    const next = applyImageRatio(
-                      imageRequestKey,
-                      typeof node.data.quality === 'string' ? node.data.quality : undefined,
-                      ratio,
-                      imageRequestModel
-                    )
-                    if (next) onChange(next)
-                  }}
-                  className={menuItemClass(imageRatio === ratio)}
-                >
-                  <Check className={cn('mr-2 h-3.5 w-3.5', imageRatio === ratio ? 'opacity-100' : 'opacity-0')} />
-                  <RatioGlyph ratio={ratio} />
-                  <span className="ml-2">{ratio}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
           {showQuality ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -520,6 +543,7 @@ function GenerateBarModelPicker({
           ) : null}
         </>
       )}
+      </div>
     </div>
   )
 }
@@ -830,7 +854,7 @@ const NodeGenerateBar: React.FC = () => {
           ) : null}
 
           <div className="mt-2 flex min-w-0 items-center gap-1.5">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
