@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { message } from 'antd'
 import { isI2IModel, UNSUPPORTED_REFERENCE_IMAGE_MESSAGE } from '@/api/aigc'
 import { isCanceledError } from '@/api/core'
 import { remapModelId, resolveImageCapabilities, resolveVideoCapabilities } from '../config/modelCapabilities'
 import { useModelsStore } from '@/store/modelsStore'
 import { useCanvasStore } from '../stores/canvasStore'
-import { finishGenerationJob, hasGenerationJob, startGenerationJob } from '../utils/generationJobs'
+import { finishGenerationJob, hasGenerationJob, startGenerationJob, subscribeGenerationJobs } from '../utils/generationJobs'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from '../utils/generateSlots'
 import { resolveMentionsForSend } from '../utils/promptMentions'
 import { useImageGeneration } from './useImageGeneration'
@@ -27,6 +27,7 @@ import { usablePosterUrl } from '../utils/videoPoster'
 
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 const DEFAULT_VIDEO_MODEL = 'happyhorse-1.1-t2v'
+const noNodeSending = () => false
 
 async function persistGeneratedMediaUrls(urls: readonly string[], signal: AbortSignal): Promise<string[]> {
   const stored: string[] = []
@@ -55,7 +56,12 @@ function toErrorMessage(err: unknown, fallback: string): string {
 export function useNodeGenerateAction(nodeId: string | null) {
   const { generate: generateImage } = useImageGeneration()
   const { generate: generateVideo } = useVideoGeneration()
-  const [sending, setSending] = useState(false)
+  const getSending = useCallback(
+    () => (nodeId ? hasGenerationJob(nodeId) : false),
+    [nodeId],
+  )
+  // Per selected node. A job on another node must not keep this dock disabled.
+  const sending = useSyncExternalStore(subscribeGenerationJobs, getSending, noNodeSending)
 
   const send = useCallback(async (barPrompt?: string) => {
     if (!nodeId) return
@@ -108,7 +114,6 @@ export function useNodeGenerateAction(nodeId: string | null) {
       }
     }
 
-    setSending(true)
     updateNode(nodeId, {
       loading: true,
       error: '',
@@ -269,8 +274,6 @@ export function useNodeGenerateAction(nodeId: string | null) {
       }
     } finally {
       const ownsJob = finishGenerationJob(nodeId, signal)
-      const superseded = signal.aborted && hasGenerationJob(nodeId)
-      if (!superseded) setSending(false)
       if (ownsJob) {
         const current = useCanvasStore.getState().nodes.find((item) => item.id === nodeId)
         if (current?.data.loading) {
