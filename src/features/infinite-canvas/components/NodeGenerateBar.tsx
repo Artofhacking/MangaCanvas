@@ -63,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { displayModelName } from '@/lib/displayModelName'
+import { imageModelTip } from '../config/imageModelTip'
 import { videoModelTip } from '../config/videoModelTip'
 import { cn } from '@/lib/utils'
 
@@ -302,7 +303,9 @@ function GenerateBarModelPicker({
         : pickerModels.length === 0
           ? '暂无可用模型'
           : displayModelName(currentKey) || '选择模型'
-  const selectedTip = isVideo && selected ? videoModelTip(selected.key, selected.label) : ''
+  const resolveTip = (key?: string | null, label?: string | null) =>
+    isVideo ? videoModelTip(key, label) : imageModelTip(key, label)
+  const selectedTip = selected ? resolveTip(selected.key, selected.label) : ''
   const triggerTitle = selectedTip
     ? `${displayModelName(selected?.label) || triggerName} — ${selectedTip}`
     : selected?.label || currentKey || '选择模型'
@@ -327,7 +330,7 @@ function GenerateBarModelPicker({
         <DropdownMenuContent
           align="end"
           sideOffset={8}
-          className={cn(DOCK_MENU, isVideo ? 'max-h-[520px] w-[22rem]' : 'max-h-[420px] w-72')}
+          className={cn(DOCK_MENU, 'w-[22rem]', isVideo ? 'max-h-[520px]' : 'max-h-[420px]')}
         >
           <p className="px-2 pb-1.5 pt-1 text-[10px] font-semibold tracking-wide text-[hsl(var(--secondary))]">
             模型
@@ -339,7 +342,7 @@ function GenerateBarModelPicker({
           ) : (
             pickerModels.map((model) => {
               const active = selected?.key === model.key
-              const tip = isVideo ? videoModelTip(model.key, model.label) : ''
+              const tip = resolveTip(model.key, model.label)
               return (
                 <DropdownMenuItem
                   key={model.key}
