@@ -64,7 +64,7 @@ function isGptImage25Key(key: string): boolean {
 }
 
 function isGptImage25Label(label: string): boolean {
-  return /gpt[\s-]*image[\s-]*2[.\-]5/.test(label)
+  return /gpt[\s-]*image[\s-]*2[.-]5/.test(label)
 }
 
 function isGptImage2Label(label: string): boolean {
