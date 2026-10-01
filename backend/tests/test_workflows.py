@@ -248,15 +248,72 @@ def test_list_node_count_counts_arrays_only(client, db, project_id):
 
     data = _data(client.get(f"/api/v1/projects/{project_id}/canvas-workflows", params={"page": 1, "size": 20}))
     by_id = {item["id"]: item for item in data["list"]}
-    assert set(by_id) >= {"workflow_empty", "workflow_three", "workflow_old", "workflow_new"}
+    # A real empty array is deleted. A non-array still counts as 0 and stays
+    # out of the list, but the broken document itself is not destroyed.
+    assert "workflow_empty" not in by_id
+    assert "workflow_old" not in by_id
+    assert set(by_id) == {"workflow_three", "workflow_new"}
+    assert data["pagination"]["total"] == 2
     assert all("canvasData" not in item for item in data["list"])
-    assert by_id["workflow_empty"]["nodeCount"] == 0
-    assert by_id["workflow_empty"]["edgeCount"] == 0
     assert by_id["workflow_three"]["nodeCount"] == 3
     assert by_id["workflow_three"]["edgeCount"] == 2
-    assert by_id["workflow_old"]["nodeCount"] == 0
-    assert by_id["workflow_old"]["edgeCount"] == 0
     assert by_id["workflow_new"]["nodeCount"] == 1
+    db.expire_all()
+    assert db.get(models.CanvasWorkflow, "workflow_empty") is None
+    broken = db.get(models.CanvasWorkflow, "workflow_old")
+    assert broken is not None
+    assert broken.canvas_data["nodes"] == {"not": "a list"}
+
+
+def test_empty_canvas_is_not_stored_and_clearing_nodes_deletes_the_row(client, db, project_id):
+    rejected = client.post(
+        f"/api/v1/projects/{project_id}/canvas-workflows",
+        json={
+            "name": "空白工作流",
+            "sourceType": "blank",
+            "canvasData": {"nodes": [], "edges": [], "viewport": {"x": 0, "y": 0, "zoom": 1}},
+        },
+    )
+    assert rejected.status_code == 400
+    body = rejected.json()
+    assert body["code"] == 1001
+    assert "空工作流" in body["message"]
+    db.expire_all()
+    assert db.query(models.CanvasWorkflow).filter_by(name="空白工作流").count() == 0
+
+    project = db.get(models.Project, project_id)
+    user = db.query(models.User).filter_by(email="emp@x.com").one()
+    db.add(
+        models.CanvasWorkflowMember(
+            workflow_id="workflow_new",
+            user_id=user.id,
+            project_id=project.id,
+            role="editor",
+        )
+    )
+    db.commit()
+
+    cleared = client.put(
+        f"/api/v1/projects/{project_id}/canvas-workflows/workflow_new",
+        json={"canvasData": {"nodes": [], "edges": [], "viewport": {"x": 0, "y": 0, "zoom": 1}}},
+    )
+    assert cleared.status_code == 200
+    payload = cleared.json()
+    assert payload["code"] == 0
+    assert payload["data"]["deleted"] is True
+    assert payload["data"]["id"] == "workflow_new"
+    db.expire_all()
+    assert db.get(models.CanvasWorkflow, "workflow_new") is None
+    assert db.query(models.CanvasWorkflowMember).filter_by(workflow_id="workflow_new").count() == 0
+
+    renamed = _data(
+        client.put(
+            f"/api/v1/projects/{project_id}/canvas-workflows/workflow_old",
+            json={"name": "只改名字"},
+        )
+    )
+    assert renamed["name"] == "只改名字"
+    assert renamed["canvasData"]["nodes"][0]["id"] == "n-heavy"
 
 
 def test_mysql_count_expression_uses_json_length_without_order_by():

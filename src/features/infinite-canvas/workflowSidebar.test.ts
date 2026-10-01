@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canvasSidebarWorkflows, workflowNodeCountLabel } from './workflowSidebar'
+import { canvasSidebarWorkflows, listedWorkflows, workflowNodeCountLabel } from './workflowSidebar'
 
 describe('canvasSidebarWorkflows', () => {
   const rows = [
@@ -26,6 +26,10 @@ describe('canvasSidebarWorkflows', () => {
       'office',
       'unknown',
     ])
+  })
+
+  it('keeps empty canvases out of the workflow space and recent list', () => {
+    expect(listedWorkflows(rows).map((item) => item.id)).toEqual(['scene', 'office', 'unknown'])
   })
 
   it('does not treat a missing nodeCount as zero', () => {

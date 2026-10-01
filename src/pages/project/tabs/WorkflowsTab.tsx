@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useWorkflowLauncher } from "@/hooks/useWorkflowLauncher"
+import { listedWorkflows } from "@/features/infinite-canvas/workflowSidebar"
 import { useCanvasDocumentsStore } from "@/features/infinite-canvas/stores/projectsStore"
 import { projectAssetsPath, workflowCanvasNavState } from "@/lib/workspaceRoutes"
 import type { WorkflowSourceType } from "@/types"
@@ -81,8 +82,7 @@ export default function WorkflowsTab() {
 
   const workflows = useMemo(
     () =>
-      projects
-        .filter((project) => String(project.projectId) === String(projectId))
+      listedWorkflows(projects.filter((project) => String(project.projectId) === String(projectId)))
         .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()),
     [projectId, projects]
   )

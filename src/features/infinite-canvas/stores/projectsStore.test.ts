@@ -122,8 +122,53 @@ describe('syncProjectWorkflows', () => {
     expect(saved?.nodeCount).toBe(3)
     expect(saved?.edgeCount).toBe(2)
     expect(saved?.canvasData.nodes).toHaveLength(1)
-    expect(empty?.nodeCount).toBe(0)
-    expect(empty?.canvasData.nodes).toEqual([])
+    expect(empty).toBeUndefined()
+  })
+
+  it('keeps the open empty canvas while editing and drops it from the workflow list', async () => {
+    useCanvasDocumentsStore.setState({
+      projects: [
+        {
+          id: 'draft_open',
+          name: '空白工作流',
+          thumbnail: '',
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+          projectId: '4',
+          sourceType: 'blank',
+          nodeCount: 0,
+          edgeCount: 0,
+          canvasData: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+        },
+      ],
+    })
+    vi.mocked(workflowsApi.getAll).mockResolvedValue({
+      success: true,
+      data: {
+        list: [
+          {
+            id: 'workflow_scene',
+            projectId: '4',
+            name: '场景工作流',
+            sourceType: 'scene',
+            status: 'draft',
+            modified: '2026-09-01T00:00:00.000Z',
+            nodeCount: 2,
+            edgeCount: 0,
+          },
+        ],
+        pagination: { page: 1, size: 100, total: 1 },
+      },
+    })
+
+    await useCanvasDocumentsStore.getState().syncProjectWorkflows('4', 'draft_open')
+    expect(useCanvasDocumentsStore.getState().projects.map((item) => item.id).sort()).toEqual([
+      'draft_open',
+      'workflow_scene',
+    ])
+
+    await useCanvasDocumentsStore.getState().syncProjectWorkflows('4')
+    expect(useCanvasDocumentsStore.getState().projects.map((item) => item.id)).toEqual(['workflow_scene'])
   })
 
   it('clears a stale loading flag kept from a previous canvas', async () => {

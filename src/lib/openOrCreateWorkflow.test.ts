@@ -85,4 +85,50 @@ describe('openOrCreateWorkflow without list canvas', () => {
     expect(workflowsApi.create).not.toHaveBeenCalled()
     expect(result).toMatchObject({ id: 'workflow_ep', created: false, canvasData: { nodes: [], edges: [] } })
   })
+
+  it('does not insert a blank workflow until the canvas has a node', async () => {
+    const result = await openOrCreateWorkflow({
+      projectId: '1',
+      sourceType: 'blank',
+    })
+
+    expect(workflowsApi.create).not.toHaveBeenCalled()
+    expect(workflowsApi.getAll).not.toHaveBeenCalled()
+    expect(result?.created).toBe(true)
+    expect(result?.id.startsWith('draft_')).toBe(true)
+    expect(result?.name).toBe('空白工作流')
+    expect(result?.canvasData.nodes).toEqual([])
+  })
+
+  it('still creates a workflow when the seed canvas already has nodes', async () => {
+    vi.mocked(workflowsApi.create).mockResolvedValue({
+      success: true,
+      data: {
+        id: 'workflow_scene',
+        projectId: '1',
+        name: '巷口 工作流',
+        sourceType: 'scene',
+        status: 'draft',
+        modified: '2026-09-01T00:00:00.000Z',
+        canvasData: {
+          nodes: [{ id: 'seed_scene', type: 'image', position: { x: 0, y: 0 }, data: { url: 'https://cdn.example/alley.png' } }],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 1 },
+        },
+      },
+    })
+
+    const result = await openOrCreateWorkflow({
+      projectId: '1',
+      sourceType: 'scene',
+      sourceName: '巷口',
+      forceNew: true,
+      seedImage: 'https://cdn.example/alley.png',
+      seedHasImage: true,
+    })
+
+    expect(workflowsApi.create).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(workflowsApi.create).mock.calls[0][1].canvasData?.nodes.length).toBeGreaterThan(0)
+    expect(result).toMatchObject({ id: 'workflow_scene', created: true })
+  })
 })

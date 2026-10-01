@@ -117,11 +117,16 @@ export const workflowsApi = {
       },
       {} as WorkflowDTO,
       '保存工作流失败'
-    ).then((response) =>
-      response.success
-        ? successResponse(mapWorkflow(response.data))
-        : errorResponse(response.message || '保存工作流失败', null)
-    )
+    ).then((response) => {
+      if (!response.success) {
+        return errorResponse(response.message || '保存工作流失败', null)
+      }
+      // Saving a canvas back down to zero nodes deletes the row.
+      if (!response.data || (response.data as { deleted?: boolean }).deleted) {
+        return successResponse(null)
+      }
+      return successResponse(mapWorkflow(response.data))
+    })
   },
 
   /**

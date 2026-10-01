@@ -288,7 +288,15 @@ export interface ProjectsStore {
     sourceAssetId?: number;
     canvasData?: Project['canvasData'];
   }) => void;
-  syncProjectWorkflows: (projectId: string) => Promise<void>;
+  syncProjectWorkflows: (projectId: string, keepWorkflowId?: string | null) => Promise<void>;
+  reassignWorkflowDocument: (previousId: string, next: {
+    id: string;
+    name: string;
+    projectId: string;
+    sourceType: string;
+    sourceAssetId?: number;
+    canvasData: Project['canvasData'];
+  }) => void;
   updateProject: (id: string, data: Partial<Project>) => void;
   getProjectById: (id: string) => Project | null;
   updateProjectCanvas: (id: string, canvasData: Partial<Project['canvasData']>) => void;

@@ -16,6 +16,15 @@ const sourceLabelMap: Record<string, string> = {
 export const createWorkflowId = () =>
   `workflow_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
+/** Local canvas that is not a database row until the user adds a node. */
+export const DRAFT_WORKFLOW_ID_PREFIX = 'draft_'
+
+export const isDraftWorkflowId = (workflowId?: string | null) =>
+  Boolean(workflowId && workflowId.startsWith(DRAFT_WORKFLOW_ID_PREFIX))
+
+export const createDraftWorkflowId = () =>
+  `${DRAFT_WORKFLOW_ID_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
 export const createWorkflowPath = (projectId: string, workflowId: string) =>
   `/project/${projectId}/workflows/${workflowId}`
 
@@ -303,6 +312,17 @@ export const openOrCreateWorkflow = async (
   }
 
   const canvasData = buildSeedCanvas(options)
+  // A blank canvas has no nodes yet. Keep it in memory so leaving does not
+  // leave a 0-node card in 工作流空间. The first non-empty save creates the row.
+  if (canvasData.nodes.length === 0) {
+    return {
+      id: createDraftWorkflowId(),
+      name,
+      created: true,
+      canvasData,
+    }
+  }
+
   const response = await workflowsApi.create(numericProjectId, {
     name,
     sourceType: options.sourceType as 'blank' | 'episode' | 'scene' | 'character' | 'object',
