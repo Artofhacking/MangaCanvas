@@ -13,7 +13,13 @@ import {
   subscribeActiveCanvasVideo,
 } from '../../utils/canvasMediaBudget'
 import { useCanvasMediaDisplaySrc } from '../../hooks/useCanvasMediaDisplaySrc'
+import {
+  canvasVideoSeekBarInsets,
+  canvasVideoUsesNativeControls,
+  shouldShowCanvasVideoSeekBar,
+} from '../../utils/canvasVideoSeek'
 import { canvasVideoPreviewMediaClass, canvasVideoPreviewStageClass } from './canvasVideoPreview'
+import { CanvasVideoSeekBar } from './CanvasVideoSeekBar'
 
 interface CanvasVideoPreviewProps {
   nodeId: string
@@ -25,6 +31,8 @@ interface CanvasVideoPreviewProps {
   suspended?: boolean
   videoRef: RefObject<HTMLVideoElement>
   onOpenPreview: () => void
+  /** Keep the track off the mute chip and, on a stack, off the corner fan. */
+  seekBarInsets?: { left: number; right: number }
 }
 
 export function CanvasVideoPreview({
@@ -36,6 +44,7 @@ export function CanvasVideoPreview({
   suspended,
   videoRef,
   onOpenPreview,
+  seekBarInsets = canvasVideoSeekBarInsets({ stacked: false, fanWidth: 0 }),
 }: CanvasVideoPreviewProps) {
   const measuredInViewport = useCanvasNodeInViewport(nodeId, CANVAS_VIDEO_MIN_VISIBLE_RATIO)
   const inViewport = measuredInViewport && !suspended
@@ -45,8 +54,15 @@ export function CanvasVideoPreview({
   const explicitSeqRef = useRef(0)
   const gestureWasOnRef = useRef(false)
   const lastPreviewClickAt = useRef(0)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const scrubbingRef = useRef(false)
   const activeId = useSyncExternalStore(subscribeActiveCanvasVideo, getActiveCanvasVideoId, () => null)
-  const showVideo = activeId === nodeId && inViewport && Boolean(url)
+  const showVideo = shouldShowCanvasVideoSeekBar({
+    hasPlayableUrl: Boolean(url),
+    suspended: Boolean(suspended),
+    inViewport: measuredInViewport,
+    ownsDecoder: activeId === nodeId,
+  })
   const poster = useCanvasMediaDisplaySrc({
     nodeId,
     url: null,
@@ -82,14 +98,19 @@ export function CanvasVideoPreview({
 
   return (
     <div
+      ref={stageRef}
       className={canvasVideoPreviewStageClass}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => {
+        if (scrubbingRef.current) return
+        setHovered(false)
+      }}
     >
       {showVideo ? (
         <video
           ref={videoRef}
           src={mediaUrl(url)}
+          controls={canvasVideoUsesNativeControls}
           autoPlay={playback.autoPlay}
           loop={playback.loop}
           muted={playback.muted}
@@ -115,7 +136,7 @@ export function CanvasVideoPreview({
         />
       ) : null}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 z-0"
         onClick={(event) => {
           const now = Date.now()
           if (!isMediaPreviewDoubleClick(now, lastPreviewClickAt.current)) {
@@ -150,6 +171,19 @@ export function CanvasVideoPreview({
           <Play className="h-5 w-5 fill-current" />
         </button>
       )}
+      {showVideo ? (
+        <CanvasVideoSeekBar
+          videoRef={videoRef}
+          src={url || ''}
+          insets={seekBarInsets}
+          onScrubbingChange={(scrubbing) => {
+            scrubbingRef.current = scrubbing
+            if (scrubbing) return
+            const stage = stageRef.current
+            if (stage && !stage.matches(':hover')) setHovered(false)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
