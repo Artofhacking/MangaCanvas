@@ -15,6 +15,44 @@ export const isI2VModel = (model: string) => model.includes('i2v')
 export const isKF2VModel = (model: string) => model.includes('kf2v')
 export const isVideoModel = (model: string) => isT2VModel(model) || isI2VModel(model) || isKF2VModel(model)
 
+const HAPPYHORSE_T2V = 'happyhorse-1.1-t2v'
+const HAPPYHORSE_I2V = 'happyhorse-1.1-i2v'
+
+function isHappyHorseModel(model: string): boolean {
+  const name = model.toLowerCase()
+  return name.includes('happyhorse') || name.includes('happy-horse')
+}
+
+/**
+ * HappyHorse outbound body is t2v or i2v only.
+ * Any reference image becomes i2v with the first frame; r2v is never sent.
+ */
+export function happyHorseOutboundOptions(options: VideoGenerateOptions): VideoGenerateOptions {
+  if (!isHappyHorseModel(options.model || '')) return options
+  const images: string[] = []
+  for (const item of [options.firstFrameImage, ...(options.images || [])]) {
+    const url = (item || '').trim()
+    if (!url || images.includes(url)) continue
+    images.push(url)
+  }
+  if (images.length === 0) {
+    return {
+      ...options,
+      model: HAPPYHORSE_T2V,
+      firstFrameImage: undefined,
+      images: undefined,
+    }
+  }
+  return {
+    ...options,
+    model: HAPPYHORSE_I2V,
+    firstFrameImage: images[0],
+    images: [images[0]],
+    imageNames: options.imageNames?.slice(0, 1),
+    ratio: undefined,
+  }
+}
+
 const SUBMIT_TIMEOUT_MS = 30_000
 const STATUS_TIMEOUT_MS = 15_000
 const POLL_INTERVAL_MS = 3_000
@@ -68,26 +106,27 @@ function sleep(ms: number, signal?: AbortSignal) {
 }
 
 async function postJob(options: VideoGenerateOptions, idempotencyKey: string) {
+  const outbound = happyHorseOutboundOptions(options)
   return requestData<VideoJob>(appClient, {
     url: '/ai/videos/generations',
     method: 'POST',
     timeout: SUBMIT_TIMEOUT_MS,
-    signal: options.signal,
+    signal: outbound.signal,
     headers: { 'Idempotency-Key': idempotencyKey },
     data: {
-      model: options.model,
-      prompt: options.prompt,
-      firstFrameImage: options.firstFrameImage || options.images?.[0],
-      lastFrameImage: options.lastFrameImage,
-      images: options.images,
-      imageNames: options.imageNames,
-      size: options.size,
-      resolution: options.resolution,
-      ...(options.ratio ? { ratio: options.ratio } : {}),
-      duration: options.duration,
-      template: options.template,
-      nodeId: options.nodeId,
-      ...(options.batchId ? { batchId: options.batchId } : {}),
+      model: outbound.model,
+      prompt: outbound.prompt,
+      firstFrameImage: outbound.firstFrameImage || outbound.images?.[0],
+      lastFrameImage: outbound.lastFrameImage,
+      images: outbound.images,
+      imageNames: outbound.imageNames,
+      size: outbound.size,
+      resolution: outbound.resolution,
+      ...(outbound.ratio ? { ratio: outbound.ratio } : {}),
+      duration: outbound.duration,
+      template: outbound.template,
+      nodeId: outbound.nodeId,
+      ...(outbound.batchId ? { batchId: outbound.batchId } : {}),
       projectId: resolveProjectId(),
     },
   })

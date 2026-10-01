@@ -17,10 +17,12 @@ import { buildGeneratedImageNodePatch } from '../utils/imageStack'
 import { collectVideoBatch } from '../utils/videoBatch'
 import { buildGeneratedVideoNodePatch } from '../utils/videoStack'
 import {
+  happyHorseRequestImages,
   imageSizeForRequest,
   listVideoRequestImages,
   normalizeVideoQuantity,
   resolveImageRequestModel,
+  routedVideoModelKey,
   videoRequestParams,
 } from '../utils/generateParams'
 import { usablePosterUrl } from '../utils/videoPoster'
@@ -159,6 +161,8 @@ export function useNodeGenerateAction(nodeId: string | null) {
       const requested = normalizeVideoQuantity(node.data.n)
       const poster = usablePosterUrl(inputs.firstFrameImage)
       const videoImages = listVideoRequestImages(inputs.firstFrameImage, inputs.refImages)
+      const requestImages = happyHorseRequestImages(model, videoImages)
+      const requestModel = routedVideoModelKey(model, videoImages.length)
       const videoFields = videoRequestParams({
         model,
         referenceCount: videoImages.length,
@@ -167,11 +171,11 @@ export function useNodeGenerateAction(nodeId: string | null) {
         size: typeof node.data.size === 'string' ? node.data.size : undefined,
       })
       const videoParams = {
-        model,
+        model: requestModel,
         prompt: inputs.prompt || '',
-        first_frame_image: videoImages[0] || inputs.firstFrameImage,
+        first_frame_image: requestImages[0],
         last_frame_image: inputs.lastFrameImage,
-        images: videoImages.length ? videoImages : undefined,
+        images: requestImages.length ? requestImages : undefined,
         seconds: typeof node.data.duration === 'number' ? node.data.duration : 5,
         size: videoFields.size,
         resolution: videoFields.resolution,

@@ -363,7 +363,8 @@ SEEDANCE_RATIO_BY_SIZE = {
     "1248*1632": "3:4",
 }
 
-# Official HappyHorse 1.1 t2v / r2v ratios. i2v does not accept ratio.
+# Official HappyHorse 1.1 t2v ratios. i2v does not accept ratio.
+# MangaCanvas does not call r2v; any reference image degrades to i2v first frame.
 HAPPYHORSE_RATIOS = (
     "16:9",
     "9:16",
@@ -488,10 +489,11 @@ def build_nexcor_seedance_video_body(
 
 
 def happyhorse_variant(ref_count: int) -> str:
-    """0 image URLs → t2v, 1 → i2v, 2+ → r2v. The stored model id does not override this."""
-    if ref_count >= 2:
-        return "happyhorse-1.1-r2v"
-    if ref_count == 1:
+    """0 image URLs → t2v, any image → i2v. The stored model id does not override this.
+
+    HappyHorse r2v has no NewAPI channel. Extra references are not a separate mode.
+    """
+    if ref_count >= 1:
         return "happyhorse-1.1-i2v"
     return "happyhorse-1.1-t2v"
 
@@ -546,12 +548,13 @@ def build_happyhorse_video_body(
     resolution: str | None = None,
 ) -> dict:
     del model  # variant follows reference count, not the stored id
-    refs = [url for url in image_urls if url][:3]
-    resolved = happyhorse_variant(len(refs))
+    urls = [url for url in image_urls if url]
+    resolved = happyhorse_variant(len(urls))
+    frame = urls[:1]
     seconds = duration if duration in {5, 10, 15} else 5
     text = (prompt or "cinematic motion").strip()
-    if names:
-        text = mention_image_roles(text, names)
+    if frame and names:
+        text = mention_image_roles(text, list(names)[:1])
     res = happyhorse_resolution(resolution, size)
     body: dict = {
         "model": resolved,
@@ -565,19 +568,12 @@ def build_happyhorse_video_body(
         chosen = happyhorse_ratio_value(ratio, size)
         body["ratio"] = chosen
         body["size"] = happyhorse_aligned_size(res, chosen)
-    if not refs:
+    if not frame:
         return body
-    if resolved.endswith("r2v"):
-        media = [{"type": "reference_image", "url": url} for url in refs]
-        body["metadata"] = {"input": {"media": media}}
-        body["images"] = refs
-        body["reference_images"] = refs
-        body["img_url"] = refs[0]
-        return body
-    media = [{"type": "first_frame", "url": refs[0]}]
+    media = [{"type": "first_frame", "url": frame[0]}]
     body["metadata"] = {"input": {"media": media}}
-    body["images"] = [refs[0]]
-    body["img_url"] = refs[0]
+    body["images"] = frame
+    body["img_url"] = frame[0]
     return body
 
 
@@ -592,7 +588,10 @@ def happyhorse_dashscope_body(
     ratio: str | None = None,
     resolution: str | None = None,
 ) -> dict:
-    """Official Model Studio video-synthesis body. i2v parameters omit ratio."""
+    """Official Model Studio video-synthesis body. i2v parameters omit ratio.
+
+    Reference images beyond the first frame are dropped. r2v is never selected.
+    """
     flat = build_happyhorse_video_body(
         model=model,
         prompt=prompt,
@@ -627,7 +626,7 @@ def resolve_video_model(model: str, has_image: bool) -> str:
     if "seedance" in name or name.startswith("minimax") or "hailuo" in name or name.startswith("vidu"):
         return raw
     if "r2v" in name:
-        return "happyhorse-1.1-r2v"
+        return "happyhorse-1.1-i2v" if has_image else "happyhorse-1.1-t2v"
     if has_image:
         return "happyhorse-1.1-i2v"
     if "t2v" in name:
