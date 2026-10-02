@@ -57,6 +57,7 @@ describe("resolveSidebarSelection", () => {
       "角色管理",
       "场景管理",
       "物品管理",
+      "视频管理",
       "工作流",
       "我的收藏",
     ])

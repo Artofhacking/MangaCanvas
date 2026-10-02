@@ -95,7 +95,7 @@ export interface ProjectAssetDTO {
   organizationId: number
   projectId: number
   name?: string | null
-  sourceType: 'workflow' | 'workflow_node' | 'character' | 'scene' | 'project_object' | 'episode'
+  sourceType: 'workflow' | 'workflow_node' | 'character' | 'scene' | 'project_object' | 'episode' | 'upload'
   sourceId: string
   prompt?: string | null
   url: string
@@ -290,7 +290,7 @@ export interface WorkflowDTO {
   projectId: number
   name: string
   thumbnail?: string | null
-  sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object'
+  sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object' | 'video'
   sourceAssetId?: number | null
   status?: 'draft' | 'active' | 'archived'
   /** Present on list and detail. List omits canvasData, so this is the node total. */
@@ -309,7 +309,7 @@ export interface WorkflowDTO {
 export interface CreateWorkflowInput {
   name: string
   thumbnail?: string
-  sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object'
+  sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object' | 'video'
   sourceAssetId?: number
   sourceEpisodeId?: number
   canvasData?: {
@@ -322,7 +322,7 @@ export interface CreateWorkflowInput {
 export interface UpdateWorkflowInput {
   name?: string
   thumbnail?: string
-  sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object'
+  sourceType?: 'blank' | 'episode' | 'scene' | 'character' | 'object' | 'video'
   sourceAssetId?: number
   status?: 'draft' | 'active' | 'archived'
   canvasData?: {

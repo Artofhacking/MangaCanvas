@@ -10,6 +10,7 @@ export const projectAssetsApi = {
       size?: number
       sourceType?: ProjectAssetDTO['sourceType']
       collected?: boolean
+      mediaType?: 'video' | 'image'
       nodeId?: string
       assetUrl?: string
     }
@@ -52,6 +53,7 @@ export const projectAssetsApi = {
     payload: {
       name?: string
       prompt?: string
+      url?: string
       metadata?: Record<string, unknown>
     }
   ) {

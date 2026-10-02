@@ -63,7 +63,7 @@ export interface NodeData {
 export interface CanvasMaterialItem {
   id: string;
   library: 'materials' | 'subjects';
-  category: 'character' | 'scene' | 'object' | 'sound';
+  category: 'character' | 'scene' | 'object' | 'video' | 'sound';
   title: string;
   subtitle: string;
   status: string;

@@ -42,7 +42,7 @@ const idAlias = new Map<string, string>()
 let adoptedWorkflowId = ''
 let onWorkflowAdopted: ((workflowId: string) => void) | null = null
 
-const SOURCE_TYPES = ['blank', 'episode', 'scene', 'character', 'object'] as const
+const SOURCE_TYPES = ['blank', 'episode', 'scene', 'character', 'object', 'video'] as const
 type WorkflowSourceType = (typeof SOURCE_TYPES)[number]
 
 export function resetCanvasAutosaveForTests() {

@@ -14,6 +14,7 @@ from ..favorites import (
     metadata_node_id,
     same_media_target,
 )
+from ..project_videos import is_project_video
 from ..util import now, paginate
 
 router = APIRouter(prefix="/projects/{project_id}/assets")
@@ -31,6 +32,7 @@ class AssetCreate(BaseModel):
 class AssetUpdate(BaseModel):
     name: str | None = None
     prompt: str | None = None
+    url: str | None = None
     metadata: dict | None = None
 
 
@@ -88,6 +90,7 @@ def list_assets(
     size: int = 20,
     sourceType: str | None = None,
     collected: bool | None = None,
+    mediaType: str | None = None,
     nodeId: str | None = None,
     assetUrl: str | None = None,
     user: models.User = Depends(current_user),
@@ -105,6 +108,10 @@ def list_assets(
         items = [item for item in items if is_collected_metadata(item.get("metadata"))]
     elif collected is False:
         items = [item for item in items if not is_collected_metadata(item.get("metadata"))]
+    if mediaType == "video":
+        items = [item for item in items if is_project_video(item.get("url"), item.get("metadata"))]
+    elif mediaType == "image":
+        items = [item for item in items if not is_project_video(item.get("url"), item.get("metadata"))]
     sliced, pagination = paginate(items, page, size, max_size=200)
     return ok({"list": sliced, "pagination": pagination})
 
@@ -176,6 +183,8 @@ def update_asset(
         row.name = body.name
     if body.prompt is not None:
         row.prompt = body.prompt
+    if body.url is not None:
+        row.url = body.url
     if body.metadata is not None:
         row.extra_metadata = coerce_metadata(body.metadata)
     row.updated_at = now()

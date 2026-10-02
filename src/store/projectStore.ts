@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { projectApi } from '@/api/projectApi'
+import { projectAssetsApi } from '@/api/projectAssetsApi'
 import type { ObjectDTO, EpisodeDTO } from '@/api/types'
+import { listProjectVideoAssets, toProjectVideo, type ProjectVideo } from '@/lib/projectVideos'
 import type {
   Character,
   CharacterCreateData,
@@ -20,6 +22,7 @@ interface ProjectState {
   initializedProjectId: number | null
   isLoading: boolean
   error: string | null
+  videosError: string | null
   ui: {
     isSceneDrawerOpen: boolean
     isEpisodeDrawerOpen: boolean
@@ -31,6 +34,7 @@ interface ProjectState {
     scenes: Scene[]
     characters: Character[]
     objects: ObjectItem[]
+    videos: ProjectVideo[]
   }
   workflows: Workflow[]
   workflowPagination?: {
@@ -46,8 +50,11 @@ interface ProjectActions {
   openDrawer: (type: 'scene' | 'episode' | 'character' | 'object') => void
   closeDrawer: (type: 'scene' | 'episode' | 'character' | 'object') => void
   closeAllDrawers: () => void
-  setAssets: (type: keyof ProjectState['assets'], data: Episode[] | Scene[] | Character[] | ObjectItem[]) => void
+  setAssets: (type: keyof ProjectState['assets'], data: Episode[] | Scene[] | Character[] | ObjectItem[] | ProjectVideo[]) => void
   loadProjectAssets: (projectId: number, force?: boolean) => Promise<void>
+  loadVideos: (projectId: number) => Promise<void>
+  createVideo: (projectId: number, data: { name: string; url: string; prompt?: string }) => Promise<ProjectVideo | null>
+  deleteVideo: (projectId: number, id: number) => Promise<boolean>
   loadCharacters: (projectId: number, role?: 'main' | 'support') => Promise<void>
   loadObjects: (projectId: number, type?: ObjectDTO['type']) => Promise<void>
   loadEpisodes: (projectId: number, status?: EpisodeDTO['status']) => Promise<void>
@@ -79,6 +86,7 @@ const initialState: ProjectState = {
   initializedProjectId: null,
   isLoading: false,
   error: null,
+  videosError: null,
   ui: {
     isSceneDrawerOpen: false,
     isEpisodeDrawerOpen: false,
@@ -90,6 +98,7 @@ const initialState: ProjectState = {
     scenes: [],
     characters: [],
     objects: [],
+    videos: [],
   },
   workflows: [],
 }
@@ -140,14 +149,26 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       return
     }
 
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, videosError: null })
 
     try {
-      const [episodes, scenes, characters, objects] = await Promise.all([
+      const [episodes, scenes, characters, objects, videos] = await Promise.all([
         projectApi.episodes.getAll(projectId),
         projectApi.scenes.getAll(projectId),
         projectApi.characters.getAll(projectId),
         projectApi.objects.getAll(projectId),
+        listProjectVideoAssets(projectId)
+          .then((items) => ({
+            videos: items.flatMap((item) => {
+              const video = toProjectVideo(item)
+              return video ? [video] : []
+            }),
+            error: null as string | null,
+          }))
+          .catch((error: unknown) => ({
+            videos: [] as ProjectVideo[],
+            error: error instanceof Error ? error.message : '加载视频失败',
+          })),
       ])
 
       const firstError = [episodes, scenes, characters, objects].find((result) => !result.success)
@@ -158,11 +179,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       set({
         initializedProjectId: projectId,
         isLoading: false,
+        videosError: videos.error,
         assets: {
           episodes: episodes.data,
           scenes: scenes.data,
           characters: characters.data,
           objects: objects.data,
+          videos: videos.videos,
         },
       })
     } catch (error) {
@@ -172,6 +195,72 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         error: error instanceof Error ? error.message : '加载项目资产失败',
       })
     }
+  },
+
+  loadVideos: async (projectId) => {
+    try {
+      const items = await listProjectVideoAssets(projectId)
+      set((state) => ({
+        videosError: null,
+        assets: {
+          ...state.assets,
+          videos: items.flatMap((item) => {
+            const video = toProjectVideo(item)
+            return video ? [video] : []
+          }),
+        },
+      }))
+    } catch (error) {
+      set({
+        videosError: error instanceof Error ? error.message : '加载视频失败',
+      })
+    }
+  },
+
+  createVideo: async (projectId, data) => {
+    try {
+      const created = await projectAssetsApi.create(projectId, {
+        name: data.name.trim().slice(0, 128),
+        sourceType: 'upload',
+        sourceId: `upload-${Date.now()}`.slice(0, 64),
+        url: data.url,
+        prompt: data.prompt?.trim() || undefined,
+        metadata: { category: 'video', mediaType: 'video', source: 'upload' },
+      })
+      const video = toProjectVideo(created)
+      if (!video) {
+        set({ error: '视频已上传，但没有写入视频库' })
+        return null
+      }
+      set((state) => ({
+        error: null,
+        videosError: null,
+        assets: {
+          ...state.assets,
+          videos: [video, ...state.assets.videos.filter((item) => item.id !== video.id)],
+        },
+      }))
+      return video
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '上传视频失败' })
+      return null
+    }
+  },
+
+  deleteVideo: async (projectId, id) => {
+    try {
+      await projectAssetsApi.remove(projectId, id)
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '删除视频失败' })
+      return false
+    }
+    set((state) => ({
+      assets: {
+        ...state.assets,
+        videos: removeAsset(state.assets.videos, id),
+      },
+    }))
+    return true
   },
 
   loadCharacters: async (projectId, role) => {
@@ -510,6 +599,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       scenes: (id: number) => get().deleteScene(projectId, id),
       characters: (id: number) => get().deleteCharacter(projectId, id),
       objects: (id: number) => get().deleteObject(projectId, id),
+      videos: (id: number) => get().deleteVideo(projectId, id),
     } as const
 
     await Promise.all(ids.map((id) => actionMap[type](id)))

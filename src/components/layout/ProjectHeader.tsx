@@ -34,6 +34,7 @@ export default function ProjectHeader({
     { id: "characters", label: "角色管理" },
     { id: "scenes", label: "场景管理" },
     { id: "objects", label: "物品管理" },
+    { id: "videos", label: "视频管理" },
     { id: "workflows", label: "工作流" },
     { id: "favorites", label: "我的收藏", icon: Star },
   ]
@@ -41,10 +42,11 @@ export default function ProjectHeader({
   return (
     <header className="workspace-fixed-header fixed top-0 z-40 flex h-14 items-center justify-between border-b border-[hsl(var(--outline-variant))]/15 bg-[hsl(var(--surface-container-lowest))]/80 px-6 backdrop-blur-md">
       {/* Left spacer for balance */}
-      <div className="w-48" />
+      <div className="w-8 shrink-0 xl:w-48" />
 
       {/* Capsule Navigation */}
-      <nav className="hidden lg:flex items-center bg-[hsl(var(--surface-container-low))] rounded-full p-1">
+      <nav className="hidden min-w-0 flex-1 items-center justify-center overflow-x-auto bg-transparent lg:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center rounded-full bg-[hsl(var(--surface-container-low))] p-1">
         {topTabs.map((tab) => (
           <button
             key={tab.id}
@@ -60,6 +62,7 @@ export default function ProjectHeader({
             {tab.label}
           </button>
         ))}
+        </div>
       </nav>
 
       {/* Right Actions */}

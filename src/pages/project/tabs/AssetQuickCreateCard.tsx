@@ -1,16 +1,17 @@
 import { Upload, Wand2, Workflow } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type AssetQuickCreateVariant = "character" | "scene" | "object"
+export type AssetQuickCreateVariant = "character" | "scene" | "object" | "video"
 
 interface AssetQuickCreateCardProps {
   variant: AssetQuickCreateVariant
   title: string
   description: string
   quickHint: string
-  onQuickCreate: () => void
+  onQuickCreate?: () => void
   onUpload?: () => void
   onOpenCanvas: () => void
+  uploadHint?: string
 }
 
 const variantStyles: Record<
@@ -56,6 +57,16 @@ const variantStyles: Record<
     footerTitle: "cn-keep text-sm font-bold text-[hsl(var(--on-surface))] mb-1 truncate",
     footerMeta: "",
   },
+  video: {
+    shell: "rounded-xl",
+    aspect: "aspect-video",
+    thumbPad: "p-4",
+    heading: "text-sm font-bold text-[hsl(var(--on-surface))]",
+    description: "mt-1 text-xs leading-5 text-[hsl(var(--secondary))]",
+    footer: "p-3",
+    footerTitle: "cn-keep text-sm font-bold text-[hsl(var(--on-surface))] mb-1 truncate",
+    footerMeta: "",
+  },
 }
 
 export default function AssetQuickCreateCard({
@@ -66,10 +77,11 @@ export default function AssetQuickCreateCard({
   onQuickCreate,
   onUpload,
   onOpenCanvas,
+  uploadHint = "图片进库",
 }: AssetQuickCreateCardProps) {
   const styles = variantStyles[variant]
   const iconButton =
-    variant === "object"
+    variant === "object" || variant === "video"
       ? { wrap: "h-9 w-9 rounded-lg", icon: "h-4 w-4" }
       : { wrap: "h-10 w-10 rounded-xl", icon: "h-4 w-4" }
 
@@ -91,17 +103,19 @@ export default function AssetQuickCreateCard({
         <p className={styles.description}>{description}</p>
 
         <div className="mt-3 flex w-full items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={onQuickCreate}
-            aria-label={`快捷创作，${quickHint}`}
-            className={cn(
-              "flex items-center justify-center bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))] transition-all hover:bg-[hsl(var(--primary))]/18",
-              iconButton.wrap,
-            )}
-          >
-            <Wand2 className={iconButton.icon} />
-          </button>
+          {onQuickCreate ? (
+            <button
+              type="button"
+              onClick={onQuickCreate}
+              aria-label={`快捷创作，${quickHint}`}
+              className={cn(
+                "flex items-center justify-center bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))] transition-all hover:bg-[hsl(var(--primary))]/18",
+                iconButton.wrap,
+              )}
+            >
+              <Wand2 className={iconButton.icon} />
+            </button>
+          ) : null}
           {onUpload ? (
             <button
               type="button"
@@ -131,22 +145,24 @@ export default function AssetQuickCreateCard({
 
       <div className={styles.footer}>
         <div className="flex items-start justify-between gap-2">
-          <button
-            type="button"
-            onClick={onQuickCreate}
-            className="min-w-0 flex-1 text-left transition-colors hover:text-[hsl(var(--primary))]"
-          >
-            <span className={cn(styles.footerTitle, "block")}>快捷创作</span>
-            <span
-              className={cn(
-                "block truncate text-[13px] text-[hsl(var(--secondary))]",
-                styles.footerMeta,
-                variant === "scene" && "font-medium",
-              )}
+          {onQuickCreate ? (
+            <button
+              type="button"
+              onClick={onQuickCreate}
+              className="min-w-0 flex-1 text-left transition-colors hover:text-[hsl(var(--primary))]"
             >
-              {quickHint}
-            </span>
-          </button>
+              <span className={cn(styles.footerTitle, "block")}>快捷创作</span>
+              <span
+                className={cn(
+                  "block truncate text-[13px] text-[hsl(var(--secondary))]",
+                  styles.footerMeta,
+                  variant === "scene" && "font-medium",
+                )}
+              >
+                {quickHint}
+              </span>
+            </button>
+          ) : null}
           {onUpload ? (
             <button
               type="button"
@@ -161,7 +177,7 @@ export default function AssetQuickCreateCard({
                   variant === "scene" && "font-medium",
                 )}
               >
-                图片进库
+                {uploadHint}
               </span>
             </button>
           ) : null}

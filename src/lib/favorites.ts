@@ -1,6 +1,6 @@
 export type CollectSource = 'favorite' | 'collect'
 export type CollectMediaType = 'image' | 'video'
-export type CollectCategory = 'character' | 'scene' | 'object'
+export type CollectCategory = 'character' | 'scene' | 'object' | 'video'
 
 export const COLLECT_SOURCES: readonly CollectSource[] = ['favorite', 'collect']
 
@@ -8,6 +8,7 @@ export const COLLECT_CATEGORY_LABEL: Record<CollectCategory, string> = {
   character: '角色',
   scene: '场景',
   object: '物品',
+  video: '视频',
 }
 
 export const FAVORITES_CHANGED_EVENT = 'mangacanvas-favorites-changed'
@@ -124,7 +125,7 @@ export function buildCollectMetadata(
 }
 
 export function collectCategoryLabel(category?: unknown): string {
-  if (category === 'character' || category === 'scene' || category === 'object') {
+  if (category === 'character' || category === 'scene' || category === 'object' || category === 'video') {
     return COLLECT_CATEGORY_LABEL[category]
   }
   return '素材'

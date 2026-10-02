@@ -5,6 +5,7 @@ export const PROJECT_ASSET_NAV_ITEMS = [
   { id: "characters", label: "角色管理" },
   { id: "scenes", label: "场景管理" },
   { id: "objects", label: "物品管理" },
+  { id: "videos", label: "视频管理" },
   { id: "workflows", label: "工作流" },
   { id: "favorites", label: "我的收藏" },
 ] as const

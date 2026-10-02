@@ -6,11 +6,16 @@ import { projectAssetsApi } from '@/api/projectAssetsApi';
 import { projectApi } from '@/api/projectApi';
 import type { ProjectAssetDTO } from '@/api/types';
 import { buildCollectMetadata, favoriteSourceId, notifyFavoritesChanged } from '@/lib/favorites';
+import {
+  listProjectVideoAssets,
+  materialCategoryOptions,
+  normalizeMaterialCategory,
+  type MaterialLibraryCategory,
+} from '@/lib/projectVideos';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { resolveProjectId } from '@/lib/session';
 import { useProjectStore } from '@/store/projectStore';
 
-type MaterialCategory = 'character' | 'scene' | 'object';
 type SaveMode = 'create' | 'existing';
 type MediaType = 'image' | 'video';
 
@@ -27,19 +32,6 @@ interface SaveToMaterialsModalProps {
   prompt?: string;
   onSaved?: (asset: ProjectAssetDTO) => void;
 }
-
-const categoryOptions = [
-  { label: '角色', value: 'character' },
-  { label: '场景', value: 'scene' },
-  { label: '物品', value: 'object' },
-];
-
-const normalizeCategory = (value?: string): MaterialCategory => {
-  if (value === 'character' || value === 'scene' || value === 'object') {
-    return value;
-  }
-  return 'object';
-};
 
 const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   open,
@@ -61,7 +53,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   const loadProjectAssets = useProjectStore((state) => state.loadProjectAssets);
   const [mode, setMode] = useState<SaveMode>('create');
   const [name, setName] = useState(initialName || '');
-  const [category, setCategory] = useState<MaterialCategory>(normalizeCategory(initialCategory));
+  const [category, setCategory] = useState<MaterialLibraryCategory>(normalizeMaterialCategory(initialCategory, mediaType));
   const [targetId, setTargetId] = useState<number>();
   const [existingOptions, setExistingOptions] = useState<Array<{ label: string; value: number }>>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -70,28 +62,43 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
     if (!open) return;
     setMode('create');
     setName(initialName || (mediaType === 'video' ? '视频素材' : '图片素材'));
-    setCategory(normalizeCategory(initialCategory));
+    setCategory(normalizeMaterialCategory(initialCategory, mediaType));
     setTargetId(undefined);
     setSubmitting(false);
   }, [open, initialCategory, initialName, mediaType]);
 
   useEffect(() => {
     if (!open || !numericProjectId) return;
-    const loader =
-      category === 'character'
-        ? projectApi.characters.getAll(numericProjectId)
-        : category === 'scene'
-          ? projectApi.scenes.getAll(numericProjectId)
-          : projectApi.objects.getAll(numericProjectId);
-    void loader.then((response) => {
-      if (!response.success) return;
-      setExistingOptions(
-        (response.data || []).map((item) => ({
-          label: item.name,
-          value: item.id,
-        }))
-      );
-    });
+    let cancelled = false;
+    const apply = (options: Array<{ label: string; value: number }>) => {
+      if (!cancelled) setExistingOptions(options);
+    };
+    if (category === 'video') {
+      void listProjectVideoAssets(numericProjectId)
+        .then((items) => {
+          apply(items.map((item) => ({ label: item.name?.trim() || `视频 ${item.id}`, value: item.id })));
+        })
+        .catch(() => apply([]));
+    } else {
+      const loader =
+        category === 'character'
+          ? projectApi.characters.getAll(numericProjectId)
+          : category === 'scene'
+            ? projectApi.scenes.getAll(numericProjectId)
+            : projectApi.objects.getAll(numericProjectId);
+      void loader.then((response) => {
+        if (!response.success) return;
+        apply(
+          (response.data || []).map((item) => ({
+            label: item.name,
+            value: item.id,
+          }))
+        );
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [category, numericProjectId, open]);
 
   const modalTitle = useMemo(() => {
@@ -127,6 +134,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
       }
       const creationMode = workflowId ? 'workflow' : 'quick';
       const writeCatalog = async () => {
+        if (category === 'video') return;
         if (mode === 'create') {
           if (category === 'character') {
             const created = await projectApi.characters.create(numericProjectId, {
@@ -196,6 +204,26 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
           ),
         });
 
+      if (category === 'video' && mode === 'existing' && targetId) {
+        await projectAssetsApi.update(numericProjectId, targetId, {
+          url: persistedUrl,
+          ...(prompt?.trim() ? { prompt: prompt.trim() } : {}),
+          ...(asFavorite
+            ? {
+                metadata: buildCollectMetadata(
+                  { category: 'video', nodeId, mediaType: 'video', sourceUrl: imageUrl },
+                  true,
+                ),
+              }
+            : {}),
+        });
+        await loadProjectAssets(numericProjectId, true);
+        if (asFavorite) notifyFavoritesChanged();
+        message.success(asFavorite ? '已收藏到项目资产库' : '已更新已有视频');
+        onClose();
+        return;
+      }
+
       if (asFavorite) {
         const asset = await saveProjectAsset();
         let catalogError: unknown = null;
@@ -219,7 +247,13 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
       await writeCatalog();
       await saveProjectAsset();
       await loadProjectAssets(numericProjectId, true);
-      message.success(mode === 'create' ? '已保存到项目素材库' : '已更新已有素材');
+      message.success(
+        category === 'video'
+          ? '已保存到视频管理'
+          : mode === 'create'
+            ? '已保存到项目素材库'
+            : '已更新已有素材',
+      );
       onClose();
     } catch (error) {
       message.error(error instanceof Error ? error.message : '保存素材失败');
@@ -297,7 +331,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
                     ? '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这段视频。'
                     : '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这张图。'
                   : mediaType === 'video'
-                    ? '将当前视频写回角色、场景或物品库，之后可在素材面板和片段中继续使用。'
+                    ? '默认写入「项目资产 → 视频管理」。也可以归到角色、场景或物品，并在素材面板里拖回画布。'
                     : '将当前图片写回角色、场景或物品库，之后可在素材面板和片段中继续使用。'}
               </div>
             </div>
@@ -322,7 +356,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
                   <Select
                     value={category}
                     onChange={(value) => setCategory(value)}
-                    options={categoryOptions}
+                    options={materialCategoryOptions(mediaType)}
                     className="w-full"
                     size="large"
                   />
@@ -338,7 +372,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
                       setCategory(value);
                       setTargetId(undefined);
                     }}
-                    options={categoryOptions}
+                    options={materialCategoryOptions(mediaType)}
                     className="w-full"
                     size="large"
                   />
