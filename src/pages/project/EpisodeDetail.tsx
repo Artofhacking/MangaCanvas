@@ -25,6 +25,9 @@ import { QuerySpinner } from "@/components/feedback/ListQueryState"
 import EpisodeStoryboard from "./EpisodeStoryboard"
 import { EpisodeAssetColumn } from "./EpisodeAssetCard"
 import { episodeAssetStatusLine, splitEpisodePlot, type EpisodeAssetKind } from "./episodeOverview"
+import { EpisodeAssociationRow } from "./EpisodeAssociationRow"
+import EpisodeAssetDetailDialog from "./EpisodeAssetDetailDialog"
+import { resolveEpisodeAssetPreview, type EpisodeAssetPreviewTarget } from "./episodeAssetPreview"
 
 export default function EpisodeDetail() {
   const { projectId, episodeId } = useParams()
@@ -39,13 +42,15 @@ export default function EpisodeDetail() {
     objects: [],
   })
   const view = searchParams.get("view") === "storyboard" ? "storyboard" : "overview"
+  const [editing, setEditing] = useState(false)
+  const [previewTarget, setPreviewTarget] = useState<EpisodeAssetPreviewTarget | null>(null)
   const setView = (next: "overview" | "storyboard") => {
+    setPreviewTarget(null)
     const params = new URLSearchParams(searchParams)
     if (next === "storyboard") params.set("view", "storyboard")
     else params.delete("view")
     setSearchParams(params, { replace: true })
   }
-  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<{ characterIds: number[]; sceneIds: number[]; objectIds: number[] }>({
     characterIds: [],
     sceneIds: [],
@@ -162,6 +167,53 @@ export default function EpisodeDetail() {
     }),
     [relatedCharacters, relatedObjects, relatedScenes]
   )
+  const preview = useMemo(
+    () => (previewTarget ? resolveEpisodeAssetPreview(previewTarget, catalog, relationPreview) : null),
+    [catalog, previewTarget, relationPreview],
+  )
+
+  const openPreviewCanvas = () => {
+    if (!projectId || !previewTarget) return
+    const kind = previewTarget.kind
+    const related = relationPreview[kind === "character" ? "characters" : kind === "scene" ? "scenes" : "objects"]
+      .find((item) => item.id === previewTarget.id)
+    const catalogItem = (
+      kind === "character" ? catalog.characters : kind === "scene" ? catalog.scenes : catalog.objects
+    ).find((item) => item.id === previewTarget.id)
+    const source = related
+      ? relationSeed(related, kind)
+      : catalogItem
+        ? toWorkflowSeedAsset(
+            {
+              id: catalogItem.id,
+              name: catalogItem.name,
+              image: catalogItem.image,
+              description: catalogItem.description,
+              hasImage: catalogItem.hasImage,
+            },
+            kind,
+          )
+        : null
+    if (!source) return
+    void launchWorkflow({
+      projectId,
+      sourceType: kind,
+      ...seedOptionsFromLaunch(
+        toCanvasLaunchSource({
+          id: source.id,
+          name: source.name,
+          image: source.image,
+          description: source.prompt,
+          video: source.video,
+          mediaType: source.mediaType,
+          hasImage: source.hasImage,
+          hasVideo: source.hasVideo,
+        }),
+      ),
+      returnTo: episodeReturnTo,
+      from: "episode",
+    })
+  }
 
   if (!episode) {
     return (
@@ -359,54 +411,29 @@ export default function EpisodeDetail() {
                 </Button>
               </div>
               <div className="grid gap-6 lg:grid-cols-3">
-                <div>
-                  <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">角色</div>
-                  <div className="space-y-2">
-                    {catalog.characters.map((item) => (
-                      <label key={item.id} className="flex items-center gap-3 rounded-xl bg-[hsl(var(--surface-container-low))] p-3">
-                        <input
-                          type="checkbox"
-                          checked={draft.characterIds.includes(item.id)}
-                          onChange={() => toggleId("characterIds", item.id)}
+                {(
+                  [
+                    { title: "角色", kind: "character" as const, key: "characterIds" as const, items: catalog.characters },
+                    { title: "场景", kind: "scene" as const, key: "sceneIds" as const, items: catalog.scenes },
+                    { title: "物品", kind: "object" as const, key: "objectIds" as const, items: catalog.objects },
+                  ]
+                ).map((column) => (
+                  <div key={column.kind}>
+                    <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">{column.title}</div>
+                    <div className="space-y-2">
+                      {column.items.map((item) => (
+                        <EpisodeAssociationRow
+                          key={item.id}
+                          name={item.name}
+                          image={item.image}
+                          checked={draft[column.key].includes(item.id)}
+                          onToggle={() => toggleId(column.key, item.id)}
+                          onPreview={() => setPreviewTarget({ kind: column.kind, id: item.id })}
                         />
-                        <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </label>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">场景</div>
-                  <div className="space-y-2">
-                    {catalog.scenes.map((item) => (
-                      <label key={item.id} className="flex items-center gap-3 rounded-xl bg-[hsl(var(--surface-container-low))] p-3">
-                        <input
-                          type="checkbox"
-                          checked={draft.sceneIds.includes(item.id)}
-                          onChange={() => toggleId("sceneIds", item.id)}
-                        />
-                        <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-3 text-sm font-semibold text-[hsl(var(--secondary))]">物品</div>
-                  <div className="space-y-2">
-                    {catalog.objects.map((item) => (
-                      <label key={item.id} className="flex items-center gap-3 rounded-xl bg-[hsl(var(--surface-container-low))] p-3">
-                        <input
-                          type="checkbox"
-                          checked={draft.objectIds.includes(item.id)}
-                          onChange={() => toggleId("objectIds", item.id)}
-                        />
-                        <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
             </section>
           ) : null}
@@ -459,27 +486,7 @@ export default function EpisodeDetail() {
                       shapingStatus: item.shapingStatus,
                       prompt: seeded.prompt || assetPrompt(column.kind, item.id),
                     }),
-                    onClick: () => {
-                      if (!projectId) return
-                      void launchWorkflow({
-                        projectId,
-                        sourceType: column.kind,
-                        ...seedOptionsFromLaunch(
-                          toCanvasLaunchSource({
-                            id: seeded.id,
-                            name: seeded.name,
-                            image: seeded.image,
-                            description: seeded.prompt,
-                            video: seeded.video,
-                            mediaType: seeded.mediaType,
-                            hasImage: seeded.hasImage,
-                            hasVideo: seeded.hasVideo,
-                          }),
-                        ),
-                        returnTo: episodeReturnTo,
-                        from: "episode",
-                      })
-                    },
+                    onClick: () => setPreviewTarget({ kind: column.kind, id: item.id }),
                   }
                 })}
                 footer={
@@ -506,6 +513,14 @@ export default function EpisodeDetail() {
           ) : null}
         </div>
       </main>
+      <EpisodeAssetDetailDialog
+        open={preview !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewTarget(null)
+        }}
+        preview={preview}
+        onOpenCanvas={preview ? () => openPreviewCanvas() : undefined}
+      />
     </div>
   )
 }
