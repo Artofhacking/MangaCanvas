@@ -272,8 +272,43 @@ export function listQuantityOptions(modelKey: string, model?: ModelConfig): numb
   return [1, 2, 4].filter((item) => item <= maxN)
 }
 
+const RATIO_ONLY_LABEL = /^\d+:\d+$/
+
+/**
+ * Text shown in the image aspect menu.
+ * A clean ratio label (`1:1`) is kept. Pixel strings and `1:1 (1024x1024)` fall back to the ratio
+ * so Wan/Qwen can keep pixel-inclusive size labels without putting them in this menu.
+ */
+export function imageAspectChoiceLabel(option: { key: string; label?: string }): string {
+  const ratio = getSizeRatio(option.key)
+  const label = String(option.label || '').trim()
+  return RATIO_ONLY_LABEL.test(label) ? label : ratio
+}
+
+export interface ImageAspectChoice {
+  label: string
+  ratio: string
+  size: string
+}
+
+export function listImageAspectChoices(
+  modelKey: string,
+  quality?: string,
+  model?: ModelConfig
+): ImageAspectChoice[] {
+  const sizes = listImageSizes(modelKey, quality, model)
+  return uniqueAspectRatios(sizes).map((ratio) => {
+    const match = sizes.find((item) => getSizeRatio(item.key) === ratio)
+    return {
+      label: match ? imageAspectChoiceLabel(match) : ratio,
+      ratio,
+      size: match?.key || '',
+    }
+  })
+}
+
 export function listImageAspectRatios(modelKey: string, quality?: string, model?: ModelConfig): string[] {
-  return uniqueAspectRatios(listImageSizes(modelKey, quality, model))
+  return listImageAspectChoices(modelKey, quality, model).map((item) => item.ratio)
 }
 
 /**

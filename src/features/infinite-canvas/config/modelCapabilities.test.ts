@@ -188,8 +188,47 @@ describe('capability lookup by id', () => {
       })
     )
     expect(fromApi.sizes?.map((item) => item.key)).toEqual(['2048x2048'])
+    expect(fromApi.sizes?.map((item) => item.label)).toEqual(['1:1'])
+    expect(fromApi.getSizesByQuality?.('high')).toEqual([{ key: '2048x2048', label: '1:1' }])
     expect(fromApi.maxN).toBe(2)
     expect(fromApi.defaultParams?.quality).toBe('high')
+  })
+
+  it('labels live GPT Image sizes as ratios and leaves Wan pixel labels intact', () => {
+    const gpt = capabilitiesFromApi(
+      live('gpt-image-2.5-flare', 'GPT Image 2.5 Flare 文生图', 'image', {
+        parameters: {
+          sizes: ['1024x1024', '1536x864', '1792x768'],
+        },
+      })
+    )
+    expect(gpt.sizes).toEqual([
+      { key: '1024x1024', label: '1:1' },
+      { key: '1536x864', label: '16:9' },
+      { key: '1792x768', label: '21:9' },
+    ])
+    expect(gpt.sizes?.every((item) => !item.label.includes('x') && !item.label.includes('*'))).toBe(true)
+
+    const opaque = capabilitiesFromApi(
+      live('vendor-opaque-id', 'GPT Image 2.5 Sunburst 文生图', 'image', {
+        parameters: { sizes: [{ key: '864x1536', label: '864x1536' }] },
+      })
+    )
+    expect(opaque.sizes).toEqual([{ key: '864x1536', label: '9:16' }])
+
+    const wan = capabilitiesFromApi(
+      live('wan2.7-image', '万相 2.7 文生图', 'image', {
+        parameters: { sizes: ['1280*1280', '1696*960'] },
+      })
+    )
+    expect(wan.sizes).toEqual([
+      { key: '1280*1280', label: '1280*1280' },
+      { key: '1696*960', label: '1696*960' },
+    ])
+    expect(wan.getSizesByQuality?.('standard')).toEqual([
+      { key: '1280*1280', label: '1:1 (1280*1280)' },
+      { key: '1696*960', label: '16:9 (1696*960)' },
+    ])
   })
 })
 

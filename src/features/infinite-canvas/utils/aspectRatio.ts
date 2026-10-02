@@ -112,8 +112,16 @@ export function sizeOptionFromKey(key: string): { key: string; label: string } {
   return { key, label: `${getSizeRatio(key)} (${key})` }
 }
 
+/** Wan / Qwen style: `16:9 (1696*960)`. The pixel key stays inside the label. */
 export function labeledSizes(keys: readonly string[]): { key: string; label: string }[] {
   return keys.map(sizeOptionFromKey)
+}
+
+/**
+ * GPT Image picker labels. `key` remains the WxH the API needs; `label` is only the ratio.
+ */
+export function ratioLabeledSizes(keys: readonly string[]): { key: string; label: string }[] {
+  return keys.map((key) => ({ key, label: getSizeRatio(key) }))
 }
 
 export function nodeAspectRatio(

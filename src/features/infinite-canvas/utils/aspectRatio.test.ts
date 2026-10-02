@@ -4,6 +4,7 @@ import {
   getSizeRatio,
   labeledSizes,
   parseSizeDimensions,
+  ratioLabeledSizes,
   sortAspectRatios,
   uniqueAspectRatios,
 } from './aspectRatio'
@@ -80,6 +81,32 @@ describe('labeledSizes', () => {
     expect(labeledSizes(['1024x1536', '1536x1024'])).toEqual([
       { key: '1024x1536', label: '2:3 (1024x1536)' },
       { key: '1536x1024', label: '3:2 (1536x1024)' },
+    ])
+  })
+})
+
+describe('ratioLabeledSizes', () => {
+  it('keeps the pixel key and shows only the ratio', () => {
+    expect(
+      ratioLabeledSizes([
+        '1024x1024',
+        '1536x864',
+        '864x1536',
+        '1536x1152',
+        '1152x1536',
+        '1536x1024',
+        '1024x1536',
+        '1792x768',
+      ])
+    ).toEqual([
+      { key: '1024x1024', label: '1:1' },
+      { key: '1536x864', label: '16:9' },
+      { key: '864x1536', label: '9:16' },
+      { key: '1536x1152', label: '4:3' },
+      { key: '1152x1536', label: '3:4' },
+      { key: '1536x1024', label: '3:2' },
+      { key: '1024x1536', label: '2:3' },
+      { key: '1792x768', label: '21:9' },
     ])
   })
 })
