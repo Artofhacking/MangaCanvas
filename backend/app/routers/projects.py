@@ -180,19 +180,42 @@ def _can_delete_project(user: models.User, project: models.Project, member: mode
     return bool(member and member.role == "owner")
 
 
+def _delete_project_links(db: Session, model, column, parent, project_id: int) -> None:
+    ids = db.query(parent.id).filter(parent.project_id == project_id)
+    db.query(model).filter(column.in_(ids)).delete(synchronize_session=False)
+
+
+def _purge_project_rows(db: Session, project_id: int) -> None:
+    """Drop child rows before parents. Junction FKs are RESTRICT, so characters/scenes/objects/episodes cannot go first."""
+    _delete_project_links(db, models.EpisodeCharacter, models.EpisodeCharacter.episode_id, models.Episode, project_id)
+    _delete_project_links(db, models.EpisodeCharacter, models.EpisodeCharacter.character_id, models.Character, project_id)
+    _delete_project_links(db, models.EpisodeScene, models.EpisodeScene.episode_id, models.Episode, project_id)
+    _delete_project_links(db, models.EpisodeScene, models.EpisodeScene.scene_id, models.Scene, project_id)
+    _delete_project_links(db, models.EpisodeObject, models.EpisodeObject.episode_id, models.Episode, project_id)
+    _delete_project_links(db, models.EpisodeObject, models.EpisodeObject.object_id, models.ProjectObject, project_id)
+    _delete_project_links(
+        db, models.CanvasWorkflowMember, models.CanvasWorkflowMember.workflow_id, models.CanvasWorkflow, project_id
+    )
+    for model in (
+        models.ProjectMember,
+        models.Character,
+        models.Scene,
+        models.ProjectObject,
+        models.Episode,
+        models.CanvasWorkflow,
+        models.ScriptDocument,
+        models.ProjectAsset,
+    ):
+        db.query(model).filter_by(project_id=project_id).delete(synchronize_session=False)
+
+
 @router.delete("/{project_id}")
 def delete_project(project_id: int, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     row = require_project_access(db, user, project_id, write=True)
     member = db.query(models.ProjectMember).filter_by(project_id=project_id, user_id=user.id).first()
     if not _can_delete_project(user, row, member):
         fail(1003, "禁止访问", 403)
-    db.query(models.ProjectMember).filter_by(project_id=project_id).delete()
-    db.query(models.Character).filter_by(project_id=project_id).delete()
-    db.query(models.Scene).filter_by(project_id=project_id).delete()
-    db.query(models.ProjectObject).filter_by(project_id=project_id).delete()
-    db.query(models.Episode).filter_by(project_id=project_id).delete()
-    db.query(models.CanvasWorkflow).filter_by(project_id=project_id).delete()
-    db.query(models.ProjectAsset).filter_by(project_id=project_id).delete()
+    _purge_project_rows(db, project_id)
     db.delete(row)
     return ok(True)
 

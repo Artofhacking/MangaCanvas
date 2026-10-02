@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import joinedload, sessionmaker
 
 from app import models
@@ -21,11 +21,19 @@ def test_duplicate_project_name_suffixes_and_avoids_collisions():
 
 @pytest.fixture
 def engine(tmp_path):
-    return create_engine(
+    engine = create_engine(
         f"sqlite:///{tmp_path / 'projects.db'}",
         future=True,
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(engine, "connect")
+    def _enable_foreign_keys(dbapi_conn, _connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    return engine
 
 
 @pytest.fixture
@@ -166,3 +174,102 @@ def test_owner_and_org_admin_can_delete_but_members_cannot(client, actors):
     assert deleted.status_code == 200
     missing = client.get(f"/api/v1/projects/{project_id}")
     assert missing.status_code == 404
+
+
+def test_owner_delete_removes_episode_links_before_parents(client, actors, Session):
+    project_id = actors["project_id"]
+    session = Session()
+    project = session.get(models.Project, project_id)
+    org_id = project.organization_id
+    owner_id = actors["owner"].id
+    character = models.Character(organization_id=org_id, project_id=project_id, name="青鱼")
+    scene = models.Scene(organization_id=org_id, project_id=project_id, name="雨巷")
+    prop = models.ProjectObject(organization_id=org_id, project_id=project_id, name="油纸伞")
+    session.add_all([character, scene, prop])
+    session.flush()
+    episode = session.query(models.Episode).filter_by(project_id=project_id).one()
+    session.add_all(
+        [
+            models.EpisodeCharacter(episode_id=episode.id, character_id=character.id),
+            models.EpisodeScene(episode_id=episode.id, scene_id=scene.id),
+            models.EpisodeObject(episode_id=episode.id, object_id=prop.id),
+            models.CanvasWorkflow(
+                id="wf-delete",
+                organization_id=org_id,
+                project_id=project_id,
+                name="分镜",
+                canvas_data={"nodes": []},
+                created_by=owner_id,
+            ),
+            models.ScriptDocument(
+                organization_id=org_id,
+                project_id=project_id,
+                title="大纲",
+                source_text="雨夜",
+                parsed_json={},
+            ),
+            models.ProjectAsset(
+                organization_id=org_id,
+                project_id=project_id,
+                name="收藏画面",
+                source_type="canvas",
+                source_id="node-1",
+                url="/static/fav.png",
+                extra_metadata={"source": "favorite"},
+            ),
+        ]
+    )
+    session.flush()
+    session.add(
+        models.CanvasWorkflowMember(
+            workflow_id="wf-delete",
+            user_id=owner_id,
+            project_id=project_id,
+            role="owner",
+        )
+    )
+    other = models.Project(organization_id=org_id, name="别的项目", owner_id=owner_id)
+    session.add(other)
+    session.flush()
+    other_character = models.Character(organization_id=org_id, project_id=other.id, name="路人")
+    session.add(other_character)
+    session.flush()
+    other_episode = models.Episode(organization_id=org_id, project_id=other.id, name="外集", code="E01")
+    session.add(other_episode)
+    session.flush()
+    session.add(models.EpisodeCharacter(episode_id=other_episode.id, character_id=other_character.id))
+    session.commit()
+    episode_id = episode.id
+    other_id = other.id
+    session.close()
+
+    client.act["user"] = actors["editor"]
+    denied = client.delete(f"/api/v1/projects/{project_id}")
+    assert denied.status_code == 403
+
+    client.act["user"] = actors["owner"]
+    deleted = client.delete(f"/api/v1/projects/{project_id}")
+    assert deleted.status_code == 200, deleted.text
+    assert _body(deleted)["code"] == 0
+    assert _body(deleted)["data"] is True
+
+    check = Session()
+    try:
+        assert check.get(models.Project, project_id) is None
+        assert check.query(models.Character).filter_by(project_id=project_id).count() == 0
+        assert check.query(models.Scene).filter_by(project_id=project_id).count() == 0
+        assert check.query(models.ProjectObject).filter_by(project_id=project_id).count() == 0
+        assert check.query(models.Episode).filter_by(project_id=project_id).count() == 0
+        assert check.query(models.EpisodeCharacter).filter_by(episode_id=episode_id).count() == 0
+        assert check.query(models.EpisodeScene).count() == 0
+        assert check.query(models.EpisodeObject).count() == 0
+        assert check.query(models.CanvasWorkflow).filter_by(id="wf-delete").count() == 0
+        assert check.query(models.CanvasWorkflowMember).filter_by(workflow_id="wf-delete").count() == 0
+        assert check.query(models.ScriptDocument).filter_by(project_id=project_id).count() == 0
+        assert check.query(models.ProjectAsset).filter_by(project_id=project_id).count() == 0
+        assert check.query(models.ProjectMember).filter_by(project_id=project_id).count() == 0
+        assert check.get(models.Project, other_id) is not None
+        assert check.query(models.EpisodeCharacter).count() == 1
+        assert check.query(models.Character).filter_by(project_id=other_id).one().name == "路人"
+    finally:
+        check.close()
