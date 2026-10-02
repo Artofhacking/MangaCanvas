@@ -1,5 +1,5 @@
 import type { ModelConfig, SizeOption } from '../types';
-import { labeledSizes } from '../utils/aspectRatio';
+import { labeledSizes, ratioLabeledSizes } from '../utils/aspectRatio';
 
 /**
  * Capability map keyed by GET /ai/models ids.
@@ -22,7 +22,19 @@ export const GPT_IMAGE_PRESET_SIZES = [
   '1792x768', // 21:9
 ] as const
 
-const gptImagePresetSizeOptions = (): SizeOption[] => labeledSizes([...GPT_IMAGE_PRESET_SIZES])
+/** GPT Image 2 / 2.5 Flare / Sunburst, including opaque vendor ids named like the family. */
+export function isGptImageModel(id?: string | null, name?: string | null): boolean {
+  const key = String(id || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+  if (key.startsWith('gpt-image')) return true
+  const label = String(name || '').trim().toLowerCase()
+  return /gpt[\s-]*image/.test(label)
+}
+
+/** Picker shows `1:1`; `key` is still the WxH sent to the image API. */
+const gptImagePresetSizeOptions = (): SizeOption[] => ratioLabeledSizes([...GPT_IMAGE_PRESET_SIZES])
 
 /** Official HappyHorse 1.1 t2v / r2v ratios. i2v does not accept `ratio`. */
 export const HAPPYHORSE_ASPECT_RATIOS = [

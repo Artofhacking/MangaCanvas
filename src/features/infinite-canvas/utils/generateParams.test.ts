@@ -4,6 +4,9 @@ import {
   applyVideoRatio,
   coerceGenerateParams,
   countVideoRequestReferences,
+  imageAspectChoiceLabel,
+  imageSizeForRequest,
+  listImageAspectChoices,
   listImageAspectRatios,
   listImageSizes,
   listVideoAspectRatios,
@@ -29,6 +32,16 @@ function imageNode(data: Partial<CustomNode['data']>): CustomNode {
   }
 }
 
+describe('image aspect menu labels', () => {
+  it('never puts a pixel string in the menu, even when the size label still has one', () => {
+    expect(imageAspectChoiceLabel({ key: '1024x1024', label: '1024x1024' })).toBe('1:1')
+    expect(imageAspectChoiceLabel({ key: '1536x864', label: '1536x864' })).toBe('16:9')
+    expect(imageAspectChoiceLabel({ key: '1024x1024', label: '1:1 (1024x1024)' })).toBe('1:1')
+    expect(imageAspectChoiceLabel({ key: '1696*960', label: '16:9 (1696*960)' })).toBe('16:9')
+    expect(imageAspectChoiceLabel({ key: '1024x1536', label: '2:3' })).toBe('2:3')
+  })
+})
+
 describe('GPT Image 2 selectable ratios', () => {
   it('derives 16:9 / 9:16 / 4:3 / 3:4 / 21:9 from the size list, labeled by true math', () => {
     expect(listImageAspectRatios('gpt-image-2')).toEqual([
@@ -53,18 +66,45 @@ describe('GPT Image 2 selectable ratios', () => {
       '1792x768',
     ])
     expect(listImageSizes('gpt-image-2').map((item) => item.label)).toEqual([
-      '1:1 (1024x1024)',
-      '16:9 (1536x864)',
-      '9:16 (864x1536)',
-      '4:3 (1536x1152)',
-      '3:4 (1152x1536)',
-      '3:2 (1536x1024)',
-      '2:3 (1024x1536)',
-      '21:9 (1792x768)',
+      '1:1',
+      '16:9',
+      '9:16',
+      '4:3',
+      '3:4',
+      '3:2',
+      '2:3',
+      '21:9',
     ])
-    expect(listImageSizes('gpt-image-2').find((item) => item.key === '1024x1536')?.label).toBe(
-      '2:3 (1024x1536)'
-    )
+    expect(listImageSizes('gpt-image-2').find((item) => item.key === '1024x1536')?.label).toBe('2:3')
+    expect(listImageAspectChoices('gpt-image-2').map((item) => item.label)).toEqual([
+      '21:9',
+      '16:9',
+      '3:2',
+      '4:3',
+      '1:1',
+      '3:4',
+      '2:3',
+      '9:16',
+    ])
+    expect(listImageAspectChoices('gpt-image-2').map((item) => `${item.label}→${item.size}`)).toEqual([
+      '21:9→1792x768',
+      '16:9→1536x864',
+      '3:2→1536x1024',
+      '4:3→1536x1152',
+      '1:1→1024x1024',
+      '3:4→1152x1536',
+      '2:3→1024x1536',
+      '9:16→864x1536',
+    ])
+  })
+
+  it('uses the same ratio labels and pixel keys for Flare and Sunburst', () => {
+    for (const id of ['gpt-image-2.5-flare', 'gpt-image-2.5-sunburst'] as const) {
+      expect(listImageSizes(id).map((item) => item.label)).toEqual(listImageSizes('gpt-image-2').map((item) => item.label))
+      expect(listImageSizes(id).map((item) => item.key)).toEqual(listImageSizes('gpt-image-2').map((item) => item.key))
+      expect(applyImageRatio(id, 'high', '21:9')).toEqual({ size: '1792x768', ratio: '21:9' })
+      expect(applyImageRatio(id, 'low', '9:16')).toEqual({ size: '864x1536', ratio: '9:16' })
+    }
   })
 
   it('maps each selectable ratio to the matching generation size key', () => {
@@ -88,7 +128,22 @@ describe('GPT Image 2 selectable ratios', () => {
       size: '1152x1536',
       ratio: '3:4',
     })
+    expect(applyImageRatio('gpt-image-2', 'medium', '4:3')).toEqual({
+      size: '1536x1152',
+      ratio: '4:3',
+    })
+    expect(applyImageRatio('gpt-image-2', 'medium', '9:16')).toEqual({
+      size: '864x1536',
+      ratio: '9:16',
+    })
+    expect(applyImageRatio('gpt-image-2', 'medium', '21:9')).toEqual({
+      size: '1792x768',
+      ratio: '21:9',
+    })
     expect(applyImageRatio('gpt-image-2', 'medium', '1:2')).toBeNull()
+    expect(imageSizeForRequest('gpt-image-2', 'medium', undefined, '16:9')).toBe('1536x864')
+    expect(imageSizeForRequest('gpt-image-2', 'medium', '1536x864', '16:9')).toBe('1536x864')
+    expect(imageSizeForRequest('gpt-image-2.5-sunburst', 'high', undefined, '2:3')).toBe('1024x1536')
   })
 
   it('prefers live /ai/models sizes over the last-resort catalog', () => {
@@ -110,6 +165,10 @@ describe('GPT Image 2 selectable ratios', () => {
       '1920x1088',
     ])
     expect(listImageAspectRatios('gpt-image-2', 'medium', live)).toEqual(['16:9', '1:1'])
+    expect(listImageAspectChoices('gpt-image-2', 'medium', live).map((item) => item.label)).toEqual([
+      '16:9',
+      '1:1',
+    ])
     expect(applyImageRatio('gpt-image-2', 'medium', '16:9', live)).toEqual({
       size: '1920x1088',
       ratio: '16:9',
@@ -120,6 +179,20 @@ describe('GPT Image 2 selectable ratios', () => {
 
 describe('万相 2.7 selectable ratios', () => {
   it('still exposes its real cinematic set including 16:9 / 9:16', () => {
+    expect(listImageSizes('wan2.7-image').map((item) => item.label)).toEqual([
+      '1:1 (1280*1280)',
+      '3:4 (1104*1472)',
+      '4:3 (1472*1104)',
+      '9:16 (960*1696)',
+      '16:9 (1696*960)',
+    ])
+    expect(listImageAspectChoices('wan2.7-image').map((item) => item.label)).toEqual([
+      '16:9',
+      '4:3',
+      '1:1',
+      '3:4',
+      '9:16',
+    ])
     expect(listImageAspectRatios('wan2.7-image')).toEqual(['16:9', '4:3', '1:1', '3:4', '9:16'])
     expect(applyImageRatio('wan2.7-image', 'standard', '16:9')).toEqual({
       size: '1696*960',

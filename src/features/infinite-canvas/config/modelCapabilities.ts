@@ -2,8 +2,8 @@ import type { ModelDTO, ModelParameterSet } from '@/api/types'
 import { displayModelName } from '@/lib/displayModelName'
 import { useModelsStore } from '@/store/modelsStore'
 import type { ModelConfig, SizeOption } from '../types'
-import { labeledSizes } from '../utils/aspectRatio'
-import { IMAGE_MODELS, VIDEO_MODELS, getAudioModel, getImageModel, getVideoModel } from './models'
+import { getSizeRatio, labeledSizes } from '../utils/aspectRatio'
+import { IMAGE_MODELS, VIDEO_MODELS, getAudioModel, getImageModel, getVideoModel, isGptImageModel } from './models'
 
 export const SAFE_IMAGE_SIZE = '1024x1024'
 export const SAFE_VIDEO_SIZE = '1280*720'
@@ -155,9 +155,15 @@ export function capabilitiesFromApi(model: ModelDTO): Partial<ModelConfig> {
   if (task) next.task = task
   if (voices.length) next.voices = voices
   if (sizes.length) {
-    next.sizes = sizes
-    next.getSizesByQuality = (): SizeOption[] =>
-      sizes[0].label.includes('(') ? sizes : labeledSizes(sizes.map((item) => item.key))
+    if (isGptImageModel(model.id, model.name)) {
+      const options = sizes.map((item) => ({ key: item.key, label: getSizeRatio(item.key) }))
+      next.sizes = options
+      next.getSizesByQuality = (): SizeOption[] => options
+    } else {
+      next.sizes = sizes
+      next.getSizesByQuality = (): SizeOption[] =>
+        sizes[0].label.includes('(') ? sizes : labeledSizes(sizes.map((item) => item.key))
+    }
   }
   if (qualities.length) next.qualities = qualities
   if (resolutions.length) next.resolutions = resolutions
@@ -237,7 +243,12 @@ function mergeModelConfig(
       (fromApi.sizes?.length ? fromApi.getSizesByQuality : undefined) ||
       mapped?.getSizesByQuality ||
       (sizes?.length
-        ? () => (sizes[0].label.includes('(') ? sizes : labeledSizes(sizes.map((item) => item.key)))
+        ? () =>
+            isGptImageModel(id, live?.name || mapped?.label)
+              ? sizes.map((item) => ({ key: item.key, label: getSizeRatio(item.key) }))
+              : sizes[0].label.includes('(')
+                ? sizes
+                : labeledSizes(sizes.map((item) => item.key))
         : undefined),
   }
 }

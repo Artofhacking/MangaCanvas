@@ -36,7 +36,7 @@ import {
   applyVideoResolution,
   coerceGenerateParams,
   getSizeRatio,
-  listImageAspectRatios,
+  listImageAspectChoices,
   listQuantityOptions,
   listVideoAspectRatios,
   normalizeVideoQuantity,
@@ -231,11 +231,11 @@ function GenerateBarModelPicker({
   const imageRequestModel =
     pickerModels.find((item) => item.key === imageRequestKey) ||
     (imageRequestKey === currentModel?.key ? currentModel : undefined)
-  const imageRatios = useMemo(
+  const imageAspectChoices = useMemo(
     () =>
       isVideo
         ? []
-        : listImageAspectRatios(
+        : listImageAspectChoices(
             imageRequestKey,
             typeof node.data.quality === 'string' ? node.data.quality : undefined,
             imageRequestModel
@@ -423,22 +423,22 @@ function GenerateBarModelPicker({
             />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={8} className={DOCK_MENU}>
-            {imageRatios.map((ratio) => (
+            {imageAspectChoices.map((choice) => (
               <DropdownMenuItem
-                key={ratio}
+                key={choice.ratio}
                 onClick={() => {
                   const next = applyImageRatio(
                     imageRequestKey,
                     typeof node.data.quality === 'string' ? node.data.quality : undefined,
-                    ratio,
+                    choice.ratio,
                     imageRequestModel
                   )
                   if (next) onChange(next)
                 }}
-                className={menuItemClass(imageRatio === ratio)}
+                className={menuItemClass(imageRatio === choice.ratio)}
               >
-                <Check className={cn('mr-2 h-3.5 w-3.5', imageRatio === ratio ? 'opacity-100' : 'opacity-0')} />
-                {ratio}
+                <Check className={cn('mr-2 h-3.5 w-3.5', imageRatio === choice.ratio ? 'opacity-100' : 'opacity-0')} />
+                {choice.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
