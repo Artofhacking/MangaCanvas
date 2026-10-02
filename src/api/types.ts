@@ -222,6 +222,9 @@ export interface EpisodeDTO {
     imageUrl?: string | null
     status?: string
     error?: string | null
+    finalized?: boolean
+    finalizedImageUrl?: string | null
+    finalizedAt?: string | null
   }>
   createdAt?: string
   updatedAt?: string

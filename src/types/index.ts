@@ -45,6 +45,11 @@ export interface StoryboardShot {
   imageUrl?: string
   status: StoryboardShotStatus
   error?: string
+  /** 当前首帧已锁定为本集交付的成片镜头 */
+  finalized?: boolean
+  /** 定稿时冻结的文件，重新生成首帧不会替换它 */
+  finalizedImageUrl?: string
+  finalizedAt?: string
 }
 
 export interface Episode {

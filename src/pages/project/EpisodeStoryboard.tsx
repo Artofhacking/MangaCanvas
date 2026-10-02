@@ -16,7 +16,9 @@ import { useImageModels } from "@/features/infinite-canvas/hooks/useModels"
 import {
   buildShotPrompt,
   collectShotReferenceImages,
+  clearShotFinal,
   createStoryboardShot,
+  finalizeShot,
   persistableStoryboard,
   pickStoryboardModel,
   resolveShotSceneId,
@@ -37,6 +39,7 @@ interface EpisodeStoryboardProps {
   scenes: Scene[]
   objects?: ObjectItem[]
   onEpisodeChange: (episode: Episode) => void
+  onOpenDelivery?: () => void
 }
 
 const STATUS_CLASS: Record<StoryboardShot["status"], string> = {
@@ -53,6 +56,7 @@ export default function EpisodeStoryboard({
   scenes,
   objects = [],
   onEpisodeChange,
+  onOpenDelivery,
 }: EpisodeStoryboardProps) {
   const { notify } = useFeedback()
   const updateEpisode = useProjectStore((state) => state.updateEpisode)
@@ -211,11 +215,20 @@ export default function EpisodeStoryboard({
         <div>
           <h3 className="text-lg font-bold text-[hsl(var(--on-surface))]">分镜表</h3>
           <p className="mt-1 text-sm text-[hsl(var(--secondary))]">
-            一行一镜。已定妆的角色、场景和道具会带定妆图；半定型只写入锁定的提示词。参考图会交给支持它的模型（GPT Image、万相 2.7 / Pro、万相 2.6 图生图）。
+            一行一镜。定稿后的首帧按镜号进入本集交付，未定稿不进包。已定妆的角色、场景和道具会带定妆图；半定型只写入锁定的提示词。参考图会交给支持它的模型（GPT Image、万相 2.7 / Pro、万相 2.6 图生图）。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {saving ? <span className="text-xs text-[hsl(var(--secondary))]">保存中…</span> : null}
+          {onOpenDelivery ? (
+            <Button
+              variant="outline"
+              onClick={onOpenDelivery}
+              className="h-10 rounded-xl border-[hsl(var(--outline-variant))]/40"
+            >
+              本集交付
+            </Button>
+          ) : null}
           {episode.description ? (
             <Button
               variant="outline"
@@ -434,12 +447,17 @@ export default function EpisodeStoryboard({
                       </div>
                     </td>
                     <td className="px-2 py-2">
-                      <Badge className={`border-0 ${STATUS_CLASS[shot.status]}`}>
-                        {STORYBOARD_STATUS_LABEL[shot.status]}
-                      </Badge>
-                      {shot.status === "failed" && shot.error ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] text-red-500">{shot.error}</p>
-                      ) : null}
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge className={`border-0 ${STATUS_CLASS[shot.status]}`}>
+                          {STORYBOARD_STATUS_LABEL[shot.status]}
+                        </Badge>
+                        {shot.finalized ? (
+                          <Badge className="border-0 bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))]">已定稿</Badge>
+                        ) : null}
+                        {shot.status === "failed" && shot.error ? (
+                          <p className="line-clamp-2 text-[11px] text-red-500">{shot.error}</p>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex flex-col gap-2">
@@ -463,6 +481,50 @@ export default function EpisodeStoryboard({
                             "生成首帧"
                           )}
                         </Button>
+                        {shot.finalized ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={shot.status === "generating"}
+                            onClick={() =>
+                              commit((current) =>
+                                current.map((item) => (item.id === shot.id ? clearShotFinal(item) : item))
+                              )
+                            }
+                            className="h-8 rounded-lg border-[hsl(var(--outline-variant))]/40 text-[hsl(var(--secondary))]"
+                          >
+                            取消定稿
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!shot.imageUrl || shot.status === "generating"}
+                            title={shot.imageUrl ? "锁定当前首帧，进入本集交付" : "先生成首帧，再定稿"}
+                            onClick={() =>
+                              commit((current) =>
+                                current.map((item) => (item.id === shot.id ? finalizeShot(item) : item))
+                              )
+                            }
+                            className="h-8 rounded-lg border-[hsl(var(--outline-variant))]/40 text-[hsl(var(--primary))]"
+                          >
+                            定稿
+                          </Button>
+                        )}
+                        {shot.finalized && shot.imageUrl && shot.finalizedImageUrl && shot.imageUrl !== shot.finalizedImageUrl ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              commit((current) =>
+                                current.map((item) => (item.id === shot.id ? finalizeShot(item) : item))
+                              )
+                            }
+                            className="h-8 text-[hsl(var(--primary))]"
+                          >
+                            用当前首帧定稿
+                          </Button>
+                        ) : null}
                         <Button
                           size="sm"
                           variant="ghost"

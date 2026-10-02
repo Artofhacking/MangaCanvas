@@ -22,6 +22,7 @@ import {
   Users,
 } from "lucide-react"
 import { QuerySpinner } from "@/components/feedback/ListQueryState"
+import EpisodeDelivery from "./EpisodeDelivery"
 import EpisodeStoryboard from "./EpisodeStoryboard"
 import { EpisodeAssetColumn } from "./EpisodeAssetCard"
 import { episodeAssetStatusLine, splitEpisodePlot, type EpisodeAssetKind } from "./episodeOverview"
@@ -41,14 +42,15 @@ export default function EpisodeDetail() {
     scenes: [],
     objects: [],
   })
-  const view = searchParams.get("view") === "storyboard" ? "storyboard" : "overview"
+  const viewParam = searchParams.get("view")
+  const view = viewParam === "storyboard" || viewParam === "delivery" ? viewParam : "overview"
   const [editing, setEditing] = useState(false)
   const [previewTarget, setPreviewTarget] = useState<EpisodeAssetPreviewTarget | null>(null)
-  const setView = (next: "overview" | "storyboard") => {
+  const setView = (next: "overview" | "storyboard" | "delivery") => {
     setPreviewTarget(null)
     const params = new URLSearchParams(searchParams)
-    if (next === "storyboard") params.set("view", "storyboard")
-    else params.delete("view")
+    if (next === "overview") params.delete("view")
+    else params.set("view", next)
     setSearchParams(params, { replace: true })
   }
   const [draft, setDraft] = useState<{ characterIds: number[]; sceneIds: number[]; objectIds: number[] }>({
@@ -270,6 +272,7 @@ export default function EpisodeDetail() {
               [
                 { id: "overview" as const, label: "本集" },
                 { id: "storyboard" as const, label: "分镜表" },
+                { id: "delivery" as const, label: "本集交付" },
               ]
             ).map((item) => (
               <button
@@ -295,6 +298,15 @@ export default function EpisodeDetail() {
               scenes={catalog.scenes}
               objects={catalog.objects}
               onEpisodeChange={setEpisode}
+              onOpenDelivery={() => setView("delivery")}
+            />
+          ) : null}
+
+          {view === "delivery" ? (
+            <EpisodeDelivery
+              projectId={Number(projectId)}
+              episode={episode}
+              onOpenStoryboard={() => setView("storyboard")}
             />
           ) : null}
 
@@ -324,6 +336,15 @@ export default function EpisodeDetail() {
                   >
                     <Clapperboard className="mr-2 h-5 w-5" />
                     打开分镜表
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => setView("delivery")}
+                    className="h-14 rounded-full border-white/30 bg-white/10 px-8 text-base font-semibold text-white hover:bg-white/16 hover:text-white"
+                  >
+                    <Package className="mr-2 h-5 w-5" />
+                    本集交付
                   </Button>
                   <Button
                     size="lg"

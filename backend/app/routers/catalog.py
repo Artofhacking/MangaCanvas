@@ -5,10 +5,11 @@ from sqlalchemy.orm import Session
 
 from .. import models, serialize
 from ..db import get_db
+from ..delivery import build_episode_delivery
 from ..deps import current_user, require_project_access
 from ..errors import fail, ok
 from ..shaping import ensure_cover_change, ensure_description_change, lock_prompt, unlock_prompt
-from ..util import now, paginate
+from ..util import iso, now, paginate
 
 router = APIRouter(prefix="/projects/{project_id}")
 
@@ -538,6 +539,18 @@ def get_episode(
     if not row:
         fail(1004, "片段不存在", 404)
     return ok(serialize.episode(db, row))
+
+
+@router.get("/episodes/{episode_id}/delivery")
+def get_episode_delivery(
+    project_id: int, episode_id: int, user: models.User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Ordered finalized shots for this episode. Unfinalized shots are gaps, not package items."""
+    require_project_access(db, user, project_id)
+    row = db.query(models.Episode).filter_by(id=episode_id, project_id=project_id).first()
+    if not row:
+        fail(1004, "片段不存在", 404)
+    return ok(build_episode_delivery(serialize.episode(db, row), exported_at=iso(now())))
 
 
 @router.put("/episodes/{episode_id}")
