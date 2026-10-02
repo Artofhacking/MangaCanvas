@@ -22,6 +22,7 @@ import { AudioGenerateControls, type AudioGenerateAvailability } from './AudioGe
 import { audioPromptPlaceholder, buildCanvasAudioRequest, readAudioMode } from '../utils/audioMode'
 import { useExactlySelectedNodeId } from '../hooks/useNodeDock'
 import { useNodeGenerateAction } from '../hooks/useNodeGenerateAction'
+import { hasGenerationJob } from '../utils/generationJobs'
 import {
   collectGenerateInputs,
   getIncomingReferenceSlots,
@@ -858,6 +859,7 @@ const NodeGenerateBar: React.FC = () => {
 
   const handleSend = (event: React.MouseEvent) => {
     event.stopPropagation()
+    if (sending || (selectedId != null && hasGenerationJob(selectedId))) return
     if (picking) {
       message.info(REFERENCE_PICK_SEND_BLOCKED)
       return
@@ -1012,9 +1014,16 @@ const NodeGenerateBar: React.FC = () => {
                 type="button"
                 onClick={handleSend}
                 disabled={sending || insufficient || picking || audioBlocked}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:opacity-50"
+                aria-busy={sending}
+                aria-label={sending ? '生成中' : '发送生成'}
+                className={cn(
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full signature-gradient text-white shadow-md transition-opacity hover:opacity-90 disabled:cursor-not-allowed',
+                  sending ? 'disabled:opacity-100' : 'disabled:opacity-50'
+                )}
                 title={
-                  picking
+                  sending
+                    ? '生成中'
+                    : picking
                     ? REFERENCE_PICK_SEND_BLOCKED
                     : audioBlocked
                       ? audioReason || '暂不能生成'
@@ -1023,7 +1032,11 @@ const NodeGenerateBar: React.FC = () => {
                         : '发送生成'
                 }
               >
-                <ArrowUp className={cn('h-4 w-4', sending && 'animate-pulse')} />
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.5} />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>

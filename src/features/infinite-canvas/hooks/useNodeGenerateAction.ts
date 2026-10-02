@@ -6,7 +6,7 @@ import { remapModelId, resolveImageCapabilities, resolveVideoCapabilities } from
 import { useModelsStore } from '@/store/modelsStore'
 import { useCanvasStore } from '../stores/canvasStore'
 import { isUserCancelAbort } from '@/lib/generationAbort'
-import { finishGenerationJob, hasGenerationJob, startGenerationJob, subscribeGenerationJobs } from '../utils/generationJobs'
+import { finishGenerationJob, hasGenerationJob, subscribeGenerationJobs, tryStartGenerationJob } from '../utils/generationJobs'
 import { rememberNodeVideoJob } from '../utils/resumeVideoJobs'
 import { collectGenerateInputs, getIncomingReferenceSlots, isGenerateNodeType } from '../utils/generateSlots'
 import { resolveMentionsForSend } from '../utils/promptMentions'
@@ -76,107 +76,114 @@ export function useNodeGenerateAction(nodeId: string | null) {
 
   const send = useCallback(async (barPrompt?: string) => {
     if (!nodeId) return
+    // Taken before any await so a second click in this turn cannot submit again.
+    const signal = tryStartGenerationJob(nodeId)
+    if (!signal) return
 
+    let started = false
     const { nodes, edges, updateNode } = useCanvasStore.getState()
     const node = nodes.find((item) => item.id === nodeId)
-    if (!node || !isGenerateNodeType(node.type)) return
-
-    const storedPrompt = typeof node.data.prompt === 'string' ? node.data.prompt : ''
-    const localPrompt = (barPrompt ?? storedPrompt).trim()
-    if (barPrompt !== undefined && barPrompt !== storedPrompt) {
-      updateNode(nodeId, { prompt: barPrompt })
-    }
-
-    const slots = getIncomingReferenceSlots(nodeId, nodes, edges)
-    const resolvedPrompt = resolveMentionsForSend(localPrompt, slots)
-    const inputs = collectGenerateInputs(nodeId, nodes, edges, {
-      includeCamera: node.type === 'videoConfig',
-      localPrompt: resolvedPrompt,
-      promptSource: 'bar',
-    })
-
-    const isImage = node.type === 'imageConfig'
-    const isAudio = node.type === 'audio'
-    if (isAudio) {
-      const mode = readAudioMode(node.data.audioMode)
-      const audioState = useModelsStore.getState().audio
-      if (!audioState || audioState.status === 'idle' || audioState.status === 'loading') {
-        message.info('正在加载音频模型…')
-        return
-      }
-      if (audioState.status === 'error') {
-        message.error(audioState.error || '音频模型列表加载失败')
-        return
-      }
-      const catalog = audioState.models.filter((item) => item.isEnabled !== false)
-      const available = audioModelsForMode(catalog, mode)
-      if (!available.length) {
-        message.info(audioGenerateBlockedMessage(mode, catalog.length))
-        return
-      }
-    }
-    const liveIds = useModelsStore
-      .getState()
-      .getModelsByModality(isAudio ? 'audio' : isImage ? 'image' : 'video')
-      .map((item) => item.id)
-    const storedModel = typeof node.data.model === 'string' ? node.data.model : ''
-    const audioCatalog = isAudio ? audioModelsForMode(useModelsStore.getState().getModelsByModality('audio'), readAudioMode(node.data.audioMode)) : []
-    const audioIds = audioCatalog.map((item) => item.id)
-    const selectedModel = isAudio
-      ? (audioIds.length ? remapModelId(storedModel || audioIds[0], audioIds, 'audio') : '')
-      : isImage
-        ? remapModelId(storedModel || DEFAULT_IMAGE_MODEL, liveIds, 'image')
-        : remapModelId(storedModel || DEFAULT_VIDEO_MODEL, liveIds, 'video')
-    const model = isImage
-      ? resolveImageRequestModel(selectedModel, inputs.refImages.length, liveIds)
-      : selectedModel
-
-    if (isImage && inputs.refImages.length && !isI2IModel(model)) {
-      message.error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE)
+    if (!node || !isGenerateNodeType(node.type)) {
+      finishGenerationJob(nodeId, signal)
       return
     }
-    const audioMode = isAudio ? readAudioMode(node.data.audioMode) : null
-    const audioRequest = audioMode
-      ? buildCanvasAudioRequest({
-          mode: audioMode,
-          model,
-          prompt: inputs.prompt,
-          lyrics: inputs.textSnippets.join('\n\n'),
-          voiceId: typeof node.data.voiceId === 'string' ? node.data.voiceId : undefined,
-        })
-      : null
-    if (audioRequest && !audioRequest.ok) {
-      message.info(audioRequest.message)
-      return
-    }
-    const audioBody: CanvasAudioRequestBody | null = audioRequest && audioRequest.ok ? audioRequest.body : null
-    const liveName = useModelsStore.getState().getModelById(model)?.name
-    const modelLabel = isAudio
-      ? (liveName || audioModeLabel(readAudioMode(node.data.audioMode)))
-      : isImage
-        ? (liveName || resolveImageCapabilities(model).label || model)
-        : (liveName || resolveVideoCapabilities(model).label || model)
-
-    const signal = startGenerationJob(nodeId)
-    const workflowId = useCanvasStore.getState().currentProjectId
-    const applyProgress = (_status: string, percent?: number) => {
-      if (signal.aborted) return
-      if (typeof percent === 'number' && Number.isFinite(percent)) {
-        updateNode(nodeId, { progress: percent })
-      }
-    }
-
-    updateNode(nodeId, {
-      loading: true,
-      error: '',
-      progress: undefined,
-      statusLabel: isImage ? undefined : isAudio ? '生成中' : '排队中',
-      ...(node.type === 'videoConfig' ? { videoJobIds: [] } : {}),
-      model,
-      modelLabel,
-    })
-
+    let isImage = false
     try {
+      const storedPrompt = typeof node.data.prompt === 'string' ? node.data.prompt : ''
+      const localPrompt = (barPrompt ?? storedPrompt).trim()
+      if (barPrompt !== undefined && barPrompt !== storedPrompt) {
+        updateNode(nodeId, { prompt: barPrompt })
+      }
+
+      const slots = getIncomingReferenceSlots(nodeId, nodes, edges)
+      const resolvedPrompt = resolveMentionsForSend(localPrompt, slots)
+      const inputs = collectGenerateInputs(nodeId, nodes, edges, {
+        includeCamera: node.type === 'videoConfig',
+        localPrompt: resolvedPrompt,
+        promptSource: 'bar',
+      })
+
+      isImage = node.type === 'imageConfig'
+      const isAudio = node.type === 'audio'
+      if (isAudio) {
+        const mode = readAudioMode(node.data.audioMode)
+        const audioState = useModelsStore.getState().audio
+        if (!audioState || audioState.status === 'idle' || audioState.status === 'loading') {
+          message.info('正在加载音频模型…')
+          return
+        }
+        if (audioState.status === 'error') {
+          message.error(audioState.error || '音频模型列表加载失败')
+          return
+        }
+        const catalog = audioState.models.filter((item) => item.isEnabled !== false)
+        const available = audioModelsForMode(catalog, mode)
+        if (!available.length) {
+          message.info(audioGenerateBlockedMessage(mode, catalog.length))
+          return
+        }
+      }
+      const liveIds = useModelsStore
+        .getState()
+        .getModelsByModality(isAudio ? 'audio' : isImage ? 'image' : 'video')
+        .map((item) => item.id)
+      const storedModel = typeof node.data.model === 'string' ? node.data.model : ''
+      const audioCatalog = isAudio ? audioModelsForMode(useModelsStore.getState().getModelsByModality('audio'), readAudioMode(node.data.audioMode)) : []
+      const audioIds = audioCatalog.map((item) => item.id)
+      const selectedModel = isAudio
+        ? (audioIds.length ? remapModelId(storedModel || audioIds[0], audioIds, 'audio') : '')
+        : isImage
+          ? remapModelId(storedModel || DEFAULT_IMAGE_MODEL, liveIds, 'image')
+          : remapModelId(storedModel || DEFAULT_VIDEO_MODEL, liveIds, 'video')
+      const model = isImage
+        ? resolveImageRequestModel(selectedModel, inputs.refImages.length, liveIds)
+        : selectedModel
+
+      if (isImage && inputs.refImages.length && !isI2IModel(model)) {
+        message.error(UNSUPPORTED_REFERENCE_IMAGE_MESSAGE)
+        return
+      }
+      const audioMode = isAudio ? readAudioMode(node.data.audioMode) : null
+      const audioRequest = audioMode
+        ? buildCanvasAudioRequest({
+            mode: audioMode,
+            model,
+            prompt: inputs.prompt,
+            lyrics: inputs.textSnippets.join('\n\n'),
+            voiceId: typeof node.data.voiceId === 'string' ? node.data.voiceId : undefined,
+          })
+        : null
+      if (audioRequest && !audioRequest.ok) {
+        message.info(audioRequest.message)
+        return
+      }
+      const audioBody: CanvasAudioRequestBody | null = audioRequest && audioRequest.ok ? audioRequest.body : null
+      const liveName = useModelsStore.getState().getModelById(model)?.name
+      const modelLabel = isAudio
+        ? (liveName || audioModeLabel(readAudioMode(node.data.audioMode)))
+        : isImage
+          ? (liveName || resolveImageCapabilities(model).label || model)
+          : (liveName || resolveVideoCapabilities(model).label || model)
+
+      const workflowId = useCanvasStore.getState().currentProjectId
+      const applyProgress = (_status: string, percent?: number) => {
+        if (signal.aborted) return
+        if (typeof percent === 'number' && Number.isFinite(percent)) {
+          updateNode(nodeId, { progress: percent })
+        }
+      }
+
+      started = true
+      updateNode(nodeId, {
+        loading: true,
+        error: '',
+        progress: undefined,
+        statusLabel: isImage ? undefined : isAudio ? '生成中' : '排队中',
+        ...(node.type === 'videoConfig' ? { videoJobIds: [] } : {}),
+        model,
+        modelLabel,
+      })
+
       if (isAudio && audioBody) {
         const generatedUrl = await audioService.generate({
           ...audioBody,
@@ -342,7 +349,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
       else if (outcome.notice.level === 'warning') message.warning(outcome.notice.text)
       else message.error(typeof outcome.patch.error === 'string' && outcome.patch.error ? outcome.patch.error : outcome.notice.text)
     } catch (err: unknown) {
-      if (signal.aborted) return
+      if (!started || signal.aborted) return
       // Refresh aborts the fetch without aborting our signal. Keep the job id so the next open can resume.
       const keepVideoJob = node.type === 'videoConfig' && (
         isCanceledError(err) ||
@@ -367,7 +374,7 @@ export function useNodeGenerateAction(nodeId: string | null) {
       }
     } finally {
       const ownsJob = finishGenerationJob(nodeId, signal)
-      if (ownsJob && !signal.aborted) {
+      if (started && ownsJob && !signal.aborted) {
         const current = useCanvasStore.getState().nodes.find((item) => item.id === nodeId)
         if (current?.data.loading) {
           const existing = typeof current.data.error === 'string' ? current.data.error : ''
