@@ -136,7 +136,16 @@ export default function EpisodesTab({
         return (
         <div
           key={episode.id}
-          onClick={() => handleEpisodeClick(episode.id)}
+          onClick={(event) => {
+            const target = event.target
+            if (
+              target instanceof Element &&
+              target.closest("button, a, [role='menuitem']")
+            ) {
+              return
+            }
+            handleEpisodeClick(episode.id)
+          }}
           className={`group relative rounded-xl overflow-hidden bg-[hsl(var(--surface-container-lowest))] transition-all hover:shadow-xl hover:shadow-[hsl(var(--on-surface))]/5 hover:-translate-y-1 ${batchMode ? "cursor-pointer ring-2 ring-transparent" : ""} ${selectedIds.includes(episode.id) ? "ring-[hsl(var(--primary))]" : ""}`}
         >
           <div className="aspect-[4/3] w-full relative overflow-hidden">
@@ -180,7 +189,11 @@ export default function EpisodesTab({
               </button>
             )}
             <div className={`absolute inset-0 bg-gradient-to-t from-[hsl(var(--on-surface))]/60 to-transparent transition-opacity flex items-end p-4 ${batchMode ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"}`}>
-              <div className="flex gap-2 w-full">
+              <div
+                className="flex gap-2 w-full"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
                 <Button
                   variant="secondary"
                   size="sm"
@@ -214,9 +227,13 @@ export default function EpisodesTab({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
+                      type="button"
                       variant="secondary"
                       size="icon"
-                      className="w-10 bg-white/20 backdrop-blur-md text-white py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
+                      aria-label="更多操作"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => event.stopPropagation()}
+                      className="w-10 shrink-0 bg-white/20 backdrop-blur-md text-white py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                     >
                       <MoreHorizontal className="w-4 h-4" />
                     </Button>
