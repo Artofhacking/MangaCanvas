@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Input, Select, Tabs, Button, message } from 'antd';
+import { Modal, Input, Select, Tabs, Button, Checkbox, message } from 'antd';
 import { useParams } from 'react-router-dom';
 import { persistMedia } from '@/api/aigc/imageService';
 import { projectAssetsApi } from '@/api/projectAssetsApi';
@@ -15,6 +15,14 @@ import {
 import { mediaUrl } from '@/lib/mediaUrl';
 import { resolveProjectId } from '@/lib/session';
 import { useProjectStore } from '@/store/projectStore';
+import {
+  ALSO_ADD_TO_FAVORITES_LABEL,
+  initialAlsoFavorite,
+  saveMaterialsEmptyWarning,
+  saveMaterialsModalTitle,
+  saveMaterialsResultMessage,
+  saveMaterialsSubmitLabel,
+} from './saveToMaterialsCopy';
 
 type SaveMode = 'create' | 'existing';
 type MediaType = 'image' | 'video';
@@ -28,6 +36,7 @@ interface SaveToMaterialsModalProps {
   initialCategory?: string;
   nodeId?: string;
   confirmLabel?: string;
+  /** Initial state of「同时加入我的收藏」. Preview star passes true; node menus leave it off. */
   asFavorite?: boolean;
   prompt?: string;
   onSaved?: (asset: ProjectAssetDTO) => void;
@@ -57,6 +66,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   const [targetId, setTargetId] = useState<number>();
   const [existingOptions, setExistingOptions] = useState<Array<{ label: string; value: number }>>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [alsoFavorite, setAlsoFavorite] = useState(() => initialAlsoFavorite(asFavorite));
 
   useEffect(() => {
     if (!open) return;
@@ -65,7 +75,8 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
     setCategory(normalizeMaterialCategory(initialCategory, mediaType));
     setTargetId(undefined);
     setSubmitting(false);
-  }, [open, initialCategory, initialName, mediaType]);
+    setAlsoFavorite(initialAlsoFavorite(asFavorite));
+  }, [open, initialCategory, initialName, mediaType, asFavorite]);
 
   useEffect(() => {
     if (!open || !numericProjectId) return;
@@ -101,14 +112,27 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
     };
   }, [category, numericProjectId, open]);
 
-  const modalTitle = useMemo(() => {
-    if (asFavorite) return mode === 'create' ? '收藏为新素材' : '收藏到已有素材';
-    return mode === 'create' ? '保存为新素材' : '添加到已有素材';
-  }, [asFavorite, mode]);
+  const modalTitle = useMemo(() => saveMaterialsModalTitle(mode), [mode]);
+
+  const finishSave = async (catalogFailed = false, asset?: ProjectAssetDTO) => {
+    if (!numericProjectId) return;
+    await loadProjectAssets(numericProjectId, true);
+    if (alsoFavorite) notifyFavoritesChanged();
+    if (asset) onSaved?.(asset);
+    const result = saveMaterialsResultMessage({
+      alsoFavorite,
+      mode,
+      category,
+      catalogFailed,
+    });
+    if (result.level === 'warning') message.warning(result.text);
+    else message.success(result.text);
+    onClose();
+  };
 
   const handleSubmit = async () => {
     if (!imageUrl) {
-      message.warning(mediaType === 'video' ? '当前视频没有可收藏的内容' : '当前图片节点没有可保存的图片');
+      message.warning(saveMaterialsEmptyWarning(mediaType));
       return;
     }
     if (!numericProjectId) {
@@ -192,7 +216,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
         projectAssetsApi.create(numericProjectId, {
           name: (name.trim() || initialName || '画布素材').slice(0, 128),
           sourceType: 'workflow',
-          sourceId: (asFavorite
+          sourceId: (alsoFavorite
             ? favoriteSourceId(nodeId, persistedUrl)
             : workflowId || nodeId || `node-${Date.now()}`
           ).slice(0, 64),
@@ -200,7 +224,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
           prompt: prompt?.trim() || undefined,
           metadata: buildCollectMetadata(
             { category, nodeId, mediaType, sourceUrl: imageUrl },
-            asFavorite,
+            alsoFavorite,
           ),
         });
 
@@ -208,7 +232,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
         await projectAssetsApi.update(numericProjectId, targetId, {
           url: persistedUrl,
           ...(prompt?.trim() ? { prompt: prompt.trim() } : {}),
-          ...(asFavorite
+          ...(alsoFavorite
             ? {
                 metadata: buildCollectMetadata(
                   { category: 'video', nodeId, mediaType: 'video', sourceUrl: imageUrl },
@@ -217,14 +241,11 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
               }
             : {}),
         });
-        await loadProjectAssets(numericProjectId, true);
-        if (asFavorite) notifyFavoritesChanged();
-        message.success(asFavorite ? '已收藏到项目资产库' : '已更新已有视频');
-        onClose();
+        await finishSave();
         return;
       }
 
-      if (asFavorite) {
+      if (alsoFavorite) {
         const asset = await saveProjectAsset();
         let catalogError: unknown = null;
         try {
@@ -232,29 +253,13 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
         } catch (error) {
           catalogError = error;
         }
-        await loadProjectAssets(numericProjectId, true);
-        notifyFavoritesChanged();
-        onSaved?.(asset);
-        if (catalogError) {
-          message.warning('素材库写入失败，收藏已保存到我的收藏');
-        } else {
-          message.success('已收藏到项目资产库');
-        }
-        onClose();
+        await finishSave(Boolean(catalogError), asset);
         return;
       }
 
       await writeCatalog();
       await saveProjectAsset();
-      await loadProjectAssets(numericProjectId, true);
-      message.success(
-        category === 'video'
-          ? '已保存到视频管理'
-          : mode === 'create'
-            ? '已保存到项目素材库'
-            : '已更新已有素材',
-      );
-      onClose();
+      await finishSave();
     } catch (error) {
       message.error(error instanceof Error ? error.message : '保存素材失败');
     } finally {
@@ -326,13 +331,9 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
             <div className="mb-6">
               <div className="text-2xl font-bold text-[hsl(var(--on-surface))]">{modalTitle}</div>
               <div className="mt-2 text-sm text-[hsl(var(--secondary))]">
-                {asFavorite
-                  ? mediaType === 'video'
-                    ? '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这段视频。'
-                    : '收藏后会写进项目资产库，并可在「资产 → 我的收藏」里回看这张图。'
-                  : mediaType === 'video'
-                    ? '默认写入「项目资产 → 视频管理」。也可以归到角色、场景或物品，并在素材面板里拖回画布。'
-                    : '将当前图片写回角色、场景或物品库，之后可在素材面板和片段中继续使用。'}
+                {mediaType === 'video'
+                  ? '默认写入「项目资产 → 视频管理」。也可以归到角色、场景或物品，并在素材面板里拖回画布。'
+                  : '将当前图片写回角色、场景或物品库，之后可在素材面板和片段中继续使用。'}
               </div>
             </div>
 
@@ -391,13 +392,29 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
               </div>
             )}
 
-            <div className="mt-auto flex justify-end gap-3 pt-10">
-              <Button onClick={onClose} size="large" className="rounded-2xl px-6">
-                取消
-              </Button>
-              <Button type="primary" onClick={() => void handleSubmit()} loading={submitting} size="large" className="rounded-2xl px-8">
-                {mode === 'create' ? confirmLabel || '保存' : '更新'}
-              </Button>
+            <div className="mt-auto pt-10">
+              <div className="rounded-2xl bg-[hsl(var(--surface-container-low))] px-4 py-3">
+                <Checkbox
+                  checked={alsoFavorite}
+                  onChange={(event) => setAlsoFavorite(event.target.checked)}
+                >
+                  <span className="text-sm font-medium text-[hsl(var(--on-surface))]">
+                    {ALSO_ADD_TO_FAVORITES_LABEL}
+                  </span>
+                </Checkbox>
+                <p className="mt-1 pl-6 text-xs leading-5 text-[hsl(var(--secondary))]">
+                  勾选后会带上收藏标记，并出现在「项目资产 → 我的收藏」。
+                </p>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <Button onClick={onClose} size="large" className="rounded-2xl px-6">
+                  取消
+                </Button>
+                <Button type="primary" onClick={() => void handleSubmit()} loading={submitting} size="large" className="rounded-2xl px-8">
+                  {saveMaterialsSubmitLabel(mode, alsoFavorite, confirmLabel)}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
