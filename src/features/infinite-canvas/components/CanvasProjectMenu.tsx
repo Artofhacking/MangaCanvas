@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { DownloadOutlined, MoreOutlined, PlusOutlined } from '@ant-design/icons'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -31,12 +32,19 @@ import {
 } from '@/lib/persistCanvas'
 import type { Episode } from '@/types'
 import {
+  CANVAS_MENU_EPISODE_FOOTER_ACTION,
+  CANVAS_MENU_MORE_ACTIONS,
+  CANVAS_MENU_PRIMARY_ACTION,
+  CANVAS_MENU_WIDTH_PX,
   EPISODE_ROW_ACTION_LABELS,
   EPISODE_ROW_ACTIONS,
   WORKFLOW_ROW_ACTION_LABELS,
   WORKFLOW_ROW_ACTIONS,
   asWorkflowSourceType,
   blankWorkflowWithName,
+  canvasMenuEpisodeBar,
+  canvasMenuListMaxHeightPx,
+  canvasMenuSection,
   canvasNameDialogCopy,
   copiedWorkflowName,
   planBlankWorkflow,
@@ -96,6 +104,7 @@ interface CanvasProjectMenuProps {
   onOpenEpisodesTab: () => void
   onLeaveCanvas: () => void
   onExportWorkflow: () => void
+  /** IndexedDB export stays available to callers. This menu does not show it. */
   onExportDatabase: () => void
 }
 
@@ -116,17 +125,25 @@ export default function CanvasProjectMenu({
   onOpenEpisodesTab,
   onLeaveCanvas,
   onExportWorkflow,
-  onExportDatabase,
 }: CanvasProjectMenuProps) {
   const { notify, confirm } = useFeedback()
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null)
+  const [episodeExpanded, setEpisodeExpanded] = useState(
+    () => canvasMenuSection('episode').defaultExpanded,
+  )
+  const [moreExpanded, setMoreExpanded] = useState(
+    () => canvasMenuSection('more').defaultExpanded,
+  )
   const [nameDialog, setNameDialog] = useState<NameDialog | null>(null)
   const [nameValue, setNameValue] = useState('')
   const [nameSaving, setNameSaving] = useState(false)
   const [creatingWorkflow, setCreatingWorkflow] = useState(false)
 
   useEffect(() => {
-    if (!open) setRowMenu(null)
+    if (open) return
+    setRowMenu(null)
+    setEpisodeExpanded(canvasMenuSection('episode').defaultExpanded)
+    setMoreExpanded(canvasMenuSection('more').defaultExpanded)
   }, [open])
 
   useEffect(() => {
@@ -396,6 +413,7 @@ export default function CanvasProjectMenu({
     }
     onEpisodesChange([response.data, ...episodes.filter((item) => item.id !== response.data.id)])
     notify.success('剧集已创建')
+    setEpisodeExpanded(true)
     onOpenChange(true)
     return true
   }
@@ -453,131 +471,173 @@ export default function CanvasProjectMenu({
     }))
 
   const dialogCopy = nameDialog ? canvasNameDialogCopy(nameDialog.kind) : null
+  const episodeBar = canvasMenuEpisodeBar({
+    episodesLoaded,
+    routeEpisodeId: episodeId,
+    sourceType: currentWorkflow?.sourceType,
+    sourceAssetId: currentWorkflow?.sourceAssetId,
+    episodes,
+  })
+  const listMaxHeight = canvasMenuListMaxHeightPx()
+  const episodeSection = canvasMenuSection('episode')
+  const workflowSection = canvasMenuSection('workflows')
+  const moreSection = canvasMenuSection('more')
 
   return (
     <>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => onOpenChange(false)} />
-          <div className="absolute left-0 top-full z-50 mt-2 flex w-[280px] flex-col overflow-hidden rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1.5 shadow-xl shadow-black/5 backdrop-blur-md">
-            <div className="max-h-[calc(100vh-220px)] overflow-y-auto overscroll-contain" onScroll={() => setRowMenu(null)}>
-              <div className="px-3 pb-1 pt-2 text-[13px] font-bold text-[hsl(var(--secondary))]">剧集</div>
-              {!episodesLoaded ? (
-                <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载剧集中...</div>
-              ) : episodes.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有剧集</div>
-              ) : (
-                episodes.map((item) => {
-                  const active = String(item.id) === String(episodeId) || currentWorkflow?.sourceAssetId === item.id
-                  const menuKey = `episode-${item.id}`
-                  return (
-                    <div
-                      key={item.id}
-                      className={`group relative flex items-center rounded-xl ${
-                        active
-                          ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
-                          : 'hover:bg-[hsl(var(--surface-container-low))]'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onSwitchEpisode(item.id)}
-                        className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-3 pr-9 text-left text-sm"
-                      >
-                        <span className="truncate font-medium">{item.name}</span>
-                        <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">
-                          {item.code}
-                        </span>
-                      </button>
-                      <RowMenuButton
-                        label={`${item.name} 更多操作`}
-                        open={rowMenu?.key === menuKey}
-                        onToggle={(rect) => toggleRowMenu(menuKey, rect, episodeMenuItems(item))}
-                      />
-                    </div>
-                  )
-                })
-              )}
+          <div
+            data-canvas-project-menu=""
+            className="absolute left-0 top-full z-50 mt-2 flex max-h-[calc(100vh-5.5rem)] flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1 shadow-xl shadow-black/5 backdrop-blur-md"
+            style={{ width: CANVAS_MENU_WIDTH_PX }}
+            onScroll={() => setRowMenu(null)}
+          >
+            <button
+              type="button"
+              aria-expanded={episodeExpanded}
+              aria-controls="canvas-project-menu-episodes"
+              onClick={() => {
+                setRowMenu(null)
+                setEpisodeExpanded((value) => !value)
+              }}
+              className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left transition-colors hover:bg-[hsl(var(--surface-container-low))]"
+            >
+              <span className="shrink-0 text-[11px] font-semibold text-[hsl(var(--secondary))]">
+                {episodeSection.label}
+              </span>
+              <span
+                className={`min-w-0 flex-1 truncate text-[13px] font-medium ${
+                  episodeBar.matched
+                    ? 'text-[hsl(var(--primary))]'
+                    : 'text-[hsl(var(--secondary))]'
+                }`}
+              >
+                {episodeBar.label}
+              </span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-[hsl(var(--secondary))] transition-transform ${
+                  episodeExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
 
-              <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
-              <div className="px-3 pb-1 pt-1 text-[13px] font-bold text-[hsl(var(--secondary))]">工作流</div>
+            {episodeExpanded && (
+              <div id="canvas-project-menu-episodes" className="pb-0.5">
+                <div
+                  className="overflow-y-auto overscroll-contain"
+                  style={{ maxHeight: listMaxHeight }}
+                  onScroll={() => setRowMenu(null)}
+                >
+                  {!episodesLoaded ? (
+                    <div className="px-2.5 py-1.5 text-xs text-[hsl(var(--secondary))]">加载剧集中...</div>
+                  ) : episodes.length === 0 ? (
+                    <div className="px-2.5 py-1.5 text-xs text-[hsl(var(--secondary))]">当前项目还没有剧集</div>
+                  ) : (
+                    episodes.map((item) => (
+                      <MenuSelectableRow
+                        key={item.id}
+                        active={item.id === episodeBar.episodeId}
+                        label={item.name}
+                        menuLabel={`${item.name} 更多操作`}
+                        menuOpen={rowMenu?.key === `episode-${item.id}`}
+                        onSelect={() => onSwitchEpisode(item.id)}
+                        onToggleMenu={(rect) => toggleRowMenu(`episode-${item.id}`, rect, episodeMenuItems(item))}
+                      />
+                    ))
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openNameDialog({ kind: 'create-episode' }, '')}
+                  disabled={!projectReady}
+                  className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] text-[hsl(var(--secondary))] transition-colors hover:bg-[hsl(var(--surface-container-low))] hover:text-[hsl(var(--on-surface))] disabled:opacity-50"
+                >
+                  <PlusOutlined style={{ fontSize: 12 }} />
+                  <span>{CANVAS_MENU_EPISODE_FOOTER_ACTION.label}</span>
+                </button>
+              </div>
+            )}
+
+            <MenuDivider />
+
+            <div className="px-2.5 pb-0.5 pt-1 text-[11px] font-semibold text-[hsl(var(--secondary))]">
+              {workflowSection.label}
+            </div>
+            <div
+              className="overflow-y-auto overscroll-contain"
+              style={{ maxHeight: listMaxHeight }}
+              onScroll={() => setRowMenu(null)}
+            >
               {!workflowsLoaded ? (
-                <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载工作流中...</div>
+                <div className="px-2.5 py-1.5 text-xs text-[hsl(var(--secondary))]">加载工作流中...</div>
               ) : workflows.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有工作流</div>
+                <div className="px-2.5 py-1.5 text-xs text-[hsl(var(--secondary))]">当前项目还没有工作流</div>
               ) : (
                 workflows.map((item) => {
-                  const active = item.id === currentWorkflowId
-                  const menuKey = `workflow-${item.id}`
                   const nodeCountLabel = workflowNodeCountLabel(item.nodeCount)
                   return (
-                    <div
+                    <MenuSelectableRow
                       key={item.id}
-                      className={`group relative flex items-center rounded-xl ${
-                        active
-                          ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
-                          : 'hover:bg-[hsl(var(--surface-container-low))]'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onSwitchWorkflow(item.id)}
-                        className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-3 pr-9 text-left text-sm"
-                      >
-                        <span className="truncate font-medium">{item.name}</span>
-                        {nodeCountLabel ? (
-                          <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">
-                            {nodeCountLabel}
-                          </span>
-                        ) : null}
-                      </button>
-                      <RowMenuButton
-                        label={`${item.name} 更多操作`}
-                        open={rowMenu?.key === menuKey}
-                        onToggle={(rect) => toggleRowMenu(menuKey, rect, workflowMenuItems(item))}
-                      />
-                    </div>
+                      active={item.id === currentWorkflowId}
+                      label={item.name}
+                      meta={nodeCountLabel}
+                      menuLabel={`${item.name} 更多操作`}
+                      menuOpen={rowMenu?.key === `workflow-${item.id}`}
+                      onSelect={() => onSwitchWorkflow(item.id)}
+                      onToggleMenu={(rect) => toggleRowMenu(`workflow-${item.id}`, rect, workflowMenuItems(item))}
+                    />
                   )
                 })
               )}
             </div>
-
-            <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
-            <button
-              type="button"
-              onClick={() => openNameDialog({ kind: 'create-episode' }, '')}
-              disabled={!projectReady}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(var(--surface-container-low))] disabled:opacity-50"
-            >
-              <PlusOutlined style={{ fontSize: 14 }} />
-              <span>新建剧集</span>
-            </button>
             <button
               type="button"
               onClick={() => openNameDialog({ kind: 'create-workflow' }, '')}
               disabled={!projectReady || creatingWorkflow}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(var(--surface-container-low))] disabled:opacity-50"
+              className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[13px] font-medium text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-low))] disabled:opacity-50"
             >
-              <PlusOutlined style={{ fontSize: 14 }} />
-              <span>新建工作流</span>
+              <PlusOutlined style={{ fontSize: 12 }} />
+              <span>{CANVAS_MENU_PRIMARY_ACTION.label}</span>
             </button>
-            <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
+
+            <MenuDivider />
+
             <button
               type="button"
-              onClick={onExportWorkflow}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(var(--surface-container-low))]"
+              aria-expanded={moreExpanded}
+              aria-controls="canvas-project-menu-more"
+              onClick={() => {
+                setRowMenu(null)
+                setMoreExpanded((value) => !value)
+              }}
+              className="flex h-8 w-full items-center justify-between rounded-lg px-2.5 text-left text-[13px] font-medium text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-low))]"
             >
-              <DownloadOutlined style={{ fontSize: 14 }} />
-              <span>导出工作流</span>
+              <span>{moreSection.label}</span>
+              <ChevronRight
+                className={`h-3.5 w-3.5 shrink-0 text-[hsl(var(--secondary))] transition-transform ${
+                  moreExpanded ? 'rotate-90' : ''
+                }`}
+              />
             </button>
-            <button
-              type="button"
-              onClick={onExportDatabase}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(var(--surface-container-low))]"
-            >
-              <DownloadOutlined style={{ fontSize: 14 }} />
-              <span>导出数据库</span>
-            </button>
+            {moreExpanded && (
+              <div id="canvas-project-menu-more" className="pb-0.5">
+                {CANVAS_MENU_MORE_ACTIONS.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => {
+                      if (action.id === 'export-workflow') onExportWorkflow()
+                    }}
+                    className="flex h-8 w-full items-center gap-2 rounded-lg pl-6 pr-2.5 text-left text-[13px] text-[hsl(var(--on-surface))] transition-colors hover:bg-[hsl(var(--surface-container-low))]"
+                  >
+                    <DownloadOutlined style={{ fontSize: 12 }} />
+                    <span>{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
@@ -667,6 +727,58 @@ export default function CanvasProjectMenu({
   )
 }
 
+function MenuDivider() {
+  return <div className="mx-1.5 my-1 h-px bg-[hsl(var(--outline-variant))]/40" />
+}
+
+function MenuSelectableRow({
+  active,
+  label,
+  meta,
+  menuLabel,
+  menuOpen,
+  onSelect,
+  onToggleMenu,
+}: {
+  active: boolean
+  label: string
+  meta?: string | null
+  menuLabel: string
+  menuOpen: boolean
+  onSelect: () => void
+  onToggleMenu: (rect: DOMRect) => void
+}) {
+  return (
+    <div
+      className={`group relative flex h-8 items-center rounded-lg ${
+        active
+          ? 'bg-[hsl(var(--primary))]/10'
+          : 'hover:bg-[hsl(var(--surface-container-low))]'
+      }`}
+    >
+      {active ? (
+        <span
+          aria-hidden
+          className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-[hsl(var(--primary))]"
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex h-full min-w-0 flex-1 items-center justify-between gap-2 pl-2.5 pr-8 text-left text-[13px]"
+      >
+        <span className={`truncate font-medium ${active ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--on-surface))]'}`}>
+          {label}
+        </span>
+        {meta ? (
+          <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">{meta}</span>
+        ) : null}
+      </button>
+      <RowMenuButton label={menuLabel} open={menuOpen} onToggle={onToggleMenu} />
+    </div>
+  )
+}
+
 function RowMenuButton({
   label,
   open,
@@ -688,11 +800,11 @@ function RowMenuButton({
         event.stopPropagation()
         onToggle(event.currentTarget.getBoundingClientRect())
       }}
-      className={`absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[hsl(var(--secondary))] transition-opacity hover:bg-[hsl(var(--surface-container-high))] hover:text-[hsl(var(--on-surface))] ${
+      className={`absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[hsl(var(--secondary))] transition-opacity hover:bg-[hsl(var(--surface-container-high))] hover:text-[hsl(var(--on-surface))] ${
         open ? 'opacity-100' : 'opacity-50 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100'
       }`}
     >
-      <MoreOutlined style={{ fontSize: 14 }} />
+      <MoreOutlined style={{ fontSize: 13 }} />
     </button>
   )
 }
