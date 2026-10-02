@@ -490,7 +490,7 @@ export default function CanvasProjectMenu({
           <div className="fixed inset-0 z-40" onClick={() => onOpenChange(false)} />
           <div
             data-canvas-project-menu=""
-            className="absolute left-0 top-full z-50 mt-2 flex max-h-[calc(100vh-5.5rem)] flex-col overflow-y-auto overscroll-contain rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1 shadow-xl shadow-black/5 backdrop-blur-md"
+            className="absolute left-0 top-full z-50 mt-2 block max-h-[calc(100vh-5.5rem)] overflow-y-auto overscroll-contain rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1 shadow-xl shadow-black/5 backdrop-blur-md"
             style={{ width: CANVAS_MENU_WIDTH_PX }}
             onScroll={() => setRowMenu(null)}
           >
