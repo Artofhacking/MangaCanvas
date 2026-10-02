@@ -30,6 +30,26 @@ export function persistableStoryboard(shots: StoryboardShot[]): StoryboardShot[]
   }))
 }
 
+/** Lock the current frame as the delivery take. A missing frame stays unchanged. */
+export function finalizeShot(shot: StoryboardShot, at = new Date().toISOString()): StoryboardShot {
+  if (!shot.imageUrl || shot.status === 'generating') return shot
+  return {
+    ...shot,
+    finalized: true,
+    finalizedImageUrl: shot.imageUrl,
+    finalizedAt: at,
+  }
+}
+
+export function clearShotFinal(shot: StoryboardShot): StoryboardShot {
+  return {
+    ...shot,
+    finalized: false,
+    finalizedImageUrl: undefined,
+    finalizedAt: undefined,
+  }
+}
+
 export function normalizeStoryboard(value: unknown): StoryboardShot[] {
   if (!Array.isArray(value)) return []
   return value.slice(0, 80).map((item, index) => {
@@ -49,6 +69,10 @@ export function normalizeStoryboard(value: unknown): StoryboardShot[] {
       ? raw.characterIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
       : []
     const sceneId = raw.sceneId == null || raw.sceneId === '' ? null : Number(raw.sceneId)
+    const finalizedImageUrl =
+      typeof raw.finalizedImageUrl === 'string' && raw.finalizedImageUrl ? raw.finalizedImageUrl : undefined
+    const finalized = raw.finalized === true && Boolean(finalizedImageUrl || imageUrl)
+    const finalizedAt = typeof raw.finalizedAt === 'string' && raw.finalizedAt ? raw.finalizedAt : undefined
     return {
       id: String(raw.id || `shot_${index + 1}`),
       index: index + 1,
@@ -58,6 +82,13 @@ export function normalizeStoryboard(value: unknown): StoryboardShot[] {
       imageUrl,
       status,
       error: typeof raw.error === 'string' && raw.error ? raw.error : undefined,
+      finalized,
+      ...(finalized
+        ? {
+            finalizedImageUrl: finalizedImageUrl || imageUrl,
+            ...(finalizedAt ? { finalizedAt } : {}),
+          }
+        : {}),
     }
   })
 }

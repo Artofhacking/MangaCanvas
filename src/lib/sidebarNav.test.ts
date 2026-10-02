@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { projectEpisodeDeliveryPath } from "./workspaceRoutes"
 import {
   episodeIdFromPath,
   formatEpisodeNavLabel,
@@ -14,6 +15,8 @@ describe("resolveProjectSidebarSection", () => {
     expect(resolveProjectSidebarSection("/project/9/episode/3")).toBe("episodes")
     expect(resolveProjectSidebarSection("/project/9/episode/3/canvas")).toBe("episodes")
     expect(resolveProjectSidebarSection("/project/9/episode/3?view=storyboard")).toBe("episodes")
+    expect(projectEpisodeDeliveryPath(9, 3)).toBe("/project/9/episode/3?view=delivery")
+    expect(resolveProjectSidebarSection(projectEpisodeDeliveryPath(9, 3))).toBe("episodes")
   })
 
   it("keeps asset tabs, including 剧集管理 and 我的收藏, on 项目资产", () => {

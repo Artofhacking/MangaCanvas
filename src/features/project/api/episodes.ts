@@ -1,3 +1,4 @@
+import type { EpisodeDelivery } from '@/features/project/delivery'
 import type { Episode, EpisodeCreateData } from '@/types'
 import type { EpisodeDTO } from '@/api/types'
 import { mapEpisode } from '@/lib/projectMappers'
@@ -103,6 +104,18 @@ export const episodesApi = {
       '删除剧集失败'
     ).then((response) =>
       response.success ? successResponse(true) : errorResponse(response.message || '删除剧集失败', false)
+    )
+  },
+
+  async getDelivery(projectId: number, id: number): Promise<ApiResponse<EpisodeDelivery | null>> {
+    const empty = null
+    return toApiResponse<EpisodeDelivery | null>(
+      {
+        url: `/projects/${projectId}/episodes/${id}/delivery`,
+        method: 'GET',
+      },
+      empty,
+      '获取本集交付清单失败'
     )
   },
 

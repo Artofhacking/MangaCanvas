@@ -171,18 +171,29 @@ def normalize_storyboard(value) -> list:
             scene_id = int(scene_id) if scene_id not in (None, "", 0, "0") else None
         except (TypeError, ValueError):
             scene_id = None
-        shots.append(
-            {
-                "id": str(item.get("id") or f"shot_{index + 1}"),
-                "index": index + 1,
-                "prompt": str(item.get("prompt") or "")[:4000],
-                "characterIds": character_ids[:12],
-                "sceneId": scene_id,
-                "imageUrl": str(image_url)[:1024] if image_url else None,
-                "status": status,
-                "error": str(item.get("error") or "")[:400] or None,
-            }
-        )
+        stored_image = str(image_url)[:1024] if image_url else None
+        finalized_image = item.get("finalizedImageUrl") or None
+        finalized_image = str(finalized_image)[:1024] if finalized_image else None
+        finalized = bool(item.get("finalized")) and bool(finalized_image or stored_image)
+        if finalized and not finalized_image:
+            finalized_image = stored_image
+        finalized_at = str(item.get("finalizedAt") or "")[:40] or None
+        shot = {
+            "id": str(item.get("id") or f"shot_{index + 1}"),
+            "index": index + 1,
+            "prompt": str(item.get("prompt") or "")[:4000],
+            "characterIds": character_ids[:12],
+            "sceneId": scene_id,
+            "imageUrl": stored_image,
+            "status": status,
+            "error": str(item.get("error") or "")[:400] or None,
+            "finalized": finalized,
+        }
+        if finalized:
+            shot["finalizedImageUrl"] = finalized_image
+            if finalized_at:
+                shot["finalizedAt"] = finalized_at
+        shots.append(shot)
     return shots
 
 
