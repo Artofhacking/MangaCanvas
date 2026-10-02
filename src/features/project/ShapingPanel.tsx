@@ -44,7 +44,7 @@ export default function ShapingPanel({ status, prompt, busy = false, onLock, onU
         {normalized === 'unset'
           ? '锁定提示词后才能出分镜。再补一张定妆封面，就会变成已定妆。'
           : normalized === 'semi'
-            ? '尚未定妆，仅按提示词约束。在编辑里生成并设为封面即可定妆。'
+            ? '尚未定妆，仅按提示词约束。出图请到无限画布，完成后保存到素材库。'
             : '改提示词或换定妆前需要先解锁。解锁后回到还没定，封面仍会留着。'}
       </p>
       <div className="mt-3">

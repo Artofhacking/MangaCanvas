@@ -8,24 +8,9 @@ import {
 } from "@/components/ui/sheet"
 import { X } from "lucide-react"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { ImageGenerationForm } from "@/components/forms/ImageGenerationForm"
-import { defaultImageGenerationConfig, type ImageGenerationConfig } from "@/lib/generateSettings"
-import GenerationTaskPanel, {
-  AssetEditorActions,
-  GenerationTaskListButton,
-} from "@/components/generation/GenerationTaskPanel"
-import { useCollapsibleTaskPanel } from "@/hooks/useCollapsibleTaskPanel"
-import {
-  assetTaskKey,
-  tasksForAsset,
-  useAssetGenerationStore,
-  withExistingAssetResult,
-} from "@/store/assetGenerationStore"
 import ShapingPanel from "@/features/project/ShapingPanel"
 import { normalizeShapingStatus } from "@/features/project/shaping"
 import type { ObjectItem } from "@/types"
-import { useCreditQuote } from "@/hooks/useCreditQuote"
-import { aspectToSize } from "@/lib/generateAssetImage"
 
 export interface ObjectCreateData {
   name: string
@@ -45,11 +30,8 @@ export interface ObjectEditData extends ObjectCreateData {
 interface ObjectCreatorProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreate?: (data: ObjectCreateData) => void
   onUpdate?: (data: ObjectEditData) => void
   initialData?: ObjectItem | null
-  mode?: "create" | "edit"
-  projectId?: number | null
   onSetPromptLock?: (locked: boolean) => Promise<void>
   lockingPrompt?: boolean
 }
@@ -59,51 +41,23 @@ export default function ObjectCreator({
   onOpenChange,
   onUpdate,
   initialData,
-  projectId,
   onSetPromptLock,
   lockingPrompt = false,
 }: ObjectCreatorProps) {
   const { notify } = useFeedback()
   const [objectName, setObjectName] = useState("")
-  const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>(() => defaultImageGenerationConfig())
-  const { panelOpen, highlightTasks, taskPanelRef, handleOpenTaskList, revealTaskPanel } =
-    useCollapsibleTaskPanel(open)
-  const allTasks = useAssetGenerationStore((state) => state.tasks)
-  const storeTasks = tasksForAsset(allTasks, "object", projectId, initialData?.id)
-  const tasks = withExistingAssetResult(storeTasks, {
-    kind: "object",
-    projectId: Number(projectId) || 0,
-    assetId: initialData?.id,
-    name: initialData?.name || "",
-    prompt: initialData?.description,
-    model: initialData?.model,
-    imageUrl: initialData?.hasImage ? initialData.image : "",
-  })
-  const runningKey = projectId ? assetTaskKey("object", Number(projectId), initialData?.id) : ""
-  const submitting = useAssetGenerationStore((state) => Boolean(runningKey && state.runningKeys[runningKey]))
-  const startGeneration = useAssetGenerationStore((state) => state.start)
-  const setCover = useAssetGenerationStore((state) => state.setCover)
+  const [prompt, setPrompt] = useState("")
   const shapingStatus = normalizeShapingStatus(initialData?.shapingStatus)
   const promptLocked = shapingStatus !== "unset"
-  const coverLocked = shapingStatus === "final"
-
-  const resetForm = () => {
-    setObjectName("")
-    setGenerationConfig(defaultImageGenerationConfig())
-  }
 
   useEffect(() => {
     if (!open) return
     if (initialData) {
       setObjectName(initialData.name)
-      setGenerationConfig((prev) => ({
-        ...prev,
-        prompt: initialData.description || "",
-        aspectRatio: initialData.aspectRatio || prev.aspectRatio,
-        referenceImages: initialData.hasImage && initialData.image ? [initialData.image] : [],
-      }))
+      setPrompt(initialData.description || "")
     } else {
-      resetForm()
+      setObjectName("")
+      setPrompt("")
     }
   }, [initialData, open])
 
@@ -116,113 +70,40 @@ export default function ObjectCreator({
     onUpdate?.({
       id: initialData.id,
       name: objectName.trim(),
-      genMethod: "model",
-      model: generationConfig.model,
-      prompt: generationConfig.prompt.trim(),
-      aspectRatio: generationConfig.aspectRatio,
-      quantity: generationConfig.quantity,
-    })
-    notify.success("物品已保存")
-  }
-
-  const { costLabel, blocked } = useCreditQuote(
-    generationConfig.model
-      ? {
-          model: generationConfig.model,
-          modality: "image",
-          quality: "medium",
-          size: aspectToSize[generationConfig.aspectRatio || "1:1"],
-          n: 1,
-          projectId: projectId ? Number(projectId) : undefined,
-        }
-      : null
-  )
-
-  const handleGenerate = () => {
-    if (!objectName.trim()) {
-      notify.warning("请输入物品名称")
-      return
-    }
-    if (!generationConfig.prompt.trim()) {
-      notify.warning("请输入物品描述")
-      return
-    }
-    if (!generationConfig.model) {
-      notify.warning("暂无可用生图模型")
-      return
-    }
-    if (!projectId) {
-      notify.warning("缺少项目信息，无法生成")
-      return
-    }
-    if (coverLocked) {
-      notify.warning("已定妆，换定妆前请先解锁")
-      return
-    }
-    if (blocked) {
-      notify.warning(blocked)
-      return
-    }
-    revealTaskPanel()
-    void startGeneration({
-      kind: "object",
-      projectId: Number(projectId),
-      assetId: initialData?.id,
-      name: objectName.trim(),
-      prompt: generationConfig.prompt.trim(),
-      model: generationConfig.model,
-      aspectRatio: generationConfig.aspectRatio,
-      quality: generationConfig.quality,
-      clarity: generationConfig.clarity,
-      n: generationConfig.quantity,
-      referenceImages: generationConfig.referenceImages,
-    }).then((result) => {
-      if (result === "ok") {
-        notify.success(initialData ? "物品已重新生成并保存" : "物品已生成并加入素材库")
-      }
-    }).catch((error) => {
-      notify.error(error instanceof Error ? error.message : "生成失败")
+      genMethod: "upload",
+      model: initialData.model,
+      prompt: prompt.trim(),
+      aspectRatio: initialData.aspectRatio,
     })
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[900px] sm:max-w-[900px] p-0 overflow-hidden bg-[hsl(var(--surface))]" style={{ maxWidth: "900px" }} hideCloseButton>
-        <SheetTitle className="sr-only">{initialData ? "编辑物品" : "创建物品"}</SheetTitle>
+        <SheetTitle className="sr-only">编辑物品</SheetTitle>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--outline-variant))]/20 bg-[hsl(var(--surface))]">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
               <X className="w-5 h-5" />
             </Button>
-            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">{initialData ? "编辑物品" : "创建物品"}</h2>
+            <h2 className="text-xl font-bold text-[hsl(var(--on-surface))]">编辑物品</h2>
           </div>
-          <GenerationTaskListButton
-            label="物品生成任务列表"
-            count={tasks.length}
-            running={submitting || tasks.some((task) => task.status === "running")}
-            expanded={panelOpen}
-            onClick={handleOpenTaskList}
-          />
         </div>
 
-        <div className="flex h-[calc(100vh-70px)]">
-          <div
-            className={`flex h-full flex-col space-y-6 overflow-y-auto p-6 pb-24 ${
-              panelOpen ? "w-[52%] border-r border-[hsl(var(--outline-variant))]/15" : "w-full"
-            }`}
-          >
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
-                <span className="text-red-500 mr-1">*</span>物品名称
-              </label>
-              <Input
-                value={objectName}
-                onChange={(e) => setObjectName(e.target.value)}
-                placeholder="请输入"
-                className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
-              />
-            </div>
-            {initialData ? (
+        <div className="flex h-[calc(100vh-70px)] flex-col space-y-6 overflow-y-auto p-6 pb-28">
+          {initialData ? (
+            <>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
+                  <span className="text-red-500 mr-1">*</span>物品名称
+                </label>
+                <Input
+                  value={objectName}
+                  onChange={(e) => setObjectName(e.target.value)}
+                  placeholder="请输入"
+                  className="h-11 rounded-xl bg-[hsl(var(--surface-container-low))] border-none text-sm placeholder:text-[hsl(var(--secondary))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--primary))]"
+                />
+              </div>
               <ShapingPanel
                 status={shapingStatus}
                 prompt={initialData.description}
@@ -230,44 +111,43 @@ export default function ObjectCreator({
                 onLock={onSetPromptLock ? () => void onSetPromptLock(true) : undefined}
                 onUnlock={onSetPromptLock ? () => void onSetPromptLock(false) : undefined}
               />
-            ) : null}
-            <ImageGenerationForm
-              directory="objects"
-              value={generationConfig}
-              onChange={setGenerationConfig}
-              promptLocked={promptLocked}
-            />
-          </div>
-          {panelOpen ? (
-            <GenerationTaskPanel
-              tasks={tasks}
-              highlight={highlightTasks}
-              panelRef={taskPanelRef}
-              onSetCover={
-              coverLocked
-                ? () => {
-                    throw new Error("已定妆，换定妆前请先解锁")
-                  }
-                : (task, url) => setCover(task.id, url)
-            }
-            />
-          ) : null}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
+                  提示词
+                  {promptLocked ? (
+                    <span className="ml-2 text-xs font-normal text-[hsl(var(--secondary))]">已锁定，改之前请先解锁</span>
+                  ) : null}
+                </label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  disabled={promptLocked}
+                  placeholder="外形、材质和用途。出图请到无限画布。"
+                  className="min-h-[140px] w-full resize-none rounded-2xl border border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] px-4 py-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none disabled:opacity-50"
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm leading-6 text-[hsl(var(--secondary))]">
+              新物品请上传入库，或到无限画布生成后保存到素材库。
+            </p>
+          )}
         </div>
 
-        <div
-          className={`absolute bottom-0 left-0 p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent ${
-            panelOpen ? "w-[52%]" : "w-full"
-          }`}
-        >
-          <AssetEditorActions
-            hasExisting={Boolean(initialData)}
-            submitting={submitting}
-            onSave={handleSave}
-            onGenerate={handleGenerate}
-            costLabel={costLabel}
-            blockedReason={coverLocked ? "已定妆，换定妆前请先解锁" : blocked}
-          />
-        </div>
+        {initialData ? (
+          <div className="absolute bottom-0 left-0 w-full space-y-2 p-4 bg-gradient-to-t from-[hsl(var(--surface))] to-transparent">
+            <Button
+              type="button"
+              onClick={handleSave}
+              className="h-12 w-full signature-gradient rounded-xl border-0 text-base font-bold text-white"
+            >
+              保存
+            </Button>
+            <p className="text-center text-xs text-[hsl(var(--secondary))]">
+              出图请到无限画布，完成后保存到素材库。
+            </p>
+          </div>
+        ) : null}
       </SheetContent>
     </Sheet>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -7,13 +7,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown, Loader2 } from "lucide-react"
-import { useFeedback } from "@/components/feedback/FeedbackProvider"
-import { ImageGenerationForm } from "@/components/forms/ImageGenerationForm"
-import { defaultImageGenerationConfig, type ImageGenerationConfig } from "@/lib/generateSettings"
-import { generateAssetImage, aspectToSize } from "@/lib/generateAssetImage"
-import { useCreditQuote } from "@/hooks/useCreditQuote"
-import type { CharacterCreateData, CharacterEditData, Character } from "@/types"
+import { ChevronDown } from "lucide-react"
+import type { Character } from "@/types"
 
 const genderOptions = [
   { value: "male", label: "男" },
@@ -34,78 +29,25 @@ export type CharacterFormValues = {
   gender: string
   ageGroup: string
   style: string
-  model: string
   prompt: string
-  aspectRatio: ImageGenerationConfig["aspectRatio"]
-  quality: ImageGenerationConfig["quality"]
-  clarity: ImageGenerationConfig["clarity"]
-  quantity: number
-  referenceImages: string[]
 }
 
 interface CharacterFormProps {
-  mode?: 'create' | 'edit'
   initialData?: Character | null
-  onSubmit?: (data: CharacterCreateData | CharacterEditData, action: "save" | "generate") => void
-  onCancel?: () => void
-  hideActions?: boolean
   onValuesChange?: (values: CharacterFormValues) => void
   promptLocked?: boolean
 }
 
 export default function CharacterForm({
-  mode = 'create',
   initialData,
-  onSubmit,
-  onCancel,
-  hideActions = false,
   onValuesChange,
   promptLocked = false,
 }: CharacterFormProps) {
-  const { notify } = useFeedback()
-  const isEditMode = mode === 'edit' && initialData != null
-  const [gender, setGender] = useState("")
-  const [age, setAge] = useState("")
-  const [characterName, setCharacterName] = useState("")
-  const [style, setStyle] = useState("")
-
-  const [generationConfig, setGenerationConfig] = useState<ImageGenerationConfig>(() => defaultImageGenerationConfig())
-  const initializedRef = useRef(false)
-  const [submitting, setSubmitting] = useState(false)
-  const { costLabel, blocked } = useCreditQuote(
-    generationConfig.model
-      ? {
-          model: generationConfig.model,
-          modality: "image",
-          quality: "medium",
-          size: aspectToSize[generationConfig.aspectRatio || "1:1"],
-          n: 1,
-        }
-      : null
-  )
-
-  useEffect(() => {
-    if (initializedRef.current) return
-    initializedRef.current = true
-
-    if (isEditMode && initialData) {
-      setCharacterName(initialData.name)
-      setGender(initialData.gender || "")
-      setAge(initialData.ageGroup || "")
-      setStyle(initialData.style || "")
-      setGenerationConfig(
-        defaultImageGenerationConfig({
-          model: initialData.model || "",
-          prompt: initialData.description || "",
-          aspectRatio: initialData.aspectRatio || "1:1",
-          referenceImages: initialData.image ? [initialData.image] : [],
-        })
-      )
-    } else {
-      resetForm()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData?.id, mode])
+  const [gender, setGender] = useState(initialData?.gender || "")
+  const [age, setAge] = useState(initialData?.ageGroup || "")
+  const [characterName, setCharacterName] = useState(initialData?.name || "")
+  const [style, setStyle] = useState(initialData?.style || "")
+  const [prompt, setPrompt] = useState(initialData?.description || "")
 
   useEffect(() => {
     onValuesChange?.({
@@ -113,104 +55,9 @@ export default function CharacterForm({
       gender,
       ageGroup: age,
       style,
-      model: generationConfig.model,
-      prompt: generationConfig.prompt,
-      aspectRatio: generationConfig.aspectRatio,
-      quality: generationConfig.quality,
-      clarity: generationConfig.clarity,
-      quantity: generationConfig.quantity,
-      referenceImages: generationConfig.referenceImages,
+      prompt,
     })
-  }, [age, characterName, gender, generationConfig, onValuesChange, style])
-
-  const resetForm = () => {
-    setCharacterName("")
-    setGender("")
-    setAge("")
-    setStyle("")
-    setGenerationConfig(defaultImageGenerationConfig())
-  }
-
-  const buildPayload = (referenceImage?: string): CharacterCreateData | CharacterEditData => {
-    const payload: CharacterCreateData = {
-      name: characterName.trim(),
-      gender,
-      ageGroup: age,
-      genMethod: "model",
-      model: generationConfig.model,
-      style,
-      description: generationConfig.prompt,
-      referenceImage,
-      quantity: generationConfig.quantity,
-    }
-    if (isEditMode && initialData) {
-      return { ...payload, id: initialData.id }
-    }
-    return payload
-  }
-
-  const handleSave = () => {
-    if (!characterName.trim()) {
-      notify.warning("请输入角色名称")
-      return
-    }
-    if (!gender) {
-      notify.warning("请选择性别")
-      return
-    }
-    if (!age) {
-      notify.warning("请选择年龄段")
-      return
-    }
-    onSubmit?.(buildPayload(), "save")
-  }
-
-  const handleGenerate = async () => {
-    if (!characterName.trim()) {
-      notify.warning("请输入角色名称")
-      return
-    }
-    if (!gender) {
-      notify.warning("请选择性别")
-      return
-    }
-    if (!age) {
-      notify.warning("请选择年龄段")
-      return
-    }
-    if (!generationConfig.prompt.trim()) {
-      notify.warning("请输入角色描述")
-      return
-    }
-    if (!generationConfig.model) {
-      notify.warning("暂无可用生图模型")
-      return
-    }
-    if (blocked) {
-      notify.warning(blocked)
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const urls = await generateAssetImage({
-        model: generationConfig.model,
-        prompt: generationConfig.prompt.trim(),
-        aspectRatio: generationConfig.aspectRatio,
-        quality: generationConfig.quality,
-        clarity: generationConfig.clarity,
-        referenceImages: generationConfig.referenceImages,
-        n: generationConfig.quantity,
-      })
-      const imageUrl = urls[0]
-      setGenerationConfig((current) => ({ ...current, referenceImages: urls }))
-      onSubmit?.(buildPayload(imageUrl), "generate")
-    } catch (error) {
-      notify.error(error instanceof Error ? error.message : "生成失败")
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  }, [age, characterName, gender, onValuesChange, prompt, style])
 
   return (
     <div className="space-y-6">
@@ -290,70 +137,21 @@ export default function CharacterForm({
         </div>
       </div>
 
-      <ImageGenerationForm
-        value={generationConfig}
-        onChange={setGenerationConfig}
-        directory="characters"
-        promptLocked={promptLocked}
-      />
-
-      {hideActions ? null : <div className="flex items-center justify-end gap-3 pt-2">
-        {onCancel && (
-          <Button variant="outline" onClick={onCancel} disabled={submitting}>
-            取消
-          </Button>
-        )}
-        {isEditMode ? (
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleSave}
-              disabled={submitting}
-              className="h-12 min-w-[120px] rounded-xl border-[hsl(var(--outline-variant))] bg-[hsl(var(--surface-container-low))] text-base font-bold text-[hsl(var(--on-surface))] hover:bg-[hsl(var(--surface-container-high))]"
-            >
-              保存
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleGenerate()}
-              disabled={submitting || Boolean(blocked)}
-              title={blocked}
-              className="h-12 min-w-[120px] px-8 signature-gradient text-white rounded-xl font-bold text-base border-0 disabled:opacity-60"
-            >
-              {submitting ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  生成中...
-                </span>
-              ) : costLabel ? (
-                `生成 · ${costLabel}`
-              ) : (
-                "生成"
-              )}
-            </Button>
-          </>
-        ) : (
-          <Button
-            type="button"
-            onClick={() => void handleGenerate()}
-            disabled={submitting || Boolean(blocked)}
-            title={blocked}
-            className="h-12 min-w-[120px] px-8 signature-gradient text-white rounded-xl font-bold text-base border-0 disabled:opacity-60"
-          >
-            {submitting ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                生成中...
-              </span>
-            ) : costLabel ? (
-              `生成 · ${costLabel}`
-            ) : (
-              "生成"
-            )}
-          </Button>
-        )}
-      </div>}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-[hsl(var(--on-surface))]">
+          提示词
+          {promptLocked ? (
+            <span className="ml-2 text-xs font-normal text-[hsl(var(--secondary))]">已锁定，改之前请先解锁</span>
+          ) : null}
+        </label>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          disabled={promptLocked}
+          placeholder="外貌、服装和气质。出图请到无限画布。"
+          className="min-h-[132px] w-full resize-none rounded-2xl border border-[hsl(var(--outline-variant))]/35 bg-[hsl(var(--surface-container-low))] px-4 py-4 text-base text-[hsl(var(--on-surface))] placeholder:text-[hsl(var(--secondary))] focus:outline-none disabled:opacity-50"
+        />
+      </div>
     </div>
   )
 }

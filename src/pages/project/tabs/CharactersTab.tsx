@@ -11,7 +11,7 @@ import { Trash2, Check, Sparkles, Image, Settings, MoreHorizontal } from "lucide
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
 import { toCanvasLaunchSource } from "@/lib/workflows"
-import type { CanvasLaunchSource, Character, CharacterCreateData, CharacterEditData } from "@/types"
+import type { CanvasLaunchSource, Character, CharacterEditData } from "@/types"
 import ShapingPanel, { ShapingBadge } from "@/features/project/ShapingPanel"
 import CharacterCreator from "../CharacterCreator"
 import AssetDetailDialog, { AssetDetailBadge } from "./AssetDetailDialog"
@@ -21,7 +21,6 @@ import AssetQuickCreateCard from "./AssetQuickCreateCard"
 interface CharactersTabProps {
   projectId?: number | null
   characters?: Character[]
-  onAddNew?: () => void
   onUpload?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
@@ -32,7 +31,6 @@ interface CharactersTabProps {
 export default function CharactersTab({
   projectId,
   characters: charactersProp,
-  onAddNew,
   onUpload,
   onOpenCanvas,
   batchMode = false,
@@ -40,7 +38,7 @@ export default function CharactersTab({
   onToggleSelect,
 }: CharactersTabProps) {
   const characters = useProjectStore((state) => charactersProp ?? state.assets.characters)
-  const { deleteCharacter, updateCharacter, createCharacter, setCharacterPromptLock } = useProjectStore()
+  const { deleteCharacter, updateCharacter, setCharacterPromptLock } = useProjectStore()
   const { confirm, notify } = useFeedback()
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -72,26 +70,11 @@ export default function CharactersTab({
     }
   }
 
-  const handleAddNew = () => {
-    if (onAddNew) {
-      onAddNew()
-    } else {
-      setEditCharacter(null)
-      setCreatorOpen(true)
-    }
-  }
-
   const handleEdit = (character: Character, e?: React.MouseEvent) => {
     e?.stopPropagation()
     setEditCharacter(character)
     setCreatorOpen(true)
     setDetailOpen(false)
-  }
-
-  const handleCreate = async (data: CharacterCreateData) => {
-    if (!projectId) return
-    await createCharacter(projectId, data)
-    notify.success("角色已加入素材库")
   }
 
   const handleUpdate = async (data: CharacterEditData) => {
@@ -103,12 +86,12 @@ export default function CharactersTab({
       ageGroup: data.ageGroup,
       style: data.style,
       description: data.description,
-      model: data.model,
+      ...(data.model ? { model: data.model } : {}),
       aspectRatio: data.aspectRatio,
       role: data.role ? roleMap[data.role] : undefined,
       ...(data.referenceImage ? { image: data.referenceImage, hasImage: true } : {}),
     })
-    notify.success(data.referenceImage ? "角色已生成并加入素材库" : "角色已保存")
+    notify.success("角色已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -149,9 +132,7 @@ export default function CharactersTab({
         <AssetQuickCreateCard
           variant="character"
           title="添加角色"
-          description="选择创作方式。"
-          quickHint="快速建角色"
-          onQuickCreate={handleAddNew}
+          description="上传入库，出图请到画布。"
           onUpload={onUpload}
           onOpenCanvas={() => handleOpenCanvas()}
         />
@@ -212,7 +193,7 @@ export default function CharactersTab({
                   onClick={(event) => handleEdit(character, event)}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
-                  {character.hasImage ? "编辑" : "生成"}
+                  编辑
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -325,11 +306,8 @@ export default function CharactersTab({
       <CharacterCreator
         open={creatorOpen}
         onOpenChange={setCreatorOpen}
-        onCreate={handleCreate}
         onUpdate={handleUpdate}
         initialData={editCharacterLive}
-        mode={editCharacterLive ? 'edit' : 'create'}
-        projectId={projectId}
         lockingPrompt={lockingPrompt}
         onSetPromptLock={
           editCharacterLive ? (locked) => handleSetPromptLock(editCharacterLive, locked) : undefined

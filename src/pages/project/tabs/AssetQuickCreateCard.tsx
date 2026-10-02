@@ -1,4 +1,4 @@
-import { Upload, Wand2, Workflow } from "lucide-react"
+import { Upload, Workflow } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type AssetQuickCreateVariant = "character" | "scene" | "object" | "video"
@@ -7,8 +7,6 @@ interface AssetQuickCreateCardProps {
   variant: AssetQuickCreateVariant
   title: string
   description: string
-  quickHint: string
-  onQuickCreate?: () => void
   onUpload?: () => void
   onOpenCanvas: () => void
   uploadHint?: string
@@ -73,8 +71,6 @@ export default function AssetQuickCreateCard({
   variant,
   title,
   description,
-  quickHint,
-  onQuickCreate,
   onUpload,
   onOpenCanvas,
   uploadHint = "图片进库",
@@ -103,19 +99,6 @@ export default function AssetQuickCreateCard({
         <p className={styles.description}>{description}</p>
 
         <div className="mt-3 flex w-full items-center justify-center gap-2">
-          {onQuickCreate ? (
-            <button
-              type="button"
-              onClick={onQuickCreate}
-              aria-label={`快捷创作，${quickHint}`}
-              className={cn(
-                "flex items-center justify-center bg-[hsl(var(--primary))]/12 text-[hsl(var(--primary))] transition-all hover:bg-[hsl(var(--primary))]/18",
-                iconButton.wrap,
-              )}
-            >
-              <Wand2 className={iconButton.icon} />
-            </button>
-          ) : null}
           {onUpload ? (
             <button
               type="button"
@@ -144,25 +127,7 @@ export default function AssetQuickCreateCard({
       </div>
 
       <div className={styles.footer}>
-        <div className="flex items-start justify-between gap-2">
-          {onQuickCreate ? (
-            <button
-              type="button"
-              onClick={onQuickCreate}
-              className="min-w-0 flex-1 text-left transition-colors hover:text-[hsl(var(--primary))]"
-            >
-              <span className={cn(styles.footerTitle, "block")}>快捷创作</span>
-              <span
-                className={cn(
-                  "block truncate text-[13px] text-[hsl(var(--secondary))]",
-                  styles.footerMeta,
-                  variant === "scene" && "font-medium",
-                )}
-              >
-                {quickHint}
-              </span>
-            </button>
-          ) : null}
+        <div className="flex items-start justify-center gap-2">
           {onUpload ? (
             <button
               type="button"
@@ -184,7 +149,7 @@ export default function AssetQuickCreateCard({
           <button
             type="button"
             onClick={onOpenCanvas}
-            className="min-w-0 flex-1 text-right transition-colors hover:text-[hsl(var(--primary))]"
+            className="min-w-0 flex-1 text-center transition-colors hover:text-[hsl(var(--primary))]"
           >
             <span className={cn(styles.footerTitle, "block")}>无限画布</span>
             <span
