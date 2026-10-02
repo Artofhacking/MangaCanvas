@@ -7,6 +7,7 @@ import { QuerySpinner } from "@/components/feedback/ListQueryState"
 import {
   collectCategoryLabel,
   collectFavoritedAt,
+  FAVORITES_CHANGED_EVENT,
   inferCollectMediaType,
   isCollectedAsset,
 } from "@/lib/favorites"
@@ -33,25 +34,39 @@ const relativeTime = (iso?: string) => {
   return days < 7 ? `${days} 天前` : new Date(iso).toLocaleDateString("zh-CN")
 }
 
+async function loadCollectedAssets(projectId: number) {
+  const pageSize = 200
+  const first = await projectAssetsApi.list(projectId, { page: 1, size: pageSize, collected: true })
+  const items = [...(first.list || [])]
+  const total = first.pagination?.total ?? items.length
+  let page = 2
+  while (items.length < total && page <= 10) {
+    const next = await projectAssetsApi.list(projectId, { page, size: pageSize, collected: true })
+    const batch = next.list || []
+    if (!batch.length) break
+    items.push(...batch)
+    page += 1
+  }
+  return items.filter(isCollectedAsset)
+}
+
 export default function FavoritesTab({ projectId, sortBy = "recent" }: FavoritesTabProps) {
   const [items, setItems] = useState<ProjectAssetDTO[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selected, setSelected] = useState<ProjectAssetDTO | null>(null)
 
   useEffect(() => {
-    if (!projectId) {
-      setItems([])
-      setIsLoading(false)
-      return
-    }
-
     let cancelled = false
-    const load = async () => {
+    const run = async () => {
+      if (!projectId) {
+        setItems([])
+        setIsLoading(false)
+        return
+      }
       setIsLoading(true)
       try {
-        const data = await projectAssetsApi.list(projectId, { page: 1, size: 200, collected: true })
-        if (cancelled) return
-        setItems((data.list || []).filter(isCollectedAsset))
+        const next = await loadCollectedAssets(projectId)
+        if (!cancelled) setItems(next)
       } catch {
         if (!cancelled) setItems([])
       } finally {
@@ -59,9 +74,14 @@ export default function FavoritesTab({ projectId, sortBy = "recent" }: Favorites
       }
     }
 
-    void load()
+    void run()
+    const refresh = () => {
+      void run()
+    }
+    window.addEventListener(FAVORITES_CHANGED_EVENT, refresh)
     return () => {
       cancelled = true
+      window.removeEventListener(FAVORITES_CHANGED_EVENT, refresh)
     }
   }, [projectId])
 

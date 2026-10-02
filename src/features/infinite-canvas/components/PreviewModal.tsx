@@ -1,7 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Modal } from 'antd';
-import { CloseOutlined, DownloadOutlined, StarOutlined } from '@ant-design/icons';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { message, Modal } from 'antd';
+import { CloseOutlined, DownloadOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
+import { projectAssetsApi } from '@/api/projectAssetsApi';
+import type { ProjectAssetDTO } from '@/api/types';
+import {
+  FAVORITES_CHANGED_EVENT,
+  isSameFavoriteTarget,
+  notifyFavoritesChanged,
+  stripCollectMetadata,
+} from '@/lib/favorites';
 import { mediaUrl } from '@/lib/mediaUrl';
+import { resolveProjectId } from '@/lib/session';
 import SaveToMaterialsModal from './SaveToMaterialsModal';
 
 interface PreviewParams {
@@ -40,6 +50,12 @@ const defaultCollectName = (
   return type === 'video' ? '视频素材' : '图片素材';
 };
 
+const resolveNumericProjectId = (routeProjectId?: string, routeId?: string) => {
+  const parsed = Number(routeProjectId || routeId);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return resolveProjectId();
+};
+
 const PreviewModal: React.FC<PreviewModalProps> = ({
   visible,
   onClose,
@@ -51,17 +67,51 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
   nodeId,
   initialCategory,
 }) => {
+  const { projectId: routeProjectId, id: routeId } = useParams();
+  const numericProjectId = resolveNumericProjectId(routeProjectId, routeId);
   const [collectOpen, setCollectOpen] = useState(false);
+  const [favorite, setFavorite] = useState<ProjectAssetDTO | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const favoriteRequest = useRef(0);
   const collectName = useMemo(
     () => defaultCollectName(type, title, params?.prompt),
     [params?.prompt, title, type],
   );
 
+  const refreshFavorite = useCallback(async () => {
+    const requestId = ++favoriteRequest.current;
+    if (!url || !numericProjectId) {
+      setFavorite(null);
+      return;
+    }
+    try {
+      const data = await projectAssetsApi.list(numericProjectId, {
+        page: 1,
+        size: 100,
+        collected: true,
+        ...(nodeId ? { nodeId } : {}),
+      });
+      if (requestId !== favoriteRequest.current) return;
+      const match = (data.list || []).find((item) => isSameFavoriteTarget(item, { url, nodeId })) || null;
+      setFavorite(match);
+    } catch {
+      if (requestId !== favoriteRequest.current) return;
+      setFavorite(null);
+    }
+  }, [nodeId, numericProjectId, url]);
+
   useEffect(() => {
     if (!visible) {
       setCollectOpen(false);
+      return;
     }
-  }, [visible]);
+    void refreshFavorite();
+    const refresh = () => {
+      void refreshFavorite();
+    };
+    window.addEventListener(FAVORITES_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(FAVORITES_CHANGED_EVENT, refresh);
+  }, [refreshFavorite, visible]);
 
   const handleDownload = () => {
     if (onDownload) {
@@ -76,8 +126,25 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
     }
   };
 
-  const handleCollect = () => {
-    if (!url) return;
+  const handleCollect = async () => {
+    if (!url || favoriteBusy) return;
+    if (favorite && numericProjectId) {
+      favoriteRequest.current += 1;
+      setFavoriteBusy(true);
+      try {
+        await projectAssetsApi.update(numericProjectId, favorite.id, {
+          metadata: stripCollectMetadata(favorite.metadata),
+        });
+        setFavorite(null);
+        notifyFavoritesChanged();
+        message.success('已取消收藏');
+      } catch (error) {
+        message.error(error instanceof Error ? error.message : '取消收藏失败');
+      } finally {
+        setFavoriteBusy(false);
+      }
+      return;
+    }
     setCollectOpen(true);
   };
 
@@ -111,13 +178,14 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleCollect}
-              disabled={!url}
+              onClick={() => void handleCollect()}
+              disabled={!url || favoriteBusy}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-              title="收藏"
-              aria-label="收藏"
+              title={favorite ? '取消收藏' : '收藏'}
+              aria-label={favorite ? '取消收藏' : '收藏'}
+              aria-pressed={Boolean(favorite)}
             >
-              <StarOutlined className="text-white" />
+              {favorite ? <StarFilled className="text-white" /> : <StarOutlined className="text-white" />}
             </button>
             <button
               type="button"
@@ -207,6 +275,9 @@ const PreviewModal: React.FC<PreviewModalProps> = ({
       confirmLabel="收藏到资产库"
       asFavorite
       prompt={params?.prompt}
+      onSaved={() => {
+        void refreshFavorite();
+      }}
     />
     </>
   );

@@ -263,7 +263,7 @@ class ProjectAsset(Base):
     source_type: Mapped[str] = mapped_column(String(32))
     source_id: Mapped[str] = mapped_column(String(64))
     prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
-    url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
     extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

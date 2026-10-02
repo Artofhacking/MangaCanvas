@@ -61,9 +61,9 @@ def rewrite_media_tree(value: Any) -> Any:
     return value
 
 
-def paginate(items: list, page: int, size: int) -> tuple[list, dict]:
+def paginate(items: list, page: int, size: int, *, max_size: int = 100) -> tuple[list, dict]:
     page = max(page or 1, 1)
-    size = min(max(size or 20, 1), 100)
+    size = min(max(size or 20, 1), max_size)
     total = len(items)
     start = (page - 1) * size
     return items[start : start + size], {"page": page, "size": size, "total": total}

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Star, Trash2 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useCanvasStore } from '../../stores/canvasStore';
 import type { CustomNode } from '../../types';
@@ -36,6 +36,7 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
   const [editLabel, setEditLabel] = useState(data.label || '画面节点');
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
+  const [saveAsFavorite, setSaveAsFavorite] = useState(false);
   const frame = useMediaCardFrame(id, data);
   const stack = readImageStack(data);
   const hasMedia = stack.urls.length > 0;
@@ -108,6 +109,17 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
       message.info('当前节点还没有图片');
       return;
     }
+    setSaveAsFavorite(false);
+    setShowSaveToMaterialsModal(true);
+  }, [data.url]);
+
+  const handleFavorite = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!data.url) {
+      message.info('当前节点还没有图片');
+      return;
+    }
+    setSaveAsFavorite(true);
     setShowSaveToMaterialsModal(true);
   }, [data.url]);
 
@@ -146,6 +158,13 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
               event.stopPropagation();
               setShowPreview(true);
             },
+            hidden: !hasMedia,
+          },
+          {
+            key: 'favorite',
+            label: '收藏',
+            icon: <Star className="h-4 w-4" />,
+            onClick: handleFavorite,
             hidden: !hasMedia,
           },
           {
@@ -211,6 +230,8 @@ const ImageConfigNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, se
         initialCategory={typeof data.sourceType === 'string' ? data.sourceType : undefined}
         nodeId={id}
         prompt={typeof data.prompt === 'string' ? data.prompt : undefined}
+        asFavorite={saveAsFavorite}
+        confirmLabel={saveAsFavorite ? '收藏到资产库' : undefined}
       />
     </>
   );

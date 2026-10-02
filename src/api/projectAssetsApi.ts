@@ -10,6 +10,8 @@ export const projectAssetsApi = {
       size?: number
       sourceType?: ProjectAssetDTO['sourceType']
       collected?: boolean
+      nodeId?: string
+      assetUrl?: string
     }
   ) {
     return requestData<ListData<ProjectAssetDTO>>(appClient, {
