@@ -162,3 +162,103 @@ export function planWorkflowCopy(nodeCount: number | undefined): WorkflowCopyPer
   if (typeof nodeCount === 'number') return 'server'
   return 'needs-detail'
 }
+
+/** Collapsed episode bar when the canvas is not sitting on an episode. */
+export const CANVAS_MENU_EPISODE_EMPTY_LABEL = '未选剧集'
+
+export const CANVAS_MENU_WIDTH_PX = 240
+
+/** One menu row. The workflow list scrolls once it passes the max below. */
+export const CANVAS_MENU_ROW_HEIGHT_PX = 32
+
+/** About seven rows stay visible; the rest scroll. */
+export const CANVAS_MENU_WORKFLOW_LIST_MAX_ROWS = 7
+
+export function canvasMenuListMaxHeightPx(): number {
+  return CANVAS_MENU_WORKFLOW_LIST_MAX_ROWS * CANVAS_MENU_ROW_HEIGHT_PX
+}
+
+export const CANVAS_MENU_SECTIONS = [
+  { id: 'episode', label: '本集', defaultExpanded: false },
+  { id: 'workflows', label: '工作流', defaultExpanded: true },
+  { id: 'more', label: '更多', defaultExpanded: false },
+] as const
+
+export type CanvasMenuSectionId = (typeof CANVAS_MENU_SECTIONS)[number]['id']
+
+export function canvasMenuSection(id: CanvasMenuSectionId) {
+  const section = CANVAS_MENU_SECTIONS.find((item) => item.id === id)
+  if (!section) throw new Error(`Unknown canvas menu section: ${id}`)
+  return section
+}
+
+/** The only action that stays visible under the workflow list. */
+export const CANVAS_MENU_PRIMARY_ACTION = {
+  id: 'create-workflow',
+  label: '新建工作流',
+} as const
+
+/** Lives at the bottom of the episode expand, next to the episode list. */
+export const CANVAS_MENU_EPISODE_FOOTER_ACTION = {
+  id: 'create-episode',
+  label: '新建剧集',
+} as const
+
+/**
+ * Secondary actions inside collapsed「更多」.
+ * Database export is intentionally not a product action in this menu.
+ */
+export const CANVAS_MENU_MORE_ACTIONS = [
+  { id: 'export-workflow', label: '导出工作流' },
+] as const
+
+export const CANVAS_MENU_HIDDEN_ACTION_IDS = ['export-database'] as const
+
+export type CanvasMenuEpisodeBarState = {
+  label: string
+  episodeId: number | null
+  pending: boolean
+  matched: boolean
+}
+
+/** One-line episode summary. Route episode wins; otherwise an episode-bound workflow. */
+export function canvasMenuEpisodeBar(input: {
+  episodesLoaded: boolean
+  routeEpisodeId?: string | null
+  sourceType?: string | null
+  sourceAssetId?: number | null
+  episodes: ReadonlyArray<{ id: number; name: string }>
+}): CanvasMenuEpisodeBarState {
+  if (!input.episodesLoaded) {
+    return {
+      label: '加载剧集中...',
+      episodeId: null,
+      pending: true,
+      matched: false,
+    }
+  }
+
+  const episodeId = resolveCanvasEpisodeId({
+    routeEpisodeId: input.routeEpisodeId,
+    sourceType: input.sourceType,
+    sourceAssetId: input.sourceAssetId,
+  })
+  const episode = episodeId == null
+    ? undefined
+    : input.episodes.find((item) => item.id === episodeId)
+  if (!episode) {
+    return {
+      label: CANVAS_MENU_EPISODE_EMPTY_LABEL,
+      episodeId: null,
+      pending: false,
+      matched: false,
+    }
+  }
+
+  return {
+    label: episode.name,
+    episodeId: episode.id,
+    pending: false,
+    matched: true,
+  }
+}
