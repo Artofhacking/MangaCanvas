@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useFeedback } from "@/components/feedback/FeedbackProvider"
 import { useProjectStore } from "@/store/projectStore"
-import { useAssetGenerationStore } from "@/store/assetGenerationStore"
 import { toCanvasLaunchSource } from "@/lib/workflows"
 import type { CanvasLaunchSource, Scene } from "@/types"
 import { useState } from "react"
@@ -21,7 +20,6 @@ import AssetQuickCreateCard from "./AssetQuickCreateCard"
 interface ScenesTabProps {
   projectId?: number | null
   scenes?: Scene[]
-  onAddNew?: () => void
   onUpload?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
@@ -32,7 +30,6 @@ interface ScenesTabProps {
 export default function ScenesTab({
   projectId,
   scenes: scenesProp,
-  onAddNew,
   onUpload,
   onOpenCanvas,
   batchMode = false,
@@ -41,7 +38,6 @@ export default function ScenesTab({
 }: ScenesTabProps) {
   const scenes = useProjectStore((state) => scenesProp ?? state.assets.scenes)
   const { deleteScene, updateScene, setScenePromptLock } = useProjectStore()
-  const generationTasks = useAssetGenerationStore((state) => state.tasks)
   const { confirm, notify } = useFeedback()
   
   const [editScene, setEditScene] = useState<Scene | null>(null)
@@ -69,24 +65,10 @@ export default function ScenesTab({
     }
   }
 
-  const handleAddNew = () => {
-    if (onAddNew) {
-      onAddNew()
-    } else {
-      setEditScene(null)
-      setCreatorOpen(true)
-    }
-  }
-
   const handleEdit = (scene: Scene) => {
     setEditScene(scene)
     setCreatorOpen(true)
   }
-
-  const isDraftScene = (scene: Scene) => !scene.hasImage && scene.status !== "in-use"
-
-  const sceneTask = (sceneId: number) =>
-    generationTasks.find((task) => task.kind === "scene" && task.assetId === sceneId)
 
   const handleUpdate = async (data: {
     id: number
@@ -103,10 +85,10 @@ export default function ScenesTab({
     await updateScene(projectId, data.id, {
       name: data.name,
       description: data.description,
-      image: data.referenceImage,
       status: data.status,
+      ...(data.referenceImage ? { image: data.referenceImage } : {}),
     })
-    notify.success(data.referenceImage ? "场景已生成并加入素材库" : "场景已保存")
+    notify.success("场景已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -142,13 +124,12 @@ export default function ScenesTab({
   }
 
   const sceneStatusLabel = (scene: Scene) => {
-    if (sceneTask(scene.id)?.status === "running") return "生成中"
     if (scene.hasImage || scene.status === "in-use") return "使用中"
     return "草稿"
   }
 
   const sceneStatusClass = (scene: Scene) =>
-    sceneTask(scene.id)?.status === "running" || scene.hasImage || scene.status === "in-use"
+    scene.hasImage || scene.status === "in-use"
       ? "bg-[hsl(var(--primary))] text-white"
       : "bg-[hsl(var(--surface-container-highest))] text-[hsl(var(--on-secondary-fixed-variant))]"
 
@@ -157,9 +138,7 @@ export default function ScenesTab({
       <AssetQuickCreateCard
         variant="scene"
         title="添加场景"
-        description="选择创作方式。"
-        quickHint="快速建场景"
-        onQuickCreate={handleAddNew}
+        description="上传入库，出图请到画布。"
         onUpload={onUpload}
         onOpenCanvas={() => handleOpenCanvas()}
       />
@@ -179,17 +158,9 @@ export default function ScenesTab({
             />
             <div className="absolute top-3 left-3 flex gap-2">
               <Badge 
-                className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase border-0 ${
-                  sceneTask(scene.id)?.status === "running" || scene.hasImage || scene.status === "in-use"
-                    ? "bg-[hsl(var(--primary))] text-white" 
-                    : "bg-[hsl(var(--surface-container-highest))] text-[hsl(var(--on-secondary-fixed-variant))]"
-                }`}
+                className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase border-0 ${sceneStatusClass(scene)}`}
               >
-                {sceneTask(scene.id)?.status === "running"
-                  ? "生成中"
-                  : scene.hasImage || scene.status === "in-use"
-                    ? "使用中"
-                    : "草稿"}
+                {sceneStatusLabel(scene)}
               </Badge>
               <ShapingBadge status={scene.shapingStatus} />
             </div>
@@ -227,11 +198,7 @@ export default function ScenesTab({
                   }}
                   className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                 >
-                  {sceneTask(scene.id)?.status === "running"
-                    ? "查看进度"
-                    : isDraftScene(scene)
-                      ? "生成"
-                      : "编辑"}
+                  编辑
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -340,8 +307,6 @@ export default function ScenesTab({
         onOpenChange={setCreatorOpen}
         onUpdate={handleUpdate}
         initialData={editSceneLive}
-        projectId={projectId}
-        mode={editSceneLive ? (isDraftScene(editSceneLive) ? "generate" : "edit") : "create"}
         lockingPrompt={lockingPrompt}
         onSetPromptLock={editSceneLive ? (locked) => handleSetPromptLock(editSceneLive, locked) : undefined}
       />

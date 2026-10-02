@@ -107,7 +107,6 @@ export default function VideosTab({
           variant="video"
           title="添加视频"
           description="上传成片，或到画布里继续做"
-          quickHint="上传视频"
           uploadHint="视频进库"
           onUpload={onUpload}
           onOpenCanvas={() => handleOpenCanvas()}

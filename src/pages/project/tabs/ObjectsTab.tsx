@@ -21,7 +21,6 @@ import AssetQuickCreateCard from "./AssetQuickCreateCard"
 interface ObjectsTabProps {
   projectId?: number | null
   objects?: ObjectItem[]
-  onAddNew?: () => void
   onUpload?: () => void
   onOpenCanvas?: (source?: CanvasLaunchSource) => void
   batchMode?: boolean
@@ -41,7 +40,6 @@ const typeColors: Record<ObjectType, string> = {
 export default function ObjectsTab({
   projectId,
   objects: objectsProp,
-  onAddNew,
   onUpload,
   onOpenCanvas,
   batchMode = false,
@@ -61,15 +59,6 @@ export default function ObjectsTab({
     ? objects.find((item) => item.id === selectedObject.id) ?? selectedObject
     : null
   const editObjectLive = editObject ? objects.find((item) => item.id === editObject.id) ?? editObject : null
-
-  const handleAddNew = () => {
-    if (onAddNew) {
-      onAddNew()
-    } else {
-      setEditObject(null)
-      setCreatorOpen(true)
-    }
-  }
 
   const handleEdit = (object: ObjectItem) => {
     setEditObject(object)
@@ -98,7 +87,7 @@ export default function ObjectsTab({
       aspectRatio: data.aspectRatio,
       ...(data.referenceImage ? { image: data.referenceImage } : {}),
     })
-    notify.success(data.referenceImage ? "物品已生成并加入素材库" : "物品已保存")
+    notify.success("物品已保存")
   }
 
   const handleOpenCanvas = (source?: CanvasLaunchSource) => {
@@ -138,9 +127,7 @@ export default function ObjectsTab({
       <AssetQuickCreateCard
         variant="object"
         title="添加物品"
-        description="选择创作方式"
-        quickHint="快速建物品"
-        onQuickCreate={handleAddNew}
+        description="上传入库，出图请到画布。"
         onUpload={onUpload}
         onOpenCanvas={() => handleOpenCanvas()}
       />
@@ -205,7 +192,7 @@ export default function ObjectsTab({
                     }}
                     className="flex-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-bold py-2 rounded-lg border border-white/30 hover:bg-white/40 transition-colors"
                   >
-                    {object.hasImage ? "编辑" : "生成"}
+                    编辑
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -317,8 +304,6 @@ export default function ObjectsTab({
         onOpenChange={setCreatorOpen}
         onUpdate={handleUpdate}
         initialData={editObjectLive}
-        mode={editObjectLive ? 'edit' : 'create'}
-        projectId={projectId}
         lockingPrompt={lockingPrompt}
         onSetPromptLock={editObjectLive ? (locked) => handleSetPromptLock(editObjectLive, locked) : undefined}
       />

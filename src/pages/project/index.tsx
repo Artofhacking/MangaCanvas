@@ -48,10 +48,7 @@ import WorkflowsTab from "./tabs/WorkflowsTab"
 import FavoritesTab from "./tabs/FavoritesTab"
 
 // Creators
-import SceneCreator from "./SceneCreator"
 import EpisodeCreator from "./EpisodeCreator"
-import CharacterCreator from "./CharacterCreator"
-import ObjectCreator from "./ObjectCreator"
 import VideoUploadDialog from "./VideoUploadDialog"
 import AssetBatchUploadDialog from "./AssetBatchUploadDialog"
 import type { AssetBatchUploadKind } from "./assetBatchUpload"
@@ -337,7 +334,6 @@ export default function ProjectDetail() {
         return (
           <ScenesTab
             scenes={sortedAssets.scenes}
-            onAddNew={() => openDrawer('scene')}
             onUpload={() => openBatchUpload("scene")}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("scene", source)}
             projectId={numericProjectId}
@@ -350,7 +346,6 @@ export default function ProjectDetail() {
         return (
           <CharactersTab
             characters={sortedAssets.characters}
-            onAddNew={() => openDrawer('character')}
             onUpload={() => openBatchUpload("character")}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("character", source)}
             projectId={numericProjectId}
@@ -363,7 +358,6 @@ export default function ProjectDetail() {
         return (
           <ObjectsTab
             objects={sortedAssets.objects}
-            onAddNew={() => openDrawer('object')}
             onUpload={() => openBatchUpload("object")}
             onOpenCanvas={(source) => handleOpenInfiniteCanvas("object", source)}
             projectId={numericProjectId}
@@ -411,28 +405,6 @@ export default function ProjectDetail() {
         }} 
       />
 
-      {/* Character Creator Drawer */}
-      <CharacterCreator 
-        open={ui.isCharacterDrawerOpen} 
-        onOpenChange={(open) => open ? openDrawer('character') : closeDrawer('character')} 
-        projectId={numericProjectId}
-        onCreate={(data) => {
-          if (!numericProjectId) return
-          void createCharacter(numericProjectId, data)
-        }} 
-      />
-
-      {/* Scene Creator Drawer */}
-      <SceneCreator 
-        open={ui.isSceneDrawerOpen} 
-        onOpenChange={(open) => open ? openDrawer('scene') : closeDrawer('scene')} 
-        projectId={numericProjectId}
-        onCreate={(data) => {
-          if (!numericProjectId) return
-          void createScene(numericProjectId, data)
-        }} 
-      />
-
       <AssetBatchUploadDialog
         open={batchUploadOpen}
         onOpenChange={setBatchUploadOpen}
@@ -461,16 +433,6 @@ export default function ProjectDetail() {
         open={videoUploadOpen}
         onOpenChange={setVideoUploadOpen}
         projectId={numericProjectId}
-      />
-
-      <ObjectCreator 
-        open={ui.isObjectDrawerOpen} 
-        onOpenChange={(open) => open ? openDrawer('object') : closeDrawer('object')} 
-        projectId={numericProjectId}
-        onCreate={(data) => {
-          if (!numericProjectId) return
-          void createObject(numericProjectId, data)
-        }} 
       />
 
       {/* Sidebar */}
