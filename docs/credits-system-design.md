@@ -3,24 +3,63 @@
 | 字段 | 值 |
 |------|----|
 | 作者 | MangaCanvas engineering |
-| 日期 | 2026-09-20（r4，官网刊例换算 + 产品拍板） |
-| 状态 | Draft |
-| 代码基线 | `main` `af15214`（及此后本地工作树；计费相关文件无增量实现） |
+| 日期 | 2026-09-20 设计稿；**2026-10-02 实现状态已回写** |
+| 状态 | 已实现，默认关闭。生产必须显式设置 `BILLING_ENABLED` / `BILLING_ENFORCE_QUOTAS` |
+| 代码基线 | `backend/app/billing_service.py`、`pricing.py`、`routers/credits.py`、`BillingReservation` |
 | 范围 | FastAPI `/api/v1` + React 18 / Vite 5 / **BrowserRouter** SPA；生产 ECS `47.104.138.144:18999` + MySQL 8 |
-| 前作 | `docs/billing-system-design.md`（2026-09-09，Approved）。本文是对照**当前代码**的重写，不是原文拷贝。钱包/预扣引擎仍未落地，工程骨架沿用前作；产品价目、生成入口、鉴权与错误码按 2026-09-20 现状更新。 |
-| 非范围（v1） | Stripe / 支付宝 / 微信；Redis、Celery、消息队列；改 nexcor / 百度 / MiniMax / Vidu 网关本身；公开自助注册 |
+| 前作 | `docs/billing-system-design.md`（2026-09-09，Approved）。2026-09-20 稿曾写「钱包仍未落地」；2026-10-02 起预扣引擎已在代码中，见「当前实现」。 |
+| 非范围（v1） | Stripe / 支付宝 / 微信；Redis、Celery、消息队列；改 nexcor / 百度 / MiniMax / Vidu 网关本身；公开自助注册；订阅 / 自助充值 / 团队积分池 |
+
+---
+
+## 当前实现（2026-10-02）
+
+计费钱包**已经落地**，不是未实现。下面从 Overview 起的大段文字是 2026-09-20 的设计基线（当时仓库里还没有 `billing_service.py`）。以本节为准。
+
+### 开关（默认关闭，生产必须显式设置）
+
+| 环境变量 | `config.py` 字段 | 默认 |
+|----------|------------------|------|
+| `BILLING_ENABLED` | `billing_enabled` | **False** |
+| `BILLING_ENFORCE_QUOTAS` | `billing_enforce_quotas` | **False** |
+| `ALLOW_PLACEHOLDER` | `allow_placeholder` | **False**（仅在未开扣费时才允许本地占位） |
+
+`billing_enabled=False` 时生成路径跳过 reserve / capture / release，不写扣费流水。`billing_enforce_quotas=False` 时额度函数是 no-op。
+
+未设置这两个变量就等于关闭扣费和额度拦截。生产要打开时，必须在进程环境里显式写上，并重启服务。不要把 `config.py` 的默认改成 `True`。`scripts/deploy.env.example` 保持 `BILLING_ENABLED=0` / `BILLING_ENFORCE_QUOTAS=0`，示例不是生产已打开。
+
+登录后的 `GET /api/v1/credits` 返回只读 `billingEnabled`（布尔，不含密钥），用来确认线上是否打开扣费，不必 SSH。
+
+### reserve → capture / release
+
+1. **reserve**（调用上游之前，独立短事务）：`UPDATE users.credits` 预扣，插入 `billing_reservations`（`status=held`）。这一步**不**写 `billing_ledger`。
+2. **capture**（拿到真实媒体 / 非空文本 / 成功剧本 JSON）：写一条 `entry_type=consume`、`amount=-cost`。`held → captured` 不再扣第二次。`balance_after` 是预扣之后的余额。
+3. **release**（失败、取消、finally）：把预扣加回 `users.credits`，`status=refunded`，并追加一条账本：`entry_type=refund`（账单页文案「退回」），`amount=+cost`（正数，否则账单页会滤掉 `amount===0`），`reference_id` 为 reservation id，`description` 说明退回原因。
+4. **sweeper**（`sweep_once` → `_expire_one`，过期且心跳停滞的 held）：同样加回余额，`status=expired`，账本 `entry_type=release`（账单页文案「释放」），`amount=+cost`。
+5. 用户在 `GET /api/v1/credits/history` 和 `/billing` 能看到失败退回，而不只是预扣行状态变化。重复 release / 已不是 held 的 sweeper 不会再写第二条。
+6. `totalUsed` 仍只统计 `entry_type=consume AND amount<0`（成功消费）。`totalEarned` 统计正数流水，但**排除** `refund` / `release`，避免失败退回把「累计获得」刷高。
+7. 对账不变量：
+
+```text
+users.credits == SUM(billing_ledger.amount WHERE entry_type NOT IN ('refund','release'))
+                 - SUM(held reservation.amount)
+```
+
+`refund` / `release` 是预扣退回的可见流水。预扣当时没有对应的账本借方，所以这两类正数不能再加进 SUM，否则余额会对不上。
+
+同一次预扣先过期再被 capture 补扣时，历史里会同时留下「释放」和之后的「消费」。这是晚到的成功结果重新入账，不是双倍展示。
 
 ---
 
 ## Overview
 
-MangaCanvas 已经在为图像、视频、润色、剧本解析付上游账单，但产品侧积分是空转：`User.credits` 从不递减；`BillingLedger` 在调用上游**之前**写入 `entry_type="consume"` 且 **`amount=0`**；四级额度表只提供 GET/PUT。失败、超时、占位 SVG、渠道未开、启发式剧本拆解都会留下（或随请求回滚）无意义流水。价格页是月费营销壳，画布顶栏和 `NodeGenerateBar` 都不展示余额或估价。
+以下各节是 2026-09-20 设计稿，实现状态见上一节。当时产品侧积分仍是空转：`User.credits` 从不递减；`BillingLedger` 在调用上游**之前**写入 `entry_type="consume"` 且 **`amount=0`**；四级额度表只提供 GET/PUT。失败、超时、占位 SVG、渠道未开、启发式剧本拆解都会留下（或随请求回滚）无意义流水。价格页是月费营销壳，画布顶栏和 `NodeGenerateBar` 都不展示余额或估价。
 
 本设计把积分做成**真实钱包**：按「解析后的 `model_id` + 计量单位」报价；调用上游**之前**用独立短事务预扣（reserve）；**仅在拿到真实媒体 / 非空文本 / 成功 LLM 剧本 JSON 后**入账 consume；失败、超时、占位图、客户端取消、进程崩溃则释放预扣。账本追加写；余额与额度用 `UPDATE ... WHERE remaining >= :cost` 防并发透支。组织 / 项目额度表已存在，v1 **有条件启用**（`quota_limit > 0` 才拦截）。v1 不接支付通道，充值只走超级管理员发放。
 
 对照 09-09 稿的关键事实变化：
 
-1. **计费实现仍为零**。仓库里没有 `billing_service.py` / `pricing.py` / `schema_migrate.py` / `BillingPriceRule` / `BillingReservation` / `BILLING_ENABLED`。`_record_usage` 仍在 `ai.py`；`scripts.py` 同样写 `amount=0`。
+1. **2026-09-20 当时计费实现为零**（该条已过时）。2026-10-02 起钱包已在 `billing_service.py` 落地，见上文「当前实现」。默认 `BILLING_ENABLED=0`。
 2. **生成入口变了**。画布主路径是选中 `imageConfig` / `videoConfig` 后的 `NodeGenerateBar`，不是节点卡片上的提交按钮。`ImageConfigNode` 已改成预览卡。资产库（角色 / 场景 / 物品）走 `assetGenerationStore` → `imageService`，**会真正打** `POST /ai/images/generations`。本幕视频走 `generateActVideo` → `happyhorse-1.1-r2v`。
 3. **模型目录扩大**。图像增加 `gpt-image-2.5-flare` / `sunburst`；视频增加 `happyhorse-1.1-r2v`，以及代码已接入、默认关闭的 Seedance / MiniMax / Vidu。聊天可能落到 `qwen-plus` 或 `grok-4.5`（`xai_api_key`）。
 4. **注册关闭**。`allow_registration` 默认 `False`；`POST /auth/register` 与飞书新用户创建都走 `require_open_registration()`。**但该函数误用错误码 `2003`**（V2 里 `2003` = 积分不足 / HTTP 402）。打开扣费前必须让出这个码。
@@ -52,19 +91,19 @@ MangaCanvas 已经在为图像、视频、润色、剧本解析付上游账单�
 
 组织 → 项目 → 成员层级已落地（`organizations` / `projects` / `project_members`）。计费必须挂 `organization_id` + `project_id`，否则团队额度无法落地。`organization_id` **只信** `projects.organization_id`，不信客户端。
 
-### 现状审计：计费仍是占位符
+### 现状审计：计费仍是占位符（2026-09-20 快照，已过时）
 
-对照 09-09 稿逐项复核（`af15214`）：
+下表是 2026-09-20 对照 09-09 稿的复核，**不是当前代码**。钱包、价目、`BILLING_ENABLED` 与 release/expire 退回流水已实现，见「当前实现」。
 
 | 09-09 断言 | 2026-09-20 实测 |
 |------------|-----------------|
-| `User.credits` 从不递减 | **仍成立**。`models.User.credits` INT 默认 0 |
-| `_record_usage` amount=0，调用前写入 | **仍成立**（`ai.py` 图像 / 视频 / 聊天） |
-| 额度表不扣 `quota_consumed` | **仍成立**。`billing.py` 仅 CRUD |
-| 无 `BILLING_ENABLED` | **仍成立**。`config.py` 无该字段 |
-| 无 `billing_reservations` / `billing_price_rules` | **仍成立**。`models.py` 停在 ledger + 四级 quota |
-| 无 `billing_service` / `pricing` / lifespan sweeper | **仍成立**。`main.py` 模块 import 时 `create_all` + seed |
-| `GET /credits` 内存分页 | **部分过时**：余额汇总已是 SQL `SUM`；**history 仍 `all()` 再 `paginate`** |
+| `User.credits` 从不递减 | **2026-09-20 成立；现已过时**。打开 `BILLING_ENABLED` 后 reserve 会扣减 |
+| `_record_usage` amount=0，调用前写入 | **2026-09-20 成立；现已过时**。成功路径改由 `capture` 写 `consume` |
+| 额度表不扣 `quota_consumed` | **2026-09-20 成立；现已过时**。`BILLING_ENFORCE_QUOTAS=1` 时 reserve/release 会改额度 |
+| 无 `BILLING_ENABLED` | **2026-09-20 成立；现已过时**。`config.py` 有 `billing_enabled`，默认 False |
+| 无 `billing_reservations` / `billing_price_rules` | **2026-09-20 成立；现已过时**。两张表已在 `models.py` |
+| 无 `billing_service` / `pricing` / lifespan sweeper | **2026-09-20 成立；现已过时**。`billing_service.sweep_once` 由应用 lifespan 调用 |
+| `GET /credits` 内存分页 | **部分过时**：余额与 history 已是 SQL；history 支持 `entryType` |
 | 新建组织 `quota_limit=0` | **仍成立**（`orgs.py`） |
 | 新建项目 `quota_limit=100000` | **仍成立**（`projects.py` L116） |
 | Header 不展示积分 | **仍成立**。`ProjectHeader` 左侧甚至留了 `w-48` spacer 注释「for balance」，但未实现 |
@@ -206,7 +245,7 @@ def get_db():
 | # | 决策 | 选择 | 理由 |
 |---|------|------|------|
 | D1 | 扣费时点 | **Reserve-then-capture**：调用上游前预扣，成功后写 consume；失败释放预扣 | 「成功才收费」且挡住并发透支。成功后再 `UPDATE WHERE credits >= cost` 会让第二路已经打完的网关变成坏账（见 Alternatives A） |
-| D2 | 账本形态 | 预扣走新表 `billing_reservations`；`billing_ledger` **仅在 capture 时写 consume**，失败预扣**不写** consume/refund | 保持 V2 `entryType`；用户账单不被「预扣+退款」刷屏；`totalUsed` 只含成功消费 |
+| D2 | 账本形态 | 预扣走 `billing_reservations`；**capture** 才写 `consume`。**2026-10-02 起** `release` 另写 `entry_type=refund`，sweeper 过期另写 `entry_type=release`，金额为正，供 `/credits/history` 与账单页展示失败退回。reserve 仍不写账本。`totalUsed` 只含成功消费；`totalEarned` 不含这两类 | 用户必须看见失败任务退回，不能只看预扣状态。退回不进累计获得，避免把失败刷成收入 |
 | D3 | Session | 计费用独立 `SessionLocal()` 立刻 commit。长调用（生成 / 剧本 LLM）**禁止** `Depends(current_user)` / `Depends(get_db)` 跨过上游等待。新增 **`current_user_detached()`**。剧本 **文档 persist** 另开短 `SessionLocal`，立刻 commit 后关闭；**不得**把 `get_db` 活过 `llm_complete` 的 180s。**不得**在 handler 里对 `get_db` 产出的 session 调 `.close()` | FastAPI 把 `get_db` 绑到整个请求；跨 LLM 持有连接会占满 pool；handler 里 `db.close()` 会让事后 `commit()` 打在已关闭 session 上 |
 | D4 | 额度 | 保留四张表；v1 CAS 只拦 `quota_limit > 0`。**`quota_percent` 忽略**。**所有默认/懒创建路径写成 0**：模型列默认、`billing.py` GET 懒创建、`projects.py` insert。另做存量 `UPDATE ... WHERE quota_limit=100000 AND quota_consumed=0`。打开 `BILLING_ENFORCE_QUOTAS` 前 **preflight 列出所有 `quota_limit > 0` 行**（不只 `=100000`）。seed 演示项目 `300000/12000` 是生产上**唯一有意开启的项目层帽** | 只改 `projects.py` insert 挡不住 model default 与 GET 懒创建；org GET 今日会按 `BillingOrganizationQuota.quota_limit` 默认 `1_000_000` 造出活帽 |
 | D5 | 计价 | 新表 `billing_price_rules` + **`seed_price_rules()` 只 insert-if-missing**。seed 数字来自 **官网刊例换算**（1 积分=¥0.01）。超管 PUT 才改价（发票校准）。匹配前同一套 normalize；**按解析后参数收费**。`reserve` 现读 DB。关闭渠道也要有价目行 | startup 覆盖会打回刊例；缺价目则一开渠道无法扣费 |
@@ -238,7 +277,7 @@ def get_db():
 - 1 积分 = 平台内部计价单位，**不能兑人民币**。v1 刊例换算规则：**1 积分 = ¥0.01**（见下节 FX）。
 - 钱包主体是 **用户**（`users.credits`）。项目额度是可选熔断，不是第二套余额。
 - 可花余额 = `users.credits`（预扣后立即变少）。冻结中金额 `frozenCredits` 只展示，不能花。
-- 硬不变量：`users.credits == SUM(billing_ledger.amount) - SUM(held reservation.amount)`。
+- 硬不变量：`users.credits == SUM(billing_ledger.amount WHERE entry_type NOT IN ('refund','release')) - SUM(held reservation.amount)`。`refund` / `release` 只用于账单展示。
 
 ### 获取（Earn / Grant）
 
@@ -1121,8 +1160,9 @@ GET `/credits`：
 
 - `balance` = `users.credits`（预扣后即可花余额）。
 - `frozenCredits` = Σ `billing_reservations.amount` where `status='held'`。
-- `totalUsed` = abs(Σ `entry_type='consume' AND amount < 0`) —— **成功生成花费**，不含 adjust。
-- `totalEarned` = Σ `amount > 0`（含 earn / allocate / 正 adjust）。今日 `credits.py` 按正负号、不按 type；PR2 起 `totalUsed` 收窄到 consume，这是有意变更。
+- `totalUsed` = abs(Σ `entry_type='consume' AND amount < 0`) —— **成功生成花费**，不含 adjust，也不含失败退回。
+- `totalEarned` = Σ `amount > 0` 且 `entry_type` 不是 `refund` / `release`（含 earn / allocate / 正 adjust）。失败退回是正数，但不是新获得的积分。
+- `billingEnabled`：`GET /credits` 上的只读布尔，等于 `settings.billing_enabled`，无密钥。
 
 **禁止**宣称 `totalEarned - totalUsed - frozen == balance`（`adjust` 可负）。历史 `amount=0` consume 不影响 SUM。
 
@@ -1322,6 +1362,7 @@ class BillingReservation(Base):
   - `reference_id = str(reservation.id)`
   - `extra_metadata`：`{ model, unit, unitCount, unitPrice, quality, resolution, size, duration, n }`（均为 **resolved** 值）
   - `organization_id` / `project_id` 从 reservation 拷贝
+- **2026-10-02：** `release` 另写 `entry_type=refund`、`amount=+cost`；sweeper 过期另写 `entry_type=release`、`amount=+cost`。不加列。`balance_after` 是退回之后的余额。`reference_id` 仍是 reservation id。详见「当前实现」。
 - 四张 quota 表结构不动。
 
 ### 迁移策略
@@ -1350,8 +1391,8 @@ class BillingReservation(Base):
 ### B. 预扣即写 ledger consume，失败再写 refund
 
 - 优点：严格追加账本，用户能看到「扣了又退」。
-- 缺点：`totalUsed` / `totalEarned` 被失败对刷高；账单噪音大；与「成功才收费」不一致。
-- **否决**为默认；失败尝试可从 `billing_reservations` 导出。
+- 缺点：若预扣当时就写 `consume`，`totalUsed` / `totalEarned` 会被失败对刷高。
+- **2026-10-02 部分采纳：** reserve 仍不写账本；只在 `release` / sweeper 过期时写正数 `refund` / `release`。`totalUsed` 不含它们，`totalEarned` 也排除它们。用户账单能看到失败退回。
 
 ### C. Redis 分布式锁 / 队列
 
@@ -1462,7 +1503,7 @@ allow_placeholder: bool = False        # ALLOW_PLACEHOLDER；仅 billing_enabled
 
 **不提供** `billing_charge_placeholders`。
 
-`billing_enabled=False`：跳过 reserve/capture，**不再写 amount=0**。PR3a 合入后生成比今日严，**不要**对运营说「行为与今天完全一样」。第一次生产保持 `BILLING_ENABLED=0`；本地无 Key 才开 `ALLOW_PLACEHOLDER=1`。
+`billing_enabled=False`（**代码默认，保持不变**）：跳过 reserve/capture/release。生产是否扣费只看进程环境变量，必须显式设置 `BILLING_ENABLED` 与 `BILLING_ENFORCE_QUOTAS`；未设置即为关闭。不要把 `config.py` 默认改成 True，也不要在未注释说明的情况下把 `scripts/deploy.env.example` 改成 `BILLING_ENABLED=1`。本地无 Key 才开 `ALLOW_PLACEHOLDER=1`。
 
 打开扣费前检查清单：
 

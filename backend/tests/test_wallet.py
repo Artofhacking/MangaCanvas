@@ -150,7 +150,23 @@ def test_release_refunds(db):
     assert release(row.id, row.attempt, reason="fail")
     db.expire_all()
     assert _emp(db).credits == 1000
-    assert db.query(models.BillingReservation).filter_by(idempotency_key="k-rel").one().status == "refunded"
+    reservation = db.query(models.BillingReservation).filter_by(idempotency_key="k-rel").one()
+    assert reservation.status == "refunded"
+    refunds = db.query(models.BillingLedger).filter_by(user_id=emp.id, entry_type="refund").all()
+    assert len(refunds) == 1
+    refund = refunds[0]
+    assert refund.amount == quoted.credits
+    assert refund.amount > 0
+    assert refund.balance_after == 1000
+    assert refund.reference_type == "ai_image"
+    assert refund.reference_id == str(row.id)
+    assert refund.project_id == row.project_id
+    assert "退回" in (refund.description or "")
+    assert (refund.extra_metadata or {}).get("reason") == "fail"
+    assert release(row.id, row.attempt, reason="fail") is False
+    db.expire_all()
+    assert db.query(models.BillingLedger).filter_by(user_id=emp.id, entry_type="refund").count() == 1
+    assert db.query(models.BillingLedger).filter_by(user_id=emp.id, entry_type="consume").count() == 0
 
 
 def test_insufficient_credits(db):
@@ -221,6 +237,17 @@ def test_heartbeat_and_sweep_then_retry(db, Session):
     assert sweep_once() == 1
     db.expire_all()
     assert _emp(db).credits == 1000
+    expired = db.query(models.BillingReservation).filter_by(idempotency_key="k-exp").one()
+    assert expired.status == "expired"
+    releases = db.query(models.BillingLedger).filter_by(user_id=emp.id, entry_type="release").all()
+    assert len(releases) == 1
+    returned = releases[0]
+    assert returned.amount == quoted.credits
+    assert returned.amount > 0
+    assert returned.balance_after == 1000
+    assert returned.reference_id == str(row.id)
+    assert "释放" in (returned.description or "")
+    assert (returned.extra_metadata or {}).get("reason") == "expired"
     again = reserve(
         user_id=emp.id,
         quote=quoted,
@@ -232,3 +259,40 @@ def test_heartbeat_and_sweep_then_retry(db, Session):
     assert again.status == "held"
     db.expire_all()
     assert _emp(db).credits == 961
+    assert db.query(models.BillingLedger).filter_by(user_id=emp.id, entry_type="release").count() == 1
+
+
+def test_refund_visible_in_history_and_not_earned(db, monkeypatch):
+    import json
+
+    from app.routers.credits import balance, history
+
+    emp = _emp(db)
+    quoted = quote_request(db, model="gpt-image-2", modality="image", n=1)
+    row = reserve(
+        user_id=emp.id,
+        quote=quoted,
+        request_body={"model": "gpt-image-2", "modality": "image"},
+        reference_type="ai_image",
+        idempotency_key="k-hist",
+    )
+    assert release(row.id, row.attempt, reason="finally")
+    db.expire_all()
+    emp = _emp(db)
+    monkeypatch.setattr("app.routers.credits.settings.billing_enabled", False)
+    summary = json.loads(balance(user=emp, db=db).body)
+    assert summary["data"]["billingEnabled"] is False
+    assert summary["data"]["balance"] == 1000
+    assert summary["data"]["totalEarned"] == 0
+    assert summary["data"]["totalUsed"] == 0
+    monkeypatch.setattr("app.routers.credits.settings.billing_enabled", True)
+    enabled = json.loads(balance(user=emp, db=db).body)
+    assert enabled["data"]["billingEnabled"] is True
+    page = json.loads(history(page=1, size=20, entryType=None, user=emp, db=db).body)
+    items = page["data"]["list"]
+    assert len(items) == 1
+    assert items[0]["entryType"] == "refund"
+    assert items[0]["amount"] == quoted.credits
+    assert items[0]["referenceId"] == str(row.id)
+    filtered = json.loads(history(page=1, size=20, entryType="refund", user=emp, db=db).body)
+    assert filtered["data"]["pagination"]["total"] == 1

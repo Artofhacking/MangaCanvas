@@ -88,6 +88,57 @@ def _credit(db: Session, user_id: int, amount: int) -> None:
     db.execute(update(models.User).where(models.User.id == user_id).values(credits=models.User.credits + amount))
 
 
+# Positive return rows are visible on /credits/history (Billing UI: refund=退回, release=释放).
+# They are excluded from the wallet identity and from totalEarned: reserve already moved
+# users.credits without a ledger debit, so a positive return must not be added on top of SUM(ledger).
+_RETURN_LABELS = {
+    "cancelled": "任务取消退回",
+    "superseded": "被新任务取代退回",
+    "crashed": "任务中断退回",
+    "empty": "无结果退回",
+    "failed": "生成失败退回",
+    "fail": "生成失败退回",
+    "finally": "生成失败退回",
+    "enqueue": "入队失败退回",
+    "capture": "入账失败退回",
+    "expired": "预扣超时释放",
+}
+
+
+def _append_return_ledger(
+    db: Session,
+    row: models.BillingReservation,
+    user: models.User | None,
+    *,
+    entry_type: str,
+    reason: str,
+) -> None:
+    if user is not None:
+        db.refresh(user)
+    label = _RETURN_LABELS.get(reason, "生成失败退回" if entry_type == "refund" else "预扣释放")
+    model_name = (row.model_id or "").strip()
+    description = f"{label} {model_name}".strip()
+    ledger = models.BillingLedger(
+        organization_id=row.organization_id,
+        project_id=row.project_id,
+        user_id=row.user_id,
+        entry_type=entry_type,
+        amount=row.amount,
+        balance_after=user.credits if user else None,
+        description=description[:200],
+        reference_type=row.reference_type,
+        reference_id=str(row.id),
+        extra_metadata={
+            "reservationId": row.id,
+            "attempt": row.attempt,
+            "model": row.model_id,
+            "reason": (reason or "")[:64],
+        },
+    )
+    db.add(ledger)
+    db.flush()
+
+
 def _consume_layer(db: Session, model, pk_clause, cost: int, layer_name: str) -> None:
     row = db.execute(select(model).where(pk_clause).with_for_update()).scalar_one_or_none()
     if row is None or row.quota_limit <= 0:
@@ -432,7 +483,7 @@ def release(reservation_id: int, attempt: int, reason: str = "") -> bool:
         peek = db.get(models.BillingReservation, reservation_id)
         if peek is None:
             return False
-        _lock_user(db, peek.user_id)
+        user = _lock_user(db, peek.user_id)
         row = db.execute(
             select(models.BillingReservation)
             .where(
@@ -452,6 +503,7 @@ def release(reservation_id: int, attempt: int, reason: str = "") -> bool:
             meta = dict(row.extra_metadata or {})
             meta["releaseReason"] = reason[:64]
             row.extra_metadata = meta
+        _append_return_ledger(db, row, user, entry_type="refund", reason=reason or "fail")
         db.commit()
         return True
     finally:
@@ -464,7 +516,7 @@ def _expire_one(reservation_id: int, attempt: int) -> None:
         peek = db.get(models.BillingReservation, reservation_id)
         if peek is None:
             return
-        _lock_user(db, peek.user_id)
+        user = _lock_user(db, peek.user_id)
         row = db.execute(
             select(models.BillingReservation)
             .where(
@@ -481,6 +533,7 @@ def _expire_one(reservation_id: int, attempt: int) -> None:
         restore_quotas(db, row.organization_id, row.project_id, row.amount)
         row.status = "expired"
         row.updated_at = now()
+        _append_return_ledger(db, row, user, entry_type="release", reason="expired")
         db.commit()
     except Exception:
         db.rollback()

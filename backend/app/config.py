@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     seed_password: str = "123456"
     seed_username: str = "superadmin"
     allow_registration: bool = False
+    # Opt-in. Production must set BILLING_ENABLED / BILLING_ENFORCE_QUOTAS explicitly.
+    # Leaving them unset keeps charging and quota enforcement off.
     billing_enabled: bool = False
     billing_enforce_quotas: bool = False
     # In-process video worker. Extra submits stay queued; they are not dropped.

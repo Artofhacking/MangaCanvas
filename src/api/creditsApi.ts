@@ -6,6 +6,7 @@ export interface CreditsBalance {
   frozenCredits?: number
   totalEarned?: number
   totalUsed?: number
+  billingEnabled?: boolean
 }
 
 export interface CreditQuote {
