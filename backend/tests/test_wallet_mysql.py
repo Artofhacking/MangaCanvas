@@ -61,7 +61,11 @@ def test_concurrent_retry_after_expire(mysql_session, monkeypatch):
         reference_type="ai_image",
         idempotency_key="k-race",
     )
+    # reserve() commits on another connection. Close this session's repeatable-read
+    # snapshot first, or MySQL will not see the new reservation row.
+    db.commit()
     held = db.get(models.BillingReservation, row.id)
+    assert held is not None
     held.expires_at = now() - timedelta(minutes=1)
     held.updated_at = now() - timedelta(seconds=130)
     db.commit()
