@@ -26,6 +26,16 @@ export function startGenerationJob(nodeId: string): AbortSignal {
   return controller.signal
 }
 
+/**
+ * Claim a node only when nothing is in flight.
+ * A second Generate click must not abort the local poller: detach does not cancel
+ * the upstream video job, so replacing the controller would stack another submit.
+ */
+export function tryStartGenerationJob(nodeId: string): AbortSignal | null {
+  if (hasGenerationJob(nodeId)) return null
+  return startGenerationJob(nodeId)
+}
+
 export function cancelGenerationJob(nodeId: string): boolean {
   const controller = jobs.get(nodeId)
   if (!controller) return false

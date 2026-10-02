@@ -7,6 +7,7 @@ import {
   startGenerationJob,
   stopLocalGenerationJobs,
   subscribeGenerationJobs,
+  tryStartGenerationJob,
 } from './generationJobs'
 
 const ids = ['node-a', 'node-b']
@@ -78,6 +79,25 @@ describe('generation jobs per node', () => {
     } finally {
       unsubscribe()
     }
+  })
+
+  it('refuses a second claim while the node is in flight', () => {
+    const first = tryStartGenerationJob('node-a')
+    const second = tryStartGenerationJob('node-a')
+    const other = tryStartGenerationJob('node-b')
+
+    expect(first).toBeInstanceOf(AbortSignal)
+    expect(first?.aborted).toBe(false)
+    expect(second).toBeNull()
+    expect(other?.aborted).toBe(false)
+    expect(hasGenerationJob('node-a')).toBe(true)
+
+    expect(finishGenerationJob('node-a', first!)).toBe(true)
+    const third = tryStartGenerationJob('node-a')
+    expect(third?.aborted).toBe(false)
+    expect(hasGenerationJob('node-a')).toBe(true)
+    finishGenerationJob('node-a', third!)
+    finishGenerationJob('node-b', other!)
   })
 
   it('marks an explicit cancel differently from a detached poller', () => {
