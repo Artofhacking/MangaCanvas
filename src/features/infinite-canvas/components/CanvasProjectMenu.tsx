@@ -36,6 +36,8 @@ import {
   WORKFLOW_ROW_ACTION_LABELS,
   WORKFLOW_ROW_ACTIONS,
   asWorkflowSourceType,
+  blankWorkflowWithName,
+  canvasNameDialogCopy,
   copiedWorkflowName,
   planBlankWorkflow,
   planWorkflowCopy,
@@ -44,6 +46,7 @@ import {
 
 type NameDialog =
   | { kind: 'create-episode' }
+  | { kind: 'create-workflow' }
   | { kind: 'rename-episode'; episode: Episode }
   | { kind: 'rename-workflow'; workflow: Project }
 
@@ -170,8 +173,8 @@ export default function CanvasProjectMenu({
     setNameValue(value)
   }
 
-  const handleCreateWorkflow = async () => {
-    if (!projectReady || creatingWorkflow) return
+  const handleCreateWorkflow = async (name: string) => {
+    if (!projectReady || creatingWorkflow) return false
     setCreatingWorkflow(true)
     try {
       const boundEpisodeId = resolveCanvasEpisodeId({
@@ -179,11 +182,11 @@ export default function CanvasProjectMenu({
         sourceType: currentWorkflow?.sourceType,
         sourceAssetId: currentWorkflow?.sourceAssetId,
       })
-      const plan = planBlankWorkflow({
+      const plan = blankWorkflowWithName(planBlankWorkflow({
         routeEpisodeId: boundEpisodeId ? String(boundEpisodeId) : null,
         episodeName: episodes.find((item) => item.id === boundEpisodeId)?.name,
         existingNames: existingWorkflowNames(),
-      })
+      }), name)
       const result = await openOrCreateWorkflow({
         projectId,
         sourceType: 'blank',
@@ -193,7 +196,7 @@ export default function CanvasProjectMenu({
       }
       if (!result || !isDraftWorkflowId(result.id)) {
         notify.error('新建工作流失败')
-        return
+        return false
       }
       useCanvasDocumentsStore.getState().createWorkflowDocument({
         id: result.id,
@@ -205,8 +208,10 @@ export default function CanvasProjectMenu({
       await useCanvasDocumentsStore.getState().syncProjectWorkflows(projectId, result.id)
       onSwitchWorkflow(result.id)
       notify.success('已新建工作流')
+      return true
     } catch {
       notify.error('新建工作流失败')
+      return false
     } finally {
       setCreatingWorkflow(false)
     }
@@ -398,20 +403,30 @@ export default function CanvasProjectMenu({
   const submitNameDialog = async () => {
     if (!nameDialog || nameSaving || !projectReady) return
     const name = nameValue.trim()
+    const copy = canvasNameDialogCopy(nameDialog.kind)
     if (!name) {
-      notify.warning(nameDialog.kind === 'rename-workflow' ? '请输入工作流名称' : '请输入剧集名称')
+      notify.warning(copy.emptyWarning)
       return
     }
     setNameSaving(true)
     try {
-      const saved = nameDialog.kind === 'rename-workflow'
-        ? await handleRenameWorkflow(nameDialog.workflow, name)
-        : nameDialog.kind === 'rename-episode'
-          ? await handleRenameEpisode(nameDialog.episode, name)
-          : await handleCreateEpisode(name)
+      const saved = await saveNameDialog(nameDialog, name)
       if (saved) setNameDialog(null)
     } finally {
       setNameSaving(false)
+    }
+  }
+
+  const saveNameDialog = async (dialog: NameDialog, name: string) => {
+    switch (dialog.kind) {
+      case 'rename-workflow':
+        return handleRenameWorkflow(dialog.workflow, name)
+      case 'rename-episode':
+        return handleRenameEpisode(dialog.episode, name)
+      case 'create-workflow':
+        return handleCreateWorkflow(name)
+      case 'create-episode':
+        return handleCreateEpisode(name)
     }
   }
 
@@ -437,12 +452,7 @@ export default function CanvasProjectMenu({
       },
     }))
 
-  const dialogTitle = nameDialog?.kind === 'create-episode'
-    ? '新建剧集'
-    : nameDialog?.kind === 'rename-episode'
-      ? '重命名剧集'
-      : '重命名工作流'
-  const dialogSubmit = nameDialog?.kind === 'create-episode' ? '创建' : '保存'
+  const dialogCopy = nameDialog ? canvasNameDialogCopy(nameDialog.kind) : null
 
   return (
     <>
@@ -544,7 +554,7 @@ export default function CanvasProjectMenu({
             </button>
             <button
               type="button"
-              onClick={() => { void handleCreateWorkflow() }}
+              onClick={() => openNameDialog({ kind: 'create-workflow' }, '')}
               disabled={!projectReady || creatingWorkflow}
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(var(--surface-container-low))] disabled:opacity-50"
             >
@@ -615,10 +625,10 @@ export default function CanvasProjectMenu({
         <DialogContent className="w-full max-w-[480px] overflow-hidden rounded-2xl border-0 bg-[hsl(var(--surface))] p-0">
           <DialogHeader className="px-6 pb-2 pt-6 text-left">
             <DialogTitle className="text-xl font-bold text-[hsl(var(--on-surface))]">
-              {dialogTitle}
+              {dialogCopy?.title}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              {nameDialog?.kind === 'create-episode' ? '只填写剧集名称' : '修改名称'}
+              {dialogCopy?.description}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -630,14 +640,14 @@ export default function CanvasProjectMenu({
             <div className="space-y-2 px-6 py-4">
               <label className="text-sm font-medium text-[hsl(var(--on-surface))]" htmlFor="canvas-project-menu-name">
                 <span className="mr-1 text-red-500">*</span>
-                {nameDialog?.kind === 'rename-workflow' ? '工作流名称' : '剧集名称'}
+                {dialogCopy?.fieldLabel}
               </label>
               <Input
                 id="canvas-project-menu-name"
                 value={nameValue}
                 autoFocus
                 onChange={(event) => setNameValue(event.target.value)}
-                placeholder={nameDialog?.kind === 'rename-workflow' ? '请输入工作流名称' : '请输入剧集名称'}
+                placeholder={dialogCopy?.placeholder}
                 className="h-11 rounded-xl border-none bg-[hsl(var(--surface-container-low))] text-sm"
               />
             </div>
@@ -647,7 +657,7 @@ export default function CanvasProjectMenu({
                 disabled={nameSaving}
                 className="h-11 w-full rounded-xl border-0 text-base font-bold text-white signature-gradient"
               >
-                {nameSaving ? '保存中...' : dialogSubmit}
+                {nameSaving ? '保存中...' : dialogCopy?.submitLabel}
               </Button>
             </div>
           </form>

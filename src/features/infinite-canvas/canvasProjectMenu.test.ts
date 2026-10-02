@@ -4,6 +4,8 @@ import {
   EPISODE_ROW_ACTION_LABELS,
   EPISODE_ROW_ACTIONS,
   WORKFLOW_ROW_ACTIONS,
+  blankWorkflowWithName,
+  canvasNameDialogCopy,
   copiedWorkflowName,
   planBlankWorkflow,
   planWorkflowCopy,
@@ -50,6 +52,45 @@ describe('planBlankWorkflow', () => {
       sourceAssetId: 3,
       persist: 'local-draft',
     })
+  })
+})
+
+describe('create workflow name dialog', () => {
+  it('asks for a name and creates with「创建」, matching the episode dialog', () => {
+    expect(canvasNameDialogCopy('create-workflow')).toEqual({
+      title: '新建工作流',
+      description: '只填写工作流名称',
+      fieldLabel: '工作流名称',
+      placeholder: '请输入工作流名称',
+      submitLabel: '创建',
+      emptyWarning: '请输入工作流名称',
+    })
+    expect(canvasNameDialogCopy('create-episode').submitLabel).toBe('创建')
+    expect(canvasNameDialogCopy('rename-workflow').submitLabel).toBe('保存')
+    expect(canvasNameDialogCopy('rename-episode')).toMatchObject({
+      title: '重命名剧集',
+      fieldLabel: '剧集名称',
+      submitLabel: '保存',
+      emptyWarning: '请输入剧集名称',
+    })
+  })
+
+  it('keeps episode binding and the local draft when the user supplies the name', () => {
+    const plan = planBlankWorkflow({
+      routeEpisodeId: '3',
+      sourceType: 'episode',
+      sourceAssetId: 9,
+      episodeName: '第三集',
+      existingNames: ['第三集 工作流'],
+    })
+
+    expect(blankWorkflowWithName(plan, '  夜戏分镜  ')).toEqual({
+      name: '夜戏分镜',
+      sourceType: 'episode',
+      sourceAssetId: 3,
+      persist: 'local-draft',
+    })
+    expect(plan.name).toBe('第三集 工作流 2')
   })
 })
 
