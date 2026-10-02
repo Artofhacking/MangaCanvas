@@ -53,9 +53,10 @@ def test_concurrent_retry_after_expire(mysql_session, monkeypatch):
 
     db = mysql_session
     emp = db.query(models.User).filter_by(email="emp@x.com").one()
+    user_id = emp.id
     quoted = quote_request(db, model="gpt-image-2", modality="image")
     row = reserve(
-        user_id=emp.id,
+        user_id=user_id,
         quote=quoted,
         request_body={"model": "gpt-image-2", "modality": "image"},
         reference_type="ai_image",
@@ -75,7 +76,7 @@ def test_concurrent_retry_after_expire(mysql_session, monkeypatch):
     def _run():
         try:
             again = reserve(
-                user_id=emp.id,
+                user_id=user_id,
                 quote=quoted,
                 request_body={"model": "gpt-image-2", "modality": "image"},
                 reference_type="ai_image",
