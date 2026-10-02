@@ -56,4 +56,11 @@ export const projectsApi = {
       method: 'DELETE',
     })
   },
+
+  duplicate(projectId: number) {
+    return requestData<ProjectDTO>(appClient, {
+      url: `/projects/${projectId}/duplicate`,
+      method: 'POST',
+    })
+  },
 }

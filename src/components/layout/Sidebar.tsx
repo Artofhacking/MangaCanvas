@@ -1,16 +1,8 @@
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
 import { 
   LayoutGrid, 
   Settings,
   ChevronDown,
   Plus,
-  Check,
   Loader2,
   Box,
   ScrollText,
@@ -24,8 +16,10 @@ import ProjectCreator from "@/pages/ProjectCreator"
 import {
   getActiveProjectId,
   setActiveProjectId,
+  clearActiveProjectId,
   getCurrentUser,
 } from "@/lib/session"
+import ProjectSwitcherMenu from "@/components/layout/ProjectSwitcherMenu"
 import { useProjectsStore, refreshProjects } from "@/store/projectsStore"
 import { projectsApi } from "@/api"
 import { episodesApi } from "@/api/projectApi"
@@ -77,9 +71,11 @@ export default function Sidebar() {
     if (projects.length === 0) return
 
     const preferredId = routeProjectId ?? getActiveProjectId() ?? projects[0]?.id
-    const matched = projects.find((project) => project.id === preferredId) || projects[0] || null
+    const found = projects.find((project) => project.id === preferredId)
+    const matched = found ?? (routeProjectId == null ? projects[0] ?? null : null)
+    if (!matched) return
 
-    if (matched && (!currentProject || currentProject.id !== matched.id)) {
+    if (!currentProject || currentProject.id !== matched.id || currentProject.name !== matched.name) {
       setCurrentProject(matched)
       if (routeProjectId && matched.id === routeProjectId) {
         setActiveProjectId(matched.id)
@@ -89,7 +85,7 @@ export default function Sidebar() {
   }, [routeProjectId, isLoaded, allProjects])
 
   const switchToProject = (project: { id: number; name: string }) => {
-    if (project.id === currentProject?.id) return
+    if (routeProjectId === project.id) return
     setIsSwitching(true)
     setCurrentProject(project)
     setActiveProjectId(project.id)
@@ -215,57 +211,24 @@ export default function Sidebar() {
       )}
       <aside className="fixed left-0 top-0 z-50 flex h-screen w-64 flex-col gap-y-2 bg-[hsl(var(--surface-container-low))] px-3.5 py-4">
         {inProjectShell ? (
-          <div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="group w-full rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[hsl(var(--surface-container-high))]">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <h1 className="cn-keep truncate text-[15px] font-semibold leading-snug text-[hsl(var(--on-surface))]">
-                        {currentProject?.name || "未选择项目"}
-                      </h1>
-                      <p className="text-xs leading-4 text-[hsl(var(--secondary))]">当前项目</p>
-                    </div>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-[hsl(var(--secondary))] group-hover:text-[hsl(var(--on-surface))]" />
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <div className="px-2 py-1.5 text-xs font-medium text-[hsl(var(--secondary))]">
-                  切换项目
-                </div>
-                <DropdownMenuSeparator />
-                {projects.length === 0 ? (
-                  <div className="px-2 py-2 text-xs text-[hsl(var(--secondary))]">
-                    暂无其他项目
-                  </div>
-                ) : (
-                  projects.map((project) => (
-                    <DropdownMenuItem
-                      key={project.id}
-                      onClick={() => switchToProject(project)}
-                      className="flex items-center justify-between cursor-pointer"
-                    >
-                      <span className={project.id === currentProject?.id ? "font-medium" : ""}>
-                        {project.name}
-                      </span>
-                      {project.id === currentProject?.id && (
-                        <Check className="w-4 h-4 text-[hsl(var(--primary))]" />
-                      )}
-                    </DropdownMenuItem>
-                  ))
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => setIsProjectCreatorOpen(true)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  新建项目
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <ProjectSwitcherMenu
+            currentProject={currentProject}
+            projects={allProjects}
+            onSwitch={switchToProject}
+            onCreate={() => setIsProjectCreatorOpen(true)}
+            onOpenSettings={() => {
+              if (activeProjectId) navigate(projectSettingsPath(activeProjectId))
+            }}
+            onCurrentDeleted={(next) => {
+              if (next) {
+                switchToProject(next)
+                return
+              }
+              clearActiveProjectId()
+              setCurrentProject(null)
+              navigate(APP_HOME_PATH, { replace: true })
+            }}
+          />
         ) : (
           <div className="px-3 py-1.5">
             <h1 className="text-[15px] font-semibold leading-snug text-[hsl(var(--on-surface))]">MangaCanvas</h1>
