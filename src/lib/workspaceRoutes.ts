@@ -1,4 +1,4 @@
-export const ASSET_TABS = ["episodes", "characters", "scenes", "objects", "workflows", "favorites"] as const
+export const ASSET_TABS = ["episodes", "characters", "scenes", "objects", "videos", "workflows", "favorites"] as const
 
 export type AssetTab = (typeof ASSET_TABS)[number]
 
@@ -33,6 +33,7 @@ export type WorkflowCanvasEntry =
   | "scenes"
   | "characters"
   | "objects"
+  | "videos"
   | "episode"
   | "dashboard"
 
@@ -65,6 +66,7 @@ export const readWorkflowCanvasNavState = (state: unknown): WorkflowCanvasNavSta
     from === "scenes" ||
     from === "characters" ||
     from === "objects" ||
+    from === "videos" ||
     from === "episode" ||
     from === "dashboard"
   ) {
@@ -119,6 +121,8 @@ const pathForCanvasEntry = (projectId: string, from: WorkflowCanvasEntry | undef
       return projectAssetsPath(projectId, "characters")
     case "objects":
       return projectAssetsPath(projectId, "objects")
+    case "videos":
+      return projectAssetsPath(projectId, "videos")
     case "dashboard":
       return projectDashboardPath(projectId)
     default:

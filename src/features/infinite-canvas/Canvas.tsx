@@ -256,6 +256,8 @@ const CanvasInner: React.FC = () => {
       ? '角色工作流'
       : currentWorkflow?.sourceType === 'object'
       ? '物品工作流'
+      : currentWorkflow?.sourceType === 'video'
+      ? '视频工作流'
       : currentWorkflow?.sourceType === 'episode'
       ? '片段工作流'
       : '项目工作流'
@@ -291,6 +293,13 @@ const CanvasInner: React.FC = () => {
       return {
         label: '返回物品',
         action: () => navigate(`/project/${projectId}/assets/objects`),
+      };
+    }
+
+    if (currentWorkflow?.sourceType === 'video') {
+      return {
+        label: '返回视频',
+        action: () => navigate(`/project/${projectId}/assets/videos`),
       };
     }
 

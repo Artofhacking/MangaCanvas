@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CloseOutlined, InboxOutlined } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { projectApi } from '@/api/projectApi';
+import { listProjectVideoAssets } from '@/lib/projectVideos';
 import type { CanvasMaterialItem } from '../types';
 import { mediaUrl } from '@/lib/mediaUrl';
 import { resolveAssetMedia } from '@/lib/assetSeed';
@@ -13,7 +14,7 @@ interface MaterialPanelProps {
 }
 
 type LibraryTab = 'materials' | 'subjects';
-type CategoryTab = 'all' | 'character' | 'scene' | 'object';
+type CategoryTab = 'all' | 'character' | 'scene' | 'object' | 'video';
 
 const libraryTabs: Array<{ key: LibraryTab; label: string }> = [
   { key: 'materials', label: '素材库' },
@@ -25,19 +26,32 @@ const categoryTabs: Array<{ key: CategoryTab; label: string }> = [
   { key: 'character', label: '角色' },
   { key: 'scene', label: '场景' },
   { key: 'object', label: '物品' },
+  { key: 'video', label: '视频' },
 ];
 
 const MATERIAL_DRAG_MIME = 'application/x-mangacanvas-material';
 
 function toMaterialItem(
-  item: { id: number; name: string; image?: string; description?: string; hasImage?: boolean },
+  item: {
+    id: number
+    name: string
+    image?: string
+    video?: string
+    description?: string
+    hasImage?: boolean
+    hasVideo?: boolean
+    mediaType?: string
+  },
   meta: Pick<CanvasMaterialItem, 'library' | 'category' | 'subtitle' | 'status'>,
 ): CanvasMaterialItem | null {
   const resolved = resolveAssetMedia({
     name: item.name,
     prompt: item.description,
     image: item.image,
+    video: item.video,
+    mediaType: item.mediaType,
     hasImage: item.hasImage,
+    hasVideo: item.hasVideo,
   });
   if (resolved.kind === 'none') return null;
   return {
@@ -91,7 +105,8 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
       projectApi.characters.getAll(numericProjectId),
       projectApi.scenes.getAll(numericProjectId),
       projectApi.objects.getAll(numericProjectId),
-    ]).then(([characters, scenes, objects]) => {
+      listProjectVideoAssets(numericProjectId).catch(() => []),
+    ]).then(([characters, scenes, objects, videos]) => {
       if (cancelled) return;
       const next = [
         ...(characters.data || []).map((item) =>
@@ -117,6 +132,25 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
             subtitle: item.type,
             status: item.status,
           }),
+        ),
+        ...videos.map((item) =>
+          toMaterialItem(
+            {
+              id: item.id,
+              name: item.name?.trim() || `视频 ${item.id}`,
+              description: item.prompt || undefined,
+              video: item.url,
+              mediaType: 'video',
+              hasVideo: true,
+              hasImage: false,
+            },
+            {
+              library: 'materials',
+              category: 'video',
+              subtitle: '视频',
+              status: 'video',
+            },
+          ),
         ),
       ].filter((item): item is CanvasMaterialItem => Boolean(item));
       setItems(next);
@@ -154,9 +188,15 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
         desc: '在资产管理中创建物品后，就可以拖进画布。',
       };
     }
+    if (activeCategory === 'video') {
+      return {
+        title: '暂无视频',
+        desc: '在视频管理里上传，或从画布保存到视频库后，就可以拖进画布。',
+      };
+    }
     return {
       title: '暂无素材',
-      desc: '在资产管理中创建角色、场景或物品后，就可以拖进画布。',
+      desc: '在资产管理中创建角色、场景、物品或视频后，就可以拖进画布。',
     };
   }, [activeCategory, activeLibrary]);
 
@@ -236,6 +276,14 @@ const MaterialPanel: React.FC<MaterialPanelProps> = ({ visible, onClose, onSelec
                     <div className="aspect-square overflow-hidden bg-[hsl(var(--surface-container-high))]">
                       {item.mediaType === 'image' && item.cover ? (
                         <img src={mediaUrl(item.cover)} alt={item.title} className="h-full w-full object-cover" />
+                      ) : item.mediaType === 'video' && item.video ? (
+                        <video
+                          src={mediaUrl(item.video)}
+                          className="h-full w-full bg-black object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-[11px] font-medium text-[hsl(var(--secondary))]">
                           {item.mediaType === 'video' ? '视频' : '文本'}

@@ -42,6 +42,7 @@ import ScenesTab from "./tabs/ScenesTab"
 import CharactersTab from "./tabs/CharactersTab"
 import EpisodesTab from "./tabs/EpisodesTab"
 import ObjectsTab from "./tabs/ObjectsTab"
+import VideosTab from "./tabs/VideosTab"
 import PlaceholderTab from "./tabs/PlaceholderTab"
 import WorkflowsTab from "./tabs/WorkflowsTab"
 import FavoritesTab from "./tabs/FavoritesTab"
@@ -51,6 +52,7 @@ import SceneCreator from "./SceneCreator"
 import EpisodeCreator from "./EpisodeCreator"
 import CharacterCreator from "./CharacterCreator"
 import ObjectCreator from "./ObjectCreator"
+import VideoUploadDialog from "./VideoUploadDialog"
 import AssetBatchUploadDialog from "./AssetBatchUploadDialog"
 import type { AssetBatchUploadKind } from "./assetBatchUpload"
 import { CardGridSkeleton } from "@/components/feedback/ListQueryState"
@@ -64,7 +66,7 @@ const uploadTabConfig: Record<
   objects: { kind: "object", label: "上传物品" },
 }
 
-const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects", "workflows", "favorites"]
+const projectTabs: ProjectTab[] = ["episodes", "characters", "scenes", "objects", "videos", "workflows", "favorites"]
 const defaultProjectTab: ProjectTab = "scenes"
 
 const secondaryTabs: { id: ProjectTab; label: string }[] = [
@@ -72,6 +74,7 @@ const secondaryTabs: { id: ProjectTab; label: string }[] = [
   { id: "characters", label: "角色管理" },
   { id: "scenes", label: "场景管理" },
   { id: "objects", label: "物品管理" },
+  { id: "videos", label: "视频管理" },
   { id: "workflows", label: "工作流" },
   { id: "favorites", label: "我的收藏" },
 ]
@@ -108,6 +111,7 @@ export default function ProjectDetail() {
   const initializedProjectId = useProjectStore((state) => state.initializedProjectId)
   const ui = useProjectStore((state) => state.ui)
   const assets = useProjectStore((state) => state.assets)
+  const videosError = useProjectStore((state) => state.videosError)
   const { 
     setActiveTab, 
     setCurrentPage, 
@@ -118,6 +122,7 @@ export default function ProjectDetail() {
     createScene,
     createCharacter,
     createObject,
+    loadVideos,
     bulkDelete,
   } = useProjectStore()
   const [batchMode, setBatchMode] = useState(false)
@@ -126,6 +131,7 @@ export default function ProjectDetail() {
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all")
   const [batchUploadOpen, setBatchUploadOpen] = useState(false)
   const [batchUploadKind, setBatchUploadKind] = useState<AssetBatchUploadKind>("character")
+  const [videoUploadOpen, setVideoUploadOpen] = useState(false)
 
   const routeTab = isProjectTab(tabParam) ? tabParam : undefined
   const activeTab = routeTab ?? storeActiveTab
@@ -150,6 +156,8 @@ export default function ProjectDetail() {
         return "scenes" as const
       case "objects":
         return "objects" as const
+      case "videos":
+        return "videos" as const
       case "workflows":
       case "favorites":
         return null
@@ -209,6 +217,7 @@ export default function ProjectDetail() {
             scenes: sortItemsByName(assets.scenes, "asc"),
             characters: sortItemsByName(assets.characters, "asc"),
             objects: sortItemsByName(assets.objects, "asc"),
+            videos: sortItemsByName(assets.videos, "asc"),
           }
         case "name-desc":
           return {
@@ -216,6 +225,7 @@ export default function ProjectDetail() {
             scenes: sortItemsByName(assets.scenes, "desc"),
             characters: sortItemsByName(assets.characters, "desc"),
             objects: sortItemsByName(assets.objects, "desc"),
+            videos: sortItemsByName(assets.videos, "desc"),
           }
         case "recent":
         default:
@@ -224,6 +234,7 @@ export default function ProjectDetail() {
             scenes: assets.scenes,
             characters: assets.characters,
             objects: assets.objects,
+            videos: assets.videos,
           }
       }
     })()
@@ -232,7 +243,7 @@ export default function ProjectDetail() {
       ...sorted,
       characters: sorted.characters.filter((character) => character.gender === genderFilter),
     }
-  }, [assets.characters, assets.episodes, assets.objects, assets.scenes, genderFilter, sortBy])
+  }, [assets.characters, assets.episodes, assets.objects, assets.scenes, assets.videos, genderFilter, sortBy])
 
   const currentAssetCount = assetType ? sortedAssets[assetType].length : 0
   const showBulkDelete = assetsReady && Boolean(assetType) && currentAssetCount > 0
@@ -361,6 +372,23 @@ export default function ProjectDetail() {
             onToggleSelect={handleToggleSelect}
           />
         )
+      case "videos":
+        return (
+          <VideosTab
+            videos={sortedAssets.videos}
+            error={videosError}
+            onRetry={() => {
+              if (!numericProjectId) return
+              void loadVideos(numericProjectId)
+            }}
+            onUpload={() => setVideoUploadOpen(true)}
+            onOpenCanvas={(source) => handleOpenInfiniteCanvas("video", source)}
+            projectId={numericProjectId}
+            batchMode={batchMode}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+          />
+        )
       case "workflows":
         return <WorkflowsTab />
       case "favorites":
@@ -429,6 +457,12 @@ export default function ProjectDetail() {
       />
 
       {/* Object Creator Drawer */}
+      <VideoUploadDialog
+        open={videoUploadOpen}
+        onOpenChange={setVideoUploadOpen}
+        projectId={numericProjectId}
+      />
+
       <ObjectCreator 
         open={ui.isObjectDrawerOpen} 
         onOpenChange={(open) => open ? openDrawer('object') : closeDrawer('object')} 
@@ -514,6 +548,16 @@ export default function ProjectDetail() {
                     className="rounded-xl px-4 py-2.5 text-xs font-bold text-[hsl(var(--secondary))] hover:bg-[hsl(var(--surface-container-low))]"
                   >
                     取消
+                  </Button>
+                )}
+                {activeTab === "videos" && (
+                  <Button
+                    onClick={() => setVideoUploadOpen(true)}
+                    variant="outline"
+                    className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold hover:bg-[hsl(var(--surface-container-low))]"
+                  >
+                    <Upload className="w-4 h-4" />
+                    上传视频
                   </Button>
                 )}
                 {uploadConfig && (

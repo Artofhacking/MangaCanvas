@@ -11,6 +11,7 @@ const sourceLabelMap: Record<string, string> = {
   scene: '场景',
   character: '角色',
   object: '物品',
+  video: '视频',
 }
 
 export const createWorkflowId = () =>
@@ -325,7 +326,7 @@ export const openOrCreateWorkflow = async (
 
   const response = await workflowsApi.create(numericProjectId, {
     name,
-    sourceType: options.sourceType as 'blank' | 'episode' | 'scene' | 'character' | 'object',
+    sourceType: options.sourceType as 'blank' | 'episode' | 'scene' | 'character' | 'object' | 'video',
     sourceAssetId: options.sourceAssetId,
     canvasData,
   })

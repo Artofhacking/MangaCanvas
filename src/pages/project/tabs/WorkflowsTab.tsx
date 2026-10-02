@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { ArrowRight, CalendarClock, Clapperboard, Plus, Sparkles, Workflow } from "lucide-react"
+import { ArrowRight, CalendarClock, Clapperboard, Film, Plus, Sparkles, Workflow } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,6 +40,11 @@ const sourceTypeMeta: Record<
     label: "物品工作流",
     badgeClassName: "bg-sky-500 text-white",
     icon: Sparkles,
+  },
+  video: {
+    label: "视频工作流",
+    badgeClassName: "bg-orange-500 text-white",
+    icon: Film,
   },
 }
 
