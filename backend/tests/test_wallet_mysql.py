@@ -53,15 +53,20 @@ def test_concurrent_retry_after_expire(mysql_session, monkeypatch):
 
     db = mysql_session
     emp = db.query(models.User).filter_by(email="emp@x.com").one()
+    user_id = emp.id
     quoted = quote_request(db, model="gpt-image-2", modality="image")
     row = reserve(
-        user_id=emp.id,
+        user_id=user_id,
         quote=quoted,
         request_body={"model": "gpt-image-2", "modality": "image"},
         reference_type="ai_image",
         idempotency_key="k-race",
     )
+    # reserve() commits on another connection. Close this session's repeatable-read
+    # snapshot first, or MySQL will not see the new reservation row.
+    db.commit()
     held = db.get(models.BillingReservation, row.id)
+    assert held is not None
     held.expires_at = now() - timedelta(minutes=1)
     held.updated_at = now() - timedelta(seconds=130)
     db.commit()
@@ -71,7 +76,7 @@ def test_concurrent_retry_after_expire(mysql_session, monkeypatch):
     def _run():
         try:
             again = reserve(
-                user_id=emp.id,
+                user_id=user_id,
                 quote=quoted,
                 request_body={"model": "gpt-image-2", "modality": "image"},
                 reference_type="ai_image",

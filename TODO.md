@@ -1,12 +1,14 @@
 # MangaCanvas 待办清单
 
-> 当前状态：**API 已大量对接**，剩余 16 个接口待接入。
+> 当前状态：**API 已大量对接**。积分与计费额度已实现；表内其余未对接项仍按原清单保留。
+>
+> 积分钱包已实现（reserve → capture / release）。`BILLING_ENABLED` 与 `BILLING_ENFORCE_QUOTAS` 在 `config.py` 默认 **False**。生产必须在环境变量里显式打开，未设置等于不扣费、不拦额度。失败释放与预扣超时会写入 `billing_ledger`（`refund` / `release`），账单页 `/billing` 与 `GET /credits/history` 可见。订阅、自助充值、团队积分池不在本迭代。
 > 
 > **后端开发请参考**: [`BACKEND_API_SPEC_V2.md`](./BACKEND_API_SPEC_V2.md)
 
 ---
 
-## 📊 接口对接统计（共 66 个接口）
+## 📊 接口对接统计（按表内各行合计 71）
 
 | 模块 | 已对接 | 未对接 | 总计 |
 |------|--------|--------|------|
@@ -24,9 +26,9 @@
 | Assets | 1 | 3 | 4 |
 | Upload | 3 | 0 | 3 |
 | AI Gateway | 1 | 0* | 1* |
-| Credits | 0 | 2 | 2 |
-| Billing | 0 | 8 | 8 |
-| **总计** | **50** | **16** | **66** |
+| Credits | 2 | 0 | 2 |
+| Billing | 8 | 0 | 8 |
+| **总计** | **57** | **14** | **71** |
 
 > *注：AI Gateway 目前直接调用 DashScope，未走后端网关。
 
@@ -67,18 +69,18 @@
 - [ ] `GET /api/v1/health` - 健康检查
 
 ### 6. 积分系统（2个接口）
-- [ ] `GET /api/v1/credits` - 积分余额
-- [ ] `GET /api/v1/credits/history` - 积分流水
+- [x] `GET /api/v1/credits` - 积分余额（含只读 `billingEnabled`）
+- [x] `GET /api/v1/credits/history` - 积分流水（含失败 `refund` 与超时 `release`）
 
 ### 7. 计费额度（8个接口）
-- [ ] `GET /api/v1/billing/enterprise/quota` - 企业额度
-- [ ] `PUT /api/v1/billing/enterprise/quota` - 更新企业额度
-- [ ] `GET /api/v1/billing/organizations/{organizationId}/quota` - 组织额度
-- [ ] `PUT /api/v1/billing/organizations/{organizationId}/quota` - 更新组织额度
-- [ ] `GET /api/v1/billing/projects/{projectId}/quota` - 项目额度
-- [ ] `PUT /api/v1/billing/projects/{projectId}/quota` - 更新项目额度
-- [ ] `GET /api/v1/billing/projects/{projectId}/users/{userId}/quota` - 用户项目额度
-- [ ] `PUT /api/v1/billing/projects/{projectId}/users/{userId}/quota` - 更新用户项目额度
+- [x] `GET /api/v1/billing/enterprise/quota` - 企业额度
+- [x] `PUT /api/v1/billing/enterprise/quota` - 更新企业额度
+- [x] `GET /api/v1/billing/organizations/{organizationId}/quota` - 组织额度
+- [x] `PUT /api/v1/billing/organizations/{organizationId}/quota` - 更新组织额度
+- [x] `GET /api/v1/billing/projects/{projectId}/quota` - 项目额度
+- [x] `PUT /api/v1/billing/projects/{projectId}/quota` - 更新项目额度
+- [x] `GET /api/v1/billing/projects/{projectId}/users/{userId}/quota` - 用户项目额度
+- [x] `PUT /api/v1/billing/projects/{projectId}/users/{userId}/quota` - 更新用户项目额度
 
 ---
 
@@ -171,6 +173,9 @@
 ---
 
 ## 📝 更新日志
+
+### 2026-10-02
+- 积分与计费额度接口标为已对接。钱包为 reserve → 成功 capture / 失败 release；过期由 sweeper 写 `release` 流水。扣费开关默认关闭，生产须显式设置环境变量。
 
 ### 2026-04-12
 - 重新梳理所有接口，基于 `BACKEND_API_SPEC_V2.md` 完整统计

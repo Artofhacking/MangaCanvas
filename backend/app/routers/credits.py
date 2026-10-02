@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import billing_service, models
+from ..config import settings
 from ..db import get_db
 from ..deps import current_user
 from ..errors import fail, ok
@@ -53,7 +54,12 @@ class PriceUpdateIn(BaseModel):
 def balance(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     earned = (
         db.query(func.coalesce(func.sum(models.BillingLedger.amount), 0))
-        .filter(models.BillingLedger.user_id == user.id, models.BillingLedger.amount > 0)
+        .filter(
+            models.BillingLedger.user_id == user.id,
+            models.BillingLedger.amount > 0,
+            # refund/release restore a hold that was never a ledger debit.
+            models.BillingLedger.entry_type.notin_(("refund", "release")),
+        )
         .scalar()
     )
     used = (
@@ -71,6 +77,7 @@ def balance(user: models.User = Depends(current_user), db: Session = Depends(get
             "frozenCredits": billing_service.frozen_credits(db, user.id),
             "totalEarned": int(earned),
             "totalUsed": abs(int(used)),
+            "billingEnabled": bool(settings.billing_enabled),
         }
     )
 

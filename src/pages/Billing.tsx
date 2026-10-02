@@ -276,7 +276,7 @@ export default function Billing() {
                         <td className="px-4 py-16 text-center" colSpan={5}>
                           <p className="text-sm font-medium text-[hsl(var(--on-surface))]">暂无流水</p>
                           <p className="mt-1 text-xs text-[hsl(var(--secondary))]">
-                            生成成功后的扣费、管理员发放都会出现在这里
+                            生成成功后的扣费、失败退回和管理员发放都会出现在这里
                           </p>
                         </td>
                       </tr>
