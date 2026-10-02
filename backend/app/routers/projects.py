@@ -162,11 +162,29 @@ def update_project(
     return ok(serialize.project(row, _stats(db, row.id)))
 
 
+def duplicate_project_name(name: str, existing: set[str]) -> str:
+    base = (name or "").strip() or "未命名项目"
+    candidate = f"{base} 副本"
+    index = 2
+    while candidate in existing:
+        candidate = f"{base} 副本 {index}"
+        index += 1
+    return candidate[:128]
+
+
+def _can_delete_project(user: models.User, project: models.Project, member: models.ProjectMember | None) -> bool:
+    if user.role and (user.role.list_all_projects or user.role.can_manage_project_members):
+        return True
+    if project.owner_id == user.id:
+        return True
+    return bool(member and member.role == "owner")
+
+
 @router.delete("/{project_id}")
 def delete_project(project_id: int, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     row = require_project_access(db, user, project_id, write=True)
     member = db.query(models.ProjectMember).filter_by(project_id=project_id, user_id=user.id).first()
-    if not (user.role and user.role.list_all_projects) and (not member or member.role != "owner"):
+    if not _can_delete_project(user, row, member):
         fail(1003, "禁止访问", 403)
     db.query(models.ProjectMember).filter_by(project_id=project_id).delete()
     db.query(models.Character).filter_by(project_id=project_id).delete()
@@ -182,9 +200,13 @@ def delete_project(project_id: int, user: models.User = Depends(current_user), d
 @router.post("/{project_id}/duplicate")
 def duplicate_project(project_id: int, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     src = require_project_access(db, user, project_id)
+    existing = {
+        row[0]
+        for row in db.query(models.Project.name).filter(models.Project.organization_id == src.organization_id)
+    }
     copy = models.Project(
         organization_id=src.organization_id,
-        name=f"{src.name} (复制)",
+        name=duplicate_project_name(src.name, existing),
         description=src.description,
         cover_image=src.cover_image,
         status="draft",
