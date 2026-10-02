@@ -35,8 +35,26 @@ def ensure_prompt_lock_columns(engine: Engine) -> None:
                 connection.execute(text(f"ALTER TABLE {table} ADD COLUMN prompt_locked_at DATETIME NULL"))
 
 
+def ensure_project_asset_url_column(engine: Engine) -> None:
+    """Keep favorite media URLs that are longer than the original VARCHAR(512)."""
+    inspector = inspect(engine)
+    if "project_assets" not in inspector.get_table_names():
+        return
+    if engine.dialect.name == "sqlite":
+        return
+    columns = {column["name"]: column for column in inspector.get_columns("project_assets")}
+    url_column = columns.get("url")
+    if not url_column:
+        return
+    if "text" in str(url_column["type"]).lower():
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE project_assets MODIFY url TEXT NULL"))
+
+
 def migrate_schema(engine: Engine) -> None:
     ensure_prompt_lock_columns(engine)
+    ensure_project_asset_url_column(engine)
     inspector = inspect(engine)
     dialect = engine.dialect.name
     if "billing_project_quotas" in inspector.get_table_names():

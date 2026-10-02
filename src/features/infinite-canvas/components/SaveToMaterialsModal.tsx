@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom';
 import { persistMedia } from '@/api/aigc/imageService';
 import { projectAssetsApi } from '@/api/projectAssetsApi';
 import { projectApi } from '@/api/projectApi';
-import { buildCollectMetadata } from '@/lib/favorites';
+import type { ProjectAssetDTO } from '@/api/types';
+import { buildCollectMetadata, favoriteSourceId, notifyFavoritesChanged } from '@/lib/favorites';
 import { mediaUrl } from '@/lib/mediaUrl';
+import { resolveProjectId } from '@/lib/session';
 import { useProjectStore } from '@/store/projectStore';
 
 type MaterialCategory = 'character' | 'scene' | 'object';
@@ -23,6 +25,7 @@ interface SaveToMaterialsModalProps {
   confirmLabel?: string;
   asFavorite?: boolean;
   prompt?: string;
+  onSaved?: (asset: ProjectAssetDTO) => void;
 }
 
 const categoryOptions = [
@@ -49,9 +52,12 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   confirmLabel,
   asFavorite = false,
   prompt,
+  onSaved,
 }) => {
   const { projectId, workflowId, id } = useParams();
-  const numericProjectId = Number(projectId || id);
+  const routeProjectId = Number(projectId || id);
+  const numericProjectId =
+    Number.isFinite(routeProjectId) && routeProjectId > 0 ? routeProjectId : resolveProjectId();
   const loadProjectAssets = useProjectStore((state) => state.loadProjectAssets);
   const [mode, setMode] = useState<SaveMode>('create');
   const [name, setName] = useState(initialName || '');
@@ -70,7 +76,7 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
   }, [open, initialCategory, initialName, mediaType]);
 
   useEffect(() => {
-    if (!open || Number.isNaN(numericProjectId) || numericProjectId <= 0) return;
+    if (!open || !numericProjectId) return;
     const loader =
       category === 'character'
         ? projectApi.characters.getAll(numericProjectId)
@@ -88,17 +94,17 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
     });
   }, [category, numericProjectId, open]);
 
-  const modalTitle = useMemo(
-    () => (mode === 'create' ? '保存为新素材' : '添加到已有素材'),
-    [mode]
-  );
+  const modalTitle = useMemo(() => {
+    if (asFavorite) return mode === 'create' ? '收藏为新素材' : '收藏到已有素材';
+    return mode === 'create' ? '保存为新素材' : '添加到已有素材';
+  }, [asFavorite, mode]);
 
   const handleSubmit = async () => {
     if (!imageUrl) {
       message.warning(mediaType === 'video' ? '当前视频没有可收藏的内容' : '当前图片节点没有可保存的图片');
       return;
     }
-    if (Number.isNaN(numericProjectId) || numericProjectId <= 0) {
+    if (!numericProjectId) {
       message.error('当前项目信息缺失');
       return;
     }
@@ -120,74 +126,100 @@ const SaveToMaterialsModal: React.FC<SaveToMaterialsModalProps> = ({
         persistedUrl = imageUrl;
       }
       const creationMode = workflowId ? 'workflow' : 'quick';
-      if (mode === 'create') {
-        if (category === 'character') {
-          const created = await projectApi.characters.create(numericProjectId, {
-            name: name.trim(),
-            gender: 'unknown',
-            ageGroup: 'young',
-            role: 'support',
-            genMethod: 'ai',
-            model: 'wan2.6-t2i',
-            description: '',
-            referenceImage: persistedUrl,
-            creationMode,
-            sourceWorkflowId: workflowId,
-            sourceNodeId: nodeId,
-          });
-          if (!created.success) throw new Error(created.message || '保存角色失败');
-        } else if (category === 'scene') {
-          const created = await projectApi.scenes.create(numericProjectId, {
-            name: name.trim(),
-            genMethod: 'ai',
-            model: 'wan2.6-t2i',
-            description: '',
-            distance: 20,
-            status: 'draft',
-            referenceImage: persistedUrl,
-            creationMode,
-            sourceWorkflowId: workflowId,
-            sourceNodeId: nodeId,
-          });
-          if (!created.success) throw new Error(created.message || '保存场景失败');
-        } else {
-          const created = await projectApi.objects.create(numericProjectId, {
-            name: name.trim(),
-            genMethod: 'upload',
-            prompt: '',
-            referenceImage: persistedUrl,
-            creationMode,
-            sourceWorkflowId: workflowId,
-            sourceNodeId: nodeId,
-          });
-          if (!created.success) throw new Error(created.message || '保存物品失败');
+      const writeCatalog = async () => {
+        if (mode === 'create') {
+          if (category === 'character') {
+            const created = await projectApi.characters.create(numericProjectId, {
+              name: name.trim(),
+              gender: 'unknown',
+              ageGroup: 'young',
+              role: 'support',
+              genMethod: 'ai',
+              model: 'wan2.6-t2i',
+              description: '',
+              referenceImage: persistedUrl,
+              creationMode,
+              sourceWorkflowId: workflowId,
+              sourceNodeId: nodeId,
+            });
+            if (!created.success) throw new Error(created.message || '保存角色失败');
+          } else if (category === 'scene') {
+            const created = await projectApi.scenes.create(numericProjectId, {
+              name: name.trim(),
+              genMethod: 'ai',
+              model: 'wan2.6-t2i',
+              description: '',
+              distance: 20,
+              status: 'draft',
+              referenceImage: persistedUrl,
+              creationMode,
+              sourceWorkflowId: workflowId,
+              sourceNodeId: nodeId,
+            });
+            if (!created.success) throw new Error(created.message || '保存场景失败');
+          } else {
+            const created = await projectApi.objects.create(numericProjectId, {
+              name: name.trim(),
+              genMethod: 'upload',
+              prompt: '',
+              referenceImage: persistedUrl,
+              creationMode,
+              sourceWorkflowId: workflowId,
+              sourceNodeId: nodeId,
+            });
+            if (!created.success) throw new Error(created.message || '保存物品失败');
+          }
+        } else if (targetId) {
+          if (category === 'character') {
+            await projectApi.characters.update(numericProjectId, targetId, { image: persistedUrl });
+          } else if (category === 'scene') {
+            await projectApi.scenes.update(numericProjectId, targetId, { image: persistedUrl });
+          } else {
+            await projectApi.objects.update(numericProjectId, targetId, { image: persistedUrl });
+          }
         }
-      } else if (targetId) {
-        if (category === 'character') {
-          await projectApi.characters.update(numericProjectId, targetId, { image: persistedUrl });
-        } else if (category === 'scene') {
-          await projectApi.scenes.update(numericProjectId, targetId, { image: persistedUrl });
-        } else {
-          await projectApi.objects.update(numericProjectId, targetId, { image: persistedUrl });
+      };
+
+      const saveProjectAsset = () =>
+        projectAssetsApi.create(numericProjectId, {
+          name: (name.trim() || initialName || '画布素材').slice(0, 128),
+          sourceType: 'workflow',
+          sourceId: (asFavorite
+            ? favoriteSourceId(nodeId, persistedUrl)
+            : workflowId || nodeId || `node-${Date.now()}`
+          ).slice(0, 64),
+          url: persistedUrl,
+          prompt: prompt?.trim() || undefined,
+          metadata: buildCollectMetadata(
+            { category, nodeId, mediaType, sourceUrl: imageUrl },
+            asFavorite,
+          ),
+        });
+
+      if (asFavorite) {
+        const asset = await saveProjectAsset();
+        let catalogError: unknown = null;
+        try {
+          await writeCatalog();
+        } catch (error) {
+          catalogError = error;
         }
+        await loadProjectAssets(numericProjectId, true);
+        notifyFavoritesChanged();
+        onSaved?.(asset);
+        if (catalogError) {
+          message.warning('素材库写入失败，收藏已保存到我的收藏');
+        } else {
+          message.success('已收藏到项目资产库');
+        }
+        onClose();
+        return;
       }
 
-      await projectAssetsApi.create(numericProjectId, {
-        name: name.trim() || initialName || '画布素材',
-        sourceType: 'workflow',
-        sourceId: workflowId || nodeId || `node-${Date.now()}`,
-        url: persistedUrl,
-        prompt: prompt?.trim() || undefined,
-        metadata: buildCollectMetadata({ category, nodeId, mediaType }, asFavorite),
-      });
+      await writeCatalog();
+      await saveProjectAsset();
       await loadProjectAssets(numericProjectId, true);
-      message.success(
-        mode === 'create'
-          ? confirmLabel
-            ? '已收藏到项目资产库'
-            : '已保存到项目素材库'
-          : '已更新已有素材',
-      );
+      message.success(mode === 'create' ? '已保存到项目素材库' : '已更新已有素材');
       onClose();
     } catch (error) {
       message.error(error instanceof Error ? error.message : '保存素材失败');

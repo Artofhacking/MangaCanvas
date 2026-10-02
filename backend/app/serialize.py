@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from . import models
+from .favorites import coerce_metadata
 from .shaping import shaping_payload
 from .util import iso, rewrite_media_tree, rewrite_stored_media_url
 
@@ -342,7 +343,7 @@ def asset(row: models.ProjectAsset) -> dict:
         "sourceId": row.source_id,
         "prompt": row.prompt,
         "url": rewrite_stored_media_url(row.url),
-        "metadata": row.extra_metadata,
+        "metadata": coerce_metadata(row.extra_metadata),
         "createdBy": row.created_by,
         "createdAt": iso(row.created_at),
         "updatedAt": iso(row.updated_at),

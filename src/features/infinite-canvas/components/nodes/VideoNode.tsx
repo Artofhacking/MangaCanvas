@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Position, NodeProps } from 'reactflow';
 import { message } from 'antd';
-import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
+import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Star, Trash2, Video, Volume2, VolumeX } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
 import SaveToMaterialsModal from '../SaveToMaterialsModal';
@@ -35,6 +35,7 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [extracting, setExtracting] = useState(false);
   const [muted, setMuted] = useState(true);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
+  const [saveAsFavorite, setSaveAsFavorite] = useState(false);
   const frame = useMediaCardFrame(id, data);
   useEnsureVideoPoster(id, data);
   const stack = readVideoStack(data);
@@ -173,6 +174,17 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
       message.info('当前节点还没有视频');
       return;
     }
+    setSaveAsFavorite(false);
+    setShowSaveToMaterialsModal(true);
+  }, [frontUrl]);
+
+  const handleFavorite = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!frontUrl) {
+      message.info('当前节点还没有视频');
+      return;
+    }
+    setSaveAsFavorite(true);
     setShowSaveToMaterialsModal(true);
   }, [frontUrl]);
 
@@ -224,6 +236,13 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             onClick: handleExtractLastFrame,
             hidden: !hasMedia,
             disabled: extracting,
+          },
+          {
+            key: 'favorite',
+            label: '收藏',
+            icon: <Star className="h-4 w-4" />,
+            onClick: handleFavorite,
+            hidden: !hasMedia,
           },
           {
             key: 'save',
@@ -295,6 +314,8 @@ const VideoNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         initialCategory={typeof data?.sourceType === 'string' ? data.sourceType : undefined}
         nodeId={id}
         prompt={typeof data?.prompt === 'string' ? data.prompt : undefined}
+        asFavorite={saveAsFavorite}
+        confirmLabel={saveAsFavorite ? '收藏到资产库' : undefined}
       />
     </div>
   );
