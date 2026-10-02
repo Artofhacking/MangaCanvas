@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Position, NodeProps } from 'reactflow';
 import { Upload, Spin, message } from 'antd';
-import { DeleteOutlined, DownloadOutlined, CopyOutlined, PictureOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined, StarOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, CopyOutlined, PictureOutlined, EyeOutlined, FolderAddOutlined, AppstoreAddOutlined } from '@ant-design/icons';
 import { Copy, Download, Eye, FolderPlus, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import PreviewModal from '../PreviewModal';
@@ -38,7 +38,6 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
   const [isDropActive, setIsDropActive] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [showSaveToMaterialsModal, setShowSaveToMaterialsModal] = useState(false);
-  const [saveAsFavorite, setSaveAsFavorite] = useState(false);
   const [saveCategory, setSaveCategory] = useState<string | undefined>(undefined);
   const contextMenuRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -323,25 +322,12 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
 
   const handleSaveToMaterials = useCallback(() => {
     closeContextMenu();
-    setSaveAsFavorite(false);
     setSaveCategory(undefined);
     setShowSaveToMaterialsModal(true);
   }, [closeContextMenu]);
 
-  const handleFavorite = useCallback(() => {
-    closeContextMenu();
-    if (!data?.url) {
-      message.info('当前节点还没有图片');
-      return;
-    }
-    setSaveAsFavorite(true);
-    setSaveCategory(undefined);
-    setShowSaveToMaterialsModal(true);
-  }, [closeContextMenu, data?.url]);
-
   const handleSaveAsCharacter = useCallback(() => {
     closeContextMenu();
-    setSaveAsFavorite(false);
     setSaveCategory('character');
     setShowSaveToMaterialsModal(true);
   }, [closeContextMenu]);
@@ -511,8 +497,6 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
         initialCategory={saveCategory ?? (typeof data?.sourceType === 'string' ? data.sourceType : undefined)}
         nodeId={id}
         prompt={typeof data?.prompt === 'string' ? data.prompt : undefined}
-        asFavorite={saveAsFavorite}
-        confirmLabel={saveAsFavorite ? '收藏到资产库' : undefined}
       />
 
       {contextMenu && typeof document !== 'undefined' && createPortal(
@@ -537,14 +521,6 @@ const ImageNode: React.FC<NodeProps<CustomNode['data']>> = ({ id, data, selected
             >
               <EyeOutlined style={{ fontSize: 17 }} />
               <span>预览图片</span>
-            </button>
-
-            <button
-              onClick={handleFavorite}
-              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] transition-colors hover:bg-black/5"
-            >
-              <StarOutlined style={{ fontSize: 17 }} />
-              <span>收藏</span>
             </button>
 
             <button
