@@ -35,6 +35,8 @@ const waiters: Array<() => void> = []
 const confirmedIds = new Set<string>()
 /** Ids we already removed, or that 404'd, so the next non-empty save creates a row. */
 const droppedIds = new Set<string>()
+/** Delete (and any caller that must not resurrect a row) wins over an in-flight autosave. */
+const suppressedIds = new Set<string>()
 /** Draft or deleted id -> the server id that now owns this editing session. */
 const idAlias = new Map<string, string>()
 let adoptedWorkflowId = ''
@@ -53,6 +55,7 @@ export function resetCanvasAutosaveForTests() {
   blockedKey = ''
   confirmedIds.clear()
   droppedIds.clear()
+  suppressedIds.clear()
   idAlias.clear()
   adoptedWorkflowId = ''
   onWorkflowAdopted = null
@@ -69,6 +72,29 @@ export function noteWorkflowLoaded(workflowId: string) {
 
 export function isAdoptedWorkflow(workflowId: string) {
   return adoptedWorkflowId !== '' && adoptedWorkflowId === workflowId
+}
+
+function autosaveSuppressed(requestedId: string, workflowId: string) {
+  return suppressedIds.has(requestedId) || suppressedIds.has(workflowId)
+}
+
+/** Drop a pending save and ignore later writes for this id until release. */
+export function suppressCanvasAutosave(workflowId: string) {
+  if (!workflowId) return
+  suppressedIds.add(workflowId)
+  const pendingId = pending.workflowId
+  if (!pendingId) return
+  if (pendingId !== workflowId && resolveWorkflowId(pendingId) !== workflowId) return
+  if (timer) clearTimeout(timer)
+  timer = null
+  pending = {}
+  const resolvers = debounceResolvers.splice(0)
+  resolvers.forEach((resolve) => resolve())
+}
+
+export function releaseCanvasAutosave(workflowId: string) {
+  if (!workflowId) return
+  suppressedIds.delete(workflowId)
 }
 
 export function setPersistedWorkflowListener(listener: ((workflowId: string) => void) | null) {
@@ -155,6 +181,10 @@ async function createWorkflowFromCanvas(projectId: number, workflowId: string, p
   })
   if (!response.success || !response.data?.id) return
   const created = response.data
+  if (suppressedIds.has(workflowId) || suppressedIds.has(created.id)) {
+    await workflowsApi.delete(projectId, created.id)
+    return
+  }
   const nextId = created.id
   useCanvasDocumentsStore.getState().reassignWorkflowDocument(workflowId, {
     id: nextId,
@@ -186,6 +216,7 @@ async function saveOnce(): Promise<void> {
   const requestedId = options.workflowId || canvas.currentProjectId
   if (!requestedId) return
   const workflowId = resolveWorkflowId(requestedId)
+  if (autosaveSuppressed(requestedId, workflowId)) return
   const liveId = canvas.currentProjectId ? resolveWorkflowId(canvas.currentProjectId) : ''
   // A newer route can already be on screen. Never write that graph under the previous id,
   // and never write the previous graph under the id we have not loaded yet.
@@ -251,6 +282,8 @@ async function saveOnce(): Promise<void> {
     viewport: persisted.viewport,
   })
 
+  if (autosaveSuppressed(requestedId, workflowId)) return
+
   const needsCreate = isDraftWorkflowId(workflowId) || droppedIds.has(workflowId)
   if (needsCreate) {
     await createWorkflowFromCanvas(numericProjectId, workflowId, persisted)
@@ -264,6 +297,12 @@ async function saveOnce(): Promise<void> {
       viewport: persisted.viewport,
     },
   })
+  if (autosaveSuppressed(requestedId, workflowId)) {
+    if (response.success && response.data) {
+      await workflowsApi.delete(numericProjectId, workflowId)
+    }
+    return
+  }
   if (!response.success) {
     if (isMissingWorkflow(response.message)) {
       droppedIds.add(workflowId)

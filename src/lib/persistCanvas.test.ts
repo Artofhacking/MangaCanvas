@@ -24,7 +24,9 @@ import {
   CANVAS_AUTOSAVE_DEBOUNCE_MS,
   noteWorkflowLoaded,
   persistOpenCanvas,
+  releaseCanvasAutosave,
   resetCanvasAutosaveForTests,
+  suppressCanvasAutosave,
 } from './persistCanvas'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgo='
@@ -265,5 +267,64 @@ describe('persistOpenCanvas', () => {
     expect(workflowsApi.create).toHaveBeenCalledTimes(1)
     expect(workflowsApi.update).toHaveBeenCalledTimes(1)
     expect(vi.mocked(workflowsApi.update).mock.calls[0][1]).toBe('workflow_server')
+  })
+
+  it('sends the episode binding when a blank draft is saved for the first time', async () => {
+    vi.mocked(workflowsApi.create).mockResolvedValue({
+      success: true,
+      data: {
+        id: 'workflow_server',
+        projectId: '8',
+        name: '第一集 工作流',
+        sourceType: 'episode',
+        sourceAssetId: 9,
+        status: 'draft',
+        modified: '2026-09-01T00:00:00.000Z',
+      },
+    })
+    useCanvasDocumentsStore.setState({
+      projects: [
+        {
+          id: 'draft_ep',
+          name: '第一集 工作流',
+          thumbnail: '',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          projectId: '8',
+          sourceType: 'episode',
+          sourceAssetId: 9,
+          nodeCount: 0,
+          edgeCount: 0,
+          canvasData: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+        },
+      ],
+      currentProjectId: null,
+    })
+    useCanvasStore.setState({ currentProjectId: 'draft_ep', nodes: [textNode('第一笔')] })
+
+    await persistOpenCanvas({ projectId: 8, workflowId: 'draft_ep', immediate: true })
+
+    expect(vi.mocked(workflowsApi.create).mock.calls[0][1]).toMatchObject({
+      name: '第一集 工作流',
+      sourceType: 'episode',
+      sourceAssetId: 9,
+    })
+    expect(workflowsApi.update).not.toHaveBeenCalled()
+  })
+
+  it('does not write a workflow back after autosave is suppressed', async () => {
+    noteWorkflowLoaded('workflow_1')
+    useCanvasStore.setState({ nodes: [textNode('将要删除')] })
+    suppressCanvasAutosave('workflow_1')
+
+    await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
+
+    expect(workflowsApi.update).not.toHaveBeenCalled()
+    expect(workflowsApi.create).not.toHaveBeenCalled()
+    expect(workflowsApi.delete).not.toHaveBeenCalled()
+
+    releaseCanvasAutosave('workflow_1')
+    await persistOpenCanvas({ projectId: 8, workflowId: 'workflow_1', immediate: true })
+    expect(workflowsApi.update).toHaveBeenCalledTimes(1)
   })
 })

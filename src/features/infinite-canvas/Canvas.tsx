@@ -33,7 +33,6 @@ import {
   LockOutlined,
   UnlockOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   SettingOutlined,
   DragOutlined,
   AlignLeftOutlined,
@@ -58,7 +57,8 @@ import { workflowsApi } from '@/features/project/api/workflows';
 import { projectApi } from '@/api/projectApi';
 import { dominantAssetNode } from '@/lib/assetSeed';
 import { buildSeedCanvas, isDraftWorkflowId, openOrCreateWorkflow, shouldRebuildEpisodeCanvas, toWorkflowSeedAsset, type WorkflowSeedAsset } from '@/lib/workflows';
-import { canvasSidebarWorkflows, workflowNodeCountLabel } from './workflowSidebar';
+import { canvasSidebarWorkflows } from './workflowSidebar';
+import CanvasProjectMenu from './components/CanvasProjectMenu';
 import { rewriteCanvasMedia } from '@/lib/mediaUrl';
 import { isAdoptedWorkflow, noteWorkflowLoaded, persistOpenCanvas, setPersistedWorkflowListener } from '@/lib/persistCanvas';
 import { stopLocalGenerationJobs } from './utils/generationJobs';
@@ -392,6 +392,17 @@ const CanvasInner: React.FC = () => {
     },
     [cleanupCanvasTransientUi, location.state, navigate, persistCurrentCanvas, projectId]
   );
+
+  const handleOpenEpisodesTab = useCallback(() => {
+    if (!projectId) return;
+    cleanupCanvasTransientUi();
+    navigate(projectAssetsPath(projectId, 'episodes'));
+  }, [cleanupCanvasTransientUi, navigate, projectId]);
+
+  const handleLeaveCanvas = useCallback(() => {
+    cleanupCanvasTransientUi();
+    navigate(projectId ? projectAssetsPath(projectId, 'workflows') : '/dashboard');
+  }, [cleanupCanvasTransientUi, navigate, projectId]);
 
   // 直接从 nodes 中计算选中的节点
   const selectedNodes = useMemo(() => {
@@ -1264,93 +1275,25 @@ const CanvasInner: React.FC = () => {
               </div>
               <DownOutlined style={{ fontSize: 12, color: 'hsl(var(--secondary))' }} />
             </button>
-            {showProjectMenu && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setShowProjectMenu(false)}
-                />
-                <div className="absolute left-0 top-full mt-2 w-[280px] rounded-2xl border border-[hsl(var(--outline-variant))]/50 bg-[hsl(var(--surface-container-lowest))]/95 p-1.5 shadow-xl shadow-black/5 backdrop-blur-md z-50">
-                  <div className="px-3 pt-2 pb-1 text-[13px] font-bold text-[hsl(var(--secondary))]">
-                    片段
-                  </div>
-                  {!episodesLoaded ? (
-                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载片段中...</div>
-                  ) : episodes.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有片段</div>
-                  ) : (
-                    episodes.map((item) => {
-                      const active = String(item.id) === String(episodeId) || currentWorkflow?.sourceAssetId === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSwitchEpisode(item.id)}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left text-sm transition-colors ${
-                            active
-                              ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
-                              : 'hover:bg-[hsl(var(--surface-container-low))]'
-                          }`}
-                        >
-                          <span className="truncate font-medium">{item.name}</span>
-                          <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">{item.code}</span>
-                        </button>
-                      );
-                    })
-                  )}
-
-                  <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
-                  <div className="px-3 pt-1 pb-1 text-[13px] font-bold text-[hsl(var(--secondary))]">
-                    工作流
-                  </div>
-                  {!workflowsLoaded ? (
-                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">加载工作流中...</div>
-                  ) : sidebarWorkflows.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-[hsl(var(--secondary))]">当前项目还没有工作流</div>
-                  ) : (
-                    sidebarWorkflows.map((item) => {
-                      const active = item.id === canvasDocumentId;
-                      const nodeCountLabel = workflowNodeCountLabel(item.nodeCount);
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSwitchWorkflow(item.id)}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-left text-sm transition-colors ${
-                            active
-                              ? 'bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]'
-                              : 'hover:bg-[hsl(var(--surface-container-low))]'
-                          }`}
-                        >
-                          <span className="truncate font-medium">{item.name}</span>
-                          {nodeCountLabel ? (
-                            <span className="shrink-0 text-[11px] text-[hsl(var(--secondary))]">
-                              {nodeCountLabel}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })
-                  )}
-
-                  <div className="mx-2 my-1.5 h-px bg-[hsl(var(--outline-variant))]/40" />
-                  <button
-                    onClick={handleExportWorkflow}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[hsl(var(--surface-container-low))] transition-colors text-left text-sm"
-                  >
-                    <DownloadOutlined style={{ fontSize: 14 }} />
-                    <span>导出工作流</span>
-                  </button>
-                  <button
-                    onClick={handleExportDatabase}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[hsl(var(--surface-container-low))] transition-colors text-left text-sm"
-                  >
-                    <DownloadOutlined style={{ fontSize: 14 }} />
-                    <span>导出数据库</span>
-                  </button>
-                </div>
-              </>
-            )}
+            <CanvasProjectMenu
+              open={showProjectMenu}
+              projectId={projectId || ''}
+              episodeId={episodeId}
+              currentWorkflowId={canvasDocumentId}
+              currentWorkflow={currentWorkflow}
+              episodes={episodes}
+              episodesLoaded={episodesLoaded}
+              workflows={sidebarWorkflows}
+              workflowsLoaded={workflowsLoaded}
+              onOpenChange={setShowProjectMenu}
+              onEpisodesChange={setEpisodes}
+              onSwitchEpisode={(id) => { void handleSwitchEpisode(id); }}
+              onSwitchWorkflow={handleSwitchWorkflow}
+              onOpenEpisodesTab={handleOpenEpisodesTab}
+              onLeaveCanvas={handleLeaveCanvas}
+              onExportWorkflow={handleExportWorkflow}
+              onExportDatabase={() => { void handleExportDatabase(); }}
+            />
           </div>
         </div>
         
